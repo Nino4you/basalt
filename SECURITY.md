@@ -2,6 +2,15 @@
 
 Basalt ist eine Entwicklungsversion. Zum Testen zuerst Kopien von Vaults verwenden.
 
+## Sicherheitslücken melden
+
+Bitte melde Sicherheitslücken **nicht** als öffentliches Issue, sondern vertraulich über
+[„Report a vulnerability“](https://github.com/Nino4you/basalt/security/advisories/new) im
+Reiter „Security“ dieses Repositorys. Beschreibe, welche Version betroffen ist und wie sich das
+Problem nachvollziehen lässt. Du bekommst eine Rückmeldung, sobald die Meldung geprüft ist.
+
+## Grenzen
+
 - Der Rust-Kern verwendet `cap-std` statt zusammengesetzter absoluter Dateipfade.
   Nur die explizite Vault-Auswahl öffnet einen neuen Dateisystem-Root.
 - Vorhandene Notizen werden nicht beim Anlegen überschrieben. Speichern prüft die
