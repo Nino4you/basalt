@@ -1,13 +1,13 @@
-# Drittanbieter-Hinweise
+# Third-party notices
 
-Basalt selbst steht unter der MPL-2.0 (siehe `LICENSE`). Die ausgelieferten Builds enthalten
-die folgenden Fremdkomponenten unter ihren jeweiligen Lizenzen. Die Rust-Liste umfasst alle
-aufgelösten Abhängigkeiten aller Zielplattformen. Erzeugt mit
+Basalt itself is licensed under the MPL-2.0 (see `LICENSE`). The distributed builds include
+the following third-party components under their respective licenses. The Rust list covers
+all resolved dependencies for every target platform. Generated with
 `node tools/third_party_notices.mjs`.
 
-## JavaScript (WebView-Oberfläche)
+## JavaScript (WebView interface)
 
-| Paket | Version | Lizenz |
+| Package | Version | License |
 | --- | --- | --- |
 | @antfu/install-pkg | 2.1.0 | MIT |
 | @braintree/sanitize-url | 7.1.2 | MIT |
@@ -139,7 +139,7 @@ aufgelösten Abhängigkeiten aller Zielplattformen. Erzeugt mit
 | internmap | 1.0.1 | ISC |
 | internmap | 2.0.3 | ISC |
 | katex | 0.19.1 | MIT |
-| khroma | 2.1.0 | siehe Lizenztext |
+| khroma | 2.1.0 | see license text |
 | layout-base | 2.0.1 | MIT |
 | layout-base | 1.0.2 | MIT |
 | lodash-es | 4.18.1 | MIT |
@@ -163,9 +163,9 @@ aufgelösten Abhängigkeiten aller Zielplattformen. Erzeugt mit
 | w3c-keyname | 2.2.8 | MIT |
 | yaml | 2.9.1 | ISC |
 
-## Rust (Kern und native Shell)
+## Rust (core and native shell)
 
-| Paket | Version | Lizenz |
+| Package | Version | License |
 | --- | --- | --- |
 | adler2 | 2.0.1 | 0BSD OR MIT OR Apache-2.0 |
 | aho-corasick | 1.1.5 | Unlicense OR MIT |
@@ -629,7 +629,7 @@ aufgelösten Abhängigkeiten aller Zielplattformen. Erzeugt mit
 | zlib-rs | 0.6.8 | Zlib |
 | zmij | 1.0.23 | MIT |
 
-## Lizenztexte
+## License texts
 
 **@antfu/install-pkg 2.1.0**
 

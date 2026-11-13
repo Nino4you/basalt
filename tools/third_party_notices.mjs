@@ -30,7 +30,7 @@ const js = dedupe(
     .map(([key, pkg]) => ({
       name: key.replace(/.*node_modules\//, ""),
       version: pkg.version,
-      license: pkg.license ?? "siehe Lizenztext",
+      license: pkg.license ?? "see license text",
       texts: licenseTexts(key),
     })),
 );
@@ -48,24 +48,24 @@ for (const manifest of ["Cargo.toml", "src-tauri/Cargo.toml"]) {
       rustAll.push({
         name: pkg.name,
         version: pkg.version,
-        license: pkg.license ?? "siehe Lizenztext",
+        license: pkg.license ?? "see license text",
         texts: licenseTexts(path.dirname(pkg.manifest_path)),
       });
 }
 const rust = dedupe(rustAll);
 
 const out = [
-  "# Drittanbieter-Hinweise\n\n",
-  "Basalt selbst steht unter der MPL-2.0 (siehe `LICENSE`). Die ausgelieferten Builds enthalten\n",
-  "die folgenden Fremdkomponenten unter ihren jeweiligen Lizenzen. Die Rust-Liste umfasst alle\n",
-  "aufgelösten Abhängigkeiten aller Zielplattformen. Erzeugt mit\n",
+  "# Third-party notices\n\n",
+  "Basalt itself is licensed under the MPL-2.0 (see `LICENSE`). The distributed builds include\n",
+  "the following third-party components under their respective licenses. The Rust list covers\n",
+  "all resolved dependencies for every target platform. Generated with\n",
   "`node tools/third_party_notices.mjs`.\n",
 ];
 for (const [title, list] of [
-  ["JavaScript (WebView-Oberfläche)", js],
-  ["Rust (Kern und native Shell)", rust],
+  ["JavaScript (WebView interface)", js],
+  ["Rust (core and native shell)", rust],
 ]) {
-  out.push(`\n## ${title}\n\n| Paket | Version | Lizenz |\n| --- | --- | --- |\n`);
+  out.push(`\n## ${title}\n\n| Package | Version | License |\n| --- | --- | --- |\n`);
   for (const p of list) out.push(`| ${p.name} | ${p.version} | ${p.license.replaceAll("|", "\\|")} |\n`);
 }
 
@@ -75,9 +75,9 @@ for (const p of [...js, ...rust])
     if (!texts.has(text)) texts.set(text, []);
     texts.get(text).push(`${p.name} ${p.version}`);
   }
-out.push("\n## Lizenztexte\n");
+out.push("\n## License texts\n");
 for (const [text, users] of texts)
   out.push(`\n**${users.join(", ")}**\n\n${FENCE}text\n${text.replaceAll(FENCE, "'''")}\n${FENCE}\n`);
 
 fs.writeFileSync("THIRD_PARTY_NOTICES.md", out.join(""));
-console.log(`${js.length} JavaScript- und ${rust.length} Rust-Pakete, ${texts.size} Lizenztexte`);
+console.log(`${js.length} JavaScript and ${rust.length} Rust packages, ${texts.size} license texts`);

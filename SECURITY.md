@@ -1,112 +1,106 @@
-# Daten- und Sicherheitsgrenzen
+# Data and security boundaries
 
-Basalt ist eine Entwicklungsversion. Zum Testen zuerst Kopien von Vaults verwenden.
+Basalt is a development preview. Try it on copies of your vaults first.
 
-## Sicherheitslücken melden
+## Reporting a vulnerability
 
-Bitte melde Sicherheitslücken **nicht** als öffentliches Issue, sondern vertraulich über
-[„Report a vulnerability“](https://github.com/Nino4you/basalt/security/advisories/new) im
-Reiter „Security“ dieses Repositorys. Beschreibe, welche Version betroffen ist und wie sich das
-Problem nachvollziehen lässt. Du bekommst eine Rückmeldung, sobald die Meldung geprüft ist.
+Please do **not** report security issues as public issues. Report them privately through
+["Report a vulnerability"](https://github.com/Nino4you/basalt/security/advisories/new) in this
+repository's Security tab. Describe the affected version and how to reproduce the problem. You
+will get a response once the report has been reviewed.
 
-## Grenzen
+## Boundaries
 
-- Der Rust-Kern verwendet `cap-std` statt zusammengesetzter absoluter Dateipfade.
-  Nur die explizite Vault-Auswahl öffnet einen neuen Dateisystem-Root.
-- Vorhandene Notizen werden nicht beim Anlegen überschrieben. Speichern prüft die
-  geladene Ausgangsversion und legt vorher eine Kopie unter `.basalt/history/` an.
-- Linux schreibt zunächst eine separate Datei und ersetzt die Zieldatei durch Rename.
-  Unkoordinierte externe Schreiber können trotzdem zwischen Prüfung und Rename schreiben:
-  Es gibt keinen dateisystemübergreifend garantierten Compare-and-Swap.
-- Android-SAF-Provider garantieren keinen atomaren Austausch. Dort wird vor dem Schreiben
-  gesichert und erneut auf Konflikte geprüft. Unterbrochene Provider-Schreibvorgänge können
-  die aktuelle Datei beschädigen; die vorherige Sicherung muss dann wiederhergestellt werden.
-- Lesezugriffe unter Android merken sich bis zu 10 Sekunden lang, welches SAF-Dokument zu
-  welchem Pfad gehört, damit nicht jeder Lesezugriff den ganzen Ordner neu auflistet.
-  Größe, Änderungszeit und Inhalt werden trotzdem jedes Mal frisch abgefragt, und der Name
-  wird gegengeprüft. Bei Providern mit undurchsichtigen Dokument-IDs kann eine extern in
-  einen anderen Ordner verschobene Datei in diesem Zeitfenster noch unter dem alten Pfad
-  gelesen werden. Schreiben, Löschen und deren Konfliktprüfungen nutzen den Cache nie.
-- Neue Dateien können bei Schreibfehlern unvollständig sein. Fehler werden weitergegeben.
-- Entwürfe und Browser-Demo liegen im lokalen WebView-/Browser-Speicher, unverschlüsselt.
-  Die ursprüngliche Versionsbasis bleibt im Entwurf, damit Wiederherstellung externe Änderungen
-  nicht still überschreibt. Ein volles/gesperrtes Speichermedium bleibt ein Fehlerfall.
-- Markdown wird vor der Anzeige mit DOMPurify bereinigt. Native CSP blockiert Remote-Ressourcen,
-  Scripts, Frames und Objekt-Einbettungen; externe Links werden nicht automatisch geöffnet.
-  Die Vorschau entfernt zusätzlich Remote-Bildquellen, auch in der Browser-Demo.
-- Plugin-Loader: Bundles werden nur nach ausdrücklicher Aktivierung aus
-  `Basalt/Plugins/<id>` ausgeführt. Es gibt **keine Sandbox**: Plugin-Code hat dieselben
-  Frontend-Rechte wie die App, einschließlich DOM, WebView-Speicher, Netzwerk und der
-  freigegebenen Tauri-Befehle. Nur vertrauenswürdige Bundles aktivieren.
-- `'unsafe-eval'` in der CSP ist ausschließlich für den CommonJS-Loader nötig. `connect-src`
-  erlaubt HTTPS/WSS, weil Sync-Plugins und Plugin-Ressourcen Netzwerkzugriff benötigen.
-  `data:` erlaubt das Lesen bereits eingebetteter Font-Bytes beim Excalidraw-SVG-Export,
-  keine zusätzlichen Netzwerkziele oder Skriptquellen. Externe Schriften bleiben gesperrt.
-  `worker-src 'self' blob:` erlaubt Workern aus Blob-URLs, die Plugins selbst erzeugen
-  (etwa für OCR). `script-src blob:` erlaubt Skripte aus Blob-URLs, die Plugin-Code
-  selbst aus eigenen Bytes erzeugt (etwa tesseract.js und dessen Wasm-Kern).
-  Das erweitert keine Rechte: Eine Blob-URL kann nur bereits laufender Seitencode anlegen,
-  und dieser darf wegen `'unsafe-eval'` ohnehin beliebigen Code ausführen. Eingeschleustes
-  Markup kann keine Blob-URLs erzeugen; Remote-Skripte bleiben gesperrt. Es gibt weiterhin
-  keinen generischen `window.require('fs')`-Shim.
-- `requestUrl` läuft in der nativen App wie in Obsidian außerhalb der WebView über den
-  Rust-Befehl `plugin_request_url` und unterliegt daher keiner CORS-Prüfung. Erlaubt sind
-  nur `http`/`https`, Anfrage- und Antwortinhalt sind auf 64 MiB begrenzt, TLS-Zertifikate
-  werden gegen die mitgelieferten Webpki-Wurzeln geprüft. Plugins hatten bereits
-  Netzwerkzugriff; es entfällt nur die Cross-Origin-Beschränkung des Browsers.
-- Plugin-Pfade unter `.obsidian/plugins/<id>` werden auf `Basalt/Plugins/<id>` abgebildet.
-  Wie `.obsidian` in Obsidian ist `Basalt/Plugins` für Plugins kein Vault-Inhalt: Es fehlt in
-  `getFiles()` und Vault-Ereignissen und ist nur über den Adapter und den Loader erreichbar.
-  So laden Sync-Plugins installierten Plugin-Code nicht als Anhang hoch.
-- `app.loadLocalStorage`/`saveLocalStorage` sind pro Vault getrennt, damit Anmeldungen
-  (etwa Sync-Token) nicht in einen anderen Vault übernommen werden. `loadData`/`saveData`
-  liegen dagegen wie in Obsidian als `Basalt/Plugins/<id>/data.json` im Vault: Was ein Plugin
-  dort speichert, liegt im Klartext neben den Notizen und wird mit ihnen kopiert und gesichert.
-  Alle übrigen Pfade unter `.obsidian/` (etwa Iconizes Icon-Pakete in `.obsidian/icons`)
-  landen in `Basalt/Config/`, das genauso wie `Basalt/Plugins` kein Vault-Inhalt ist und nur
-  über den Adapter erreichbar ist. Andere versteckte Pfade (`.basalt/`, versteckte
-  Unterordner) bleiben gesperrt; `..`- und `.`-Segmente werden weiterhin abgelehnt, doppelte
-  sowie führende und abschließende Schrägstriche wie bei Obsidians `normalizePath` ignoriert.
-- Ressourcen-URLs (`adapter.getResourcePath`) gibt es nur für den eigenen Plugin-Ordner und nur
-  so eng, wie etwa eine Tesseract-OCR-Engine es braucht (Sprachdaten per `langPath` im Worker):
-  - Das native Protokoll `basalt-resource:` liefert ausschließlich Dateien unter
-    `Basalt/Plugins/<id>/` eines Plugins, das in der aktuellen Vault-Sitzung aktiviert ist.
-    Beim Aktivieren erhält das Plugin eine zufällige 256-Bit-Freigabe in der URL; Deaktivieren
-    widerruft sie, ein Vault-Wechsel verwirft alle Freigaben. Andere Plugin-Ordner, Notizen,
-    Anhänge und der App-Datenordner haben keine Ressourcen-URLs.
-  - Nur `GET`/`HEAD`, keine Ordnerlisten, keine verborgenen Pfade. Gelesen wird über denselben
-    Speicherpfad wie `plugin_vault_read` (`VaultPath`, `cap-std` beziehungsweise SAF, kein
-    Symlink-Ausbruch, 64 MiB). Unbekannte Freigaben, ungültige Pfade und fehlende Dateien
-    ergeben einheitlich 404.
-  - Antworten sind immer `application/octet-stream` mit `nosniff` und eigener
-    `sandbox`-CSP. Die WebView-CSP nennt das Protokoll nur in `connect-src`, nicht in
-    `script-src`, `img-src`, `frame-src` oder `worker-src`: Die URLs sind nur per `fetch`
-    lesbar, nie als Skript, Bild oder Frame ladbar. CORS-Freigabe gibt es nur für Basalts
-    eigene Herkunft (`tauri://localhost`, unter Android `http://tauri.localhost`).
-  - Plugin-Code ist nicht sandboxed und konnte dieselben Bytes bereits über den Adapter lesen;
-    die URL fügt nur einen zweiten, ebenso begrenzten Lesepfad hinzu, den auch Worker nutzen
-    können. Es gibt weiterhin keine breite Asset-Freigabe.
-- Plugin-Dateilöschung prüft die beobachtete Version, sichert die Bytes unter `.basalt/trash/`,
-  prüft sie erneut und löscht erst danach. Ein Rennen zwischen letzter Prüfung und Löschung
-  durch unkoordinierte externe Schreiber bleibt möglich. Ordnerlöschung wird abgelehnt.
-- Das Dateimenü verwendet denselben nativen Löschpfad nach Bestätigung. Geladene und
-  wiederhergestellte Notizentwürfe werden vorher mit ihrer ursprünglichen Konfliktbasis
-  gespeichert. Plugin-interne, noch ungespeicherte Bearbeitungen sind nicht Bestandteil
-  der Dateisicherung; Plugin-Dateien deshalb vorher speichern. Die Browser-Demo hält
-  Sicherung und Entfernung gemeinsam in einem lokalen Speichervorgang fest und blendet
-  `.basalt/` aus der Dateiliste aus. Sie ist kein Test des nativen Dateisystems.
-- Umbenennen erfolgt derzeit nicht atomar: zuerst eine exklusive Kopie, dann die geprüfte
-  Löschung des Originals. Bei unklarem Löschfehler bleibt die Zielkopie zur Wiederherstellung
-  erhalten und der Fehler wird angezeigt. Zeitstempel und Dateirechte können sich dabei ändern;
-  Links werden noch nicht automatisch angepasst. Groß-/Kleinschreibungswechsel auf
-  case-insensitiven Dateisystemen sind nicht abgedeckt.
-- Diese Plugin-Dateioperationen sind auf 64 MiB pro Datei begrenzt. Papierkorb und
-  Versionssicherungen werden nicht automatisch bereinigt; sie belegen weiterhin Speicherplatz
-  und sind keine sichere Datenlöschung. Wiederherstellung ist derzeit manuell.
-- Kein automatischer Sync, kein Konto und keine Telemetrie.
-- Debug-signierte Android-APKs sind Testartefakte, keine produktionssignierten Veröffentlichungen.
-  Der feste Entwicklungsschlüssel liegt als Actions-Secret vor, nicht im Git-Verlauf.
-  Produktive Releases werden über `.github/workflows/release.yml` mit einem separat verwalteten
-  Android-Release-Schlüssel und einem OpenPGP-Schlüssel signiert; beide liegen nur als Secrets der
-  GitHub-Umgebung `release` vor (siehe `docs/release-signing.md`). Releases entstehen als Entwurf
-  und werden manuell freigegeben.
+- The Rust core uses `cap-std` instead of joined absolute file paths. Only an explicit vault
+  selection opens a new file system root.
+- Existing notes are never overwritten when creating a note. Saving checks the previously
+  loaded version and first writes a copy to `.basalt/history/`.
+- On Linux, a save first writes a separate file and replaces the target by rename.
+  Uncoordinated external writers can still write between the check and the rename: there is no
+  compare-and-swap that is guaranteed across file systems.
+- Android SAF providers do not guarantee an atomic replace. There, Basalt backs up before
+  writing and checks for conflicts again. An interrupted provider write can damage the current
+  file; the previous backup then has to be restored.
+- Reads on Android remember for up to 10 seconds which SAF document belongs to which path, so
+  that not every read lists the whole folder again. Size, modification time and content are
+  still queried fresh every time, and the name is cross-checked. With providers that use opaque
+  document IDs, a file moved to another folder externally may still be read under its old path
+  within that window. Writes, deletions and their conflict checks never use the cache.
+- New files can be incomplete after a write error. Errors are passed on.
+- Drafts and the browser demo live in local WebView/browser storage, unencrypted. A draft keeps
+  its original version base, so restoring it cannot silently overwrite external changes. A full
+  or locked storage medium remains an error case.
+- Markdown is sanitized with DOMPurify before display. The native CSP blocks remote resources,
+  scripts, frames and object embeds; external links are never opened automatically. The preview
+  additionally strips remote image sources, also in the browser demo.
+- Plugin loader: bundles from `Basalt/Plugins/<id>` only run after explicit activation. There
+  is **no sandbox**: plugin code has the same frontend permissions as the app, including the
+  DOM, WebView storage, network and the exposed Tauri commands. Only enable trusted bundles.
+- `'unsafe-eval'` in the CSP is needed solely for the CommonJS loader. `connect-src` allows
+  HTTPS/WSS because sync plugins and plugin resources need network access. `data:` allows
+  reading already embedded font bytes during Excalidraw SVG export, not additional network
+  targets or script sources. External fonts stay blocked. `worker-src 'self' blob:` allows
+  workers from blob URLs that plugins create themselves (for example for OCR). `script-src blob:`
+  allows scripts from blob URLs that plugin code creates from its own bytes (for example
+  tesseract.js and its Wasm core). This grants no additional rights: only page code that is
+  already running can create a blob URL, and because of `'unsafe-eval'` it may run arbitrary
+  code anyway. Injected markup cannot create blob URLs; remote scripts stay blocked. There is
+  still no generic `window.require('fs')` shim.
+- In the native app, `requestUrl` runs outside the WebView like in Obsidian, through the Rust
+  command `plugin_request_url`, and is therefore not subject to CORS. Only `http`/`https` are
+  allowed, request and response bodies are capped at 64 MiB, and TLS certificates are verified
+  against the bundled webpki roots. Plugins already had network access; only the browser's
+  cross-origin restriction goes away.
+- Plugin paths under `.obsidian/plugins/<id>` map to `Basalt/Plugins/<id>`. Like `.obsidian` in
+  Obsidian, `Basalt/Plugins` is not vault content for plugins: it is missing from `getFiles()`
+  and vault events and is reachable only through the adapter and the loader. This keeps sync
+  plugins from uploading installed plugin code as attachments.
+- `app.loadLocalStorage`/`saveLocalStorage` are separated per vault, so sign-ins (for example
+  sync tokens) are not carried over into another vault. `loadData`/`saveData`, on the other
+  hand, live in the vault as `Basalt/Plugins/<id>/data.json`, like in Obsidian: whatever a
+  plugin stores there sits in plain text next to the notes and is copied and backed up with
+  them. All other paths under `.obsidian/` (for example Iconize's icon packs in
+  `.obsidian/icons`) land in `Basalt/Config/`, which, like `Basalt/Plugins`, is not vault
+  content and is reachable only through the adapter. Other hidden paths (`.basalt/`, hidden
+  subfolders) stay blocked; `..` and `.` segments are still rejected, while duplicate, leading
+  and trailing slashes are ignored as in Obsidian's `normalizePath`.
+- Resource URLs (`adapter.getResourcePath`) exist only for a plugin's own folder and only as
+  narrowly as, for example, a Tesseract OCR engine needs them (language data via `langPath` in
+  a worker):
+  - The native `basalt-resource:` protocol serves only files under `Basalt/Plugins/<id>/` of a
+    plugin that is activated in the current vault session. On activation the plugin receives a
+    random 256-bit grant in the URL; deactivation revokes it, and switching vaults discards all
+    grants. Other plugin folders, notes, attachments and the app data folder have no resource
+    URLs.
+  - Only `GET`/`HEAD`, no folder listings, no hidden paths. Reads go through the same storage
+    path as `plugin_vault_read` (`VaultPath`, `cap-std` or SAF, no symlink escape, 64 MiB).
+    Unknown grants, invalid paths and missing files all return 404.
+  - Responses are always `application/octet-stream` with `nosniff` and their own `sandbox` CSP.
+    The WebView CSP names the protocol only in `connect-src`, not in `script-src`, `img-src`,
+    `frame-src` or `worker-src`: the URLs can only be read with `fetch`, never loaded as a
+    script, image or frame. CORS is allowed only for Basalt's own origin (`tauri://localhost`,
+    on Android `http://tauri.localhost`).
+  - Plugin code is not sandboxed and could already read the same bytes through the adapter; the
+    URL only adds a second, equally limited read path that workers can use too. There is still
+    no broad asset exposure.
+- Plugin file deletion checks the observed version, backs the bytes up to `.basalt/trash/`,
+  checks again and only then deletes. A race between the last check and the deletion by
+  uncoordinated external writers remains possible. Folder deletion is rejected.
+- The file menu uses the same native deletion path after confirmation. Loaded and restored note
+  drafts are saved first with their original conflict base. Unsaved edits inside a plugin are
+  not part of the file backup, so save plugin files first. The browser demo records backup and
+  removal together in one local storage operation and hides `.basalt/` from the file list. It is
+  not a test of the native file system.
+- Renaming is currently not atomic: first an exclusive copy, then a checked deletion of the
+  original. If the deletion fails in an unclear way, the target copy is kept for recovery and
+  the error is shown. Timestamps and file permissions may change in the process; links are not
+  updated automatically yet. Case-only renames on case-insensitive file systems are not covered.
+- These plugin file operations are limited to 64 MiB per file. Trash and version backups are
+  not cleaned up automatically; they keep using storage and are not secure deletion. Restoring
+  is currently manual.
+- No automatic sync, no account and no telemetry.
+- Debug-signed Android APKs are test artifacts, not production-signed releases. The fixed
+  development key is stored as an Actions secret, not in the git history. Production releases
+  are signed through `.github/workflows/release.yml` with a separately managed Android release
+  key and an OpenPGP key; both exist only as secrets of the GitHub environment `release` (see
+  `docs/release-signing.md`). Releases are created as drafts and published manually.

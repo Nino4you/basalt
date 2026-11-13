@@ -396,13 +396,13 @@ jobs:
           fi
           {
             echo
-            echo "## Signaturen"
+            echo "## Signatures"
             echo
             echo '```'
             cat dist-release/SIGNING.txt
             echo '```'
             echo
-            echo "Prüfung: siehe docs/release-signing.md im Repository."
+            echo "Verification: see docs/release-signing.md in the repository."
           } >> "$RUNNER_TEMP/notes.md"
           args=(--draft --verify-tag --title "Basalt $VERSION" --notes-file "$RUNNER_TEMP/notes.md")
           if [ "$PRERELEASE" = "true" ]; then args+=(--prerelease); fi

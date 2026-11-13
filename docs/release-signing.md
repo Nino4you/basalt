@@ -1,58 +1,57 @@
-# Signierte Releases
+# Signed releases
 
-Der Workflow `.github/workflows/release.yml` baut produktiv signierte Pakete und legt sie als
-**Entwurf** eines GitHub-Releases ab. Veröffentlicht wird erst, wenn der Entwurf auf GitHub
-manuell freigegeben wird.
+The workflow `.github/workflows/release.yml` builds production-signed packages and stores them as
+a **draft** GitHub release. Nothing is published until the draft is released manually on GitHub.
 
-| Artefakt                                 | Signatur                                                     |
+| Artifact                                 | Signature                                                    |
 | ---------------------------------------- | ------------------------------------------------------------ |
-| `Basalt_<version>_android-universal.apk` | Android-Release-Schlüssel (APK-Signaturschema v1–v3)         |
-| `Basalt_<version>_android-universal.aab` | Android-Release-Schlüssel (JAR-Signatur, Upload-Schlüssel)   |
-| `.deb`, `.AppImage` (Linux x86_64)       | abgesetzte OpenPGP-Signatur `<datei>.asc`                    |
-| `SHA256SUMS`                             | Prüfsummen aller Pakete, OpenPGP-signiert (`SHA256SUMS.asc`) |
-| `basalt-release-key.asc`, `SIGNING.txt`  | öffentlicher OpenPGP-Schlüssel und beide Fingerabdrücke      |
+| `Basalt_<version>_android-universal.apk` | Android release key (APK signature scheme v1–v3)             |
+| `Basalt_<version>_android-universal.aab` | Android release key (JAR signature, upload key)              |
+| `.deb`, `.AppImage` (Linux x86_64)       | detached OpenPGP signature `<file>.asc`                      |
+| `SHA256SUMS`                             | checksums of all packages, OpenPGP-signed (`SHA256SUMS.asc`) |
+| `basalt-release-key.asc`, `SIGNING.txt`  | public OpenPGP key and both fingerprints                     |
 
-Die APK/AAB enthält ARM64, ARMv7 und x86_64. Signierschlüssel liegen nur in GitHub-Secrets,
-nie im Git-Verlauf; der Workflow schreibt den Keystore nur temporär in `$RUNNER_TEMP` und
-löscht ihn am Ende des Jobs.
+The APK/AAB contains ARM64, ARMv7 and x86_64. Signing keys exist only in GitHub secrets, never
+in the git history; the workflow writes the keystore only temporarily to `$RUNNER_TEMP` and
+deletes it at the end of the job.
 
-## Einmalige Einrichtung
+## One-time setup
 
-### Probelauf ohne Schlüssel (optional, vorab)
+### Dry run without keys (optional, beforehand)
 
-Unter **Actions → Signed release → Run workflow** mit Haken bei **test_keys** läuft der komplette
-Ablauf schon vor der Einrichtung durch: Der Lauf erzeugt Wegwerf-Schlüssel (Gültigkeit 1–2 Tage,
-Name „Basalt TEST KEY – NOT FOR DISTRIBUTION“), braucht keine Secrets und lädt nur das
-Actions-Artefakt `Basalt-v<version>-testkeys-signed` hoch. So lassen sich Build (inklusive ARMv7),
-Signatur und Prüfung testen, bevor echte Schlüssel existieren. Diese Pakete **nie weitergeben**;
-bei einem Tag-Release ist der Schalter nicht verfügbar.
+**Actions → Signed release → Run workflow** with **test_keys** checked runs the whole pipeline
+before any setup: the run creates throwaway keys (valid for 1–2 days, named
+"Basalt TEST KEY – NOT FOR DISTRIBUTION"), needs no secrets and only uploads the Actions
+artifact `Basalt-v<version>-testkeys-signed`. This tests the build (including ARMv7), signing and
+verification before real keys exist. **Never distribute** these packages; the switch is not
+available for tag releases.
 
-### Automatisch mit dem Einrichtungsskript (empfohlen)
+### Automatically with the setup script (recommended)
 
-`tools/setup_release_signing.sh` erledigt die Schritte 1 bis 3 in einem Durchgang: Es fragt nach
-E-Mail-Adresse, Keystore-Passwort und GPG-Passphrase (verdeckt, jeweils zweimal), erzeugt beide
-Schlüssel, legt die GitHub-Umgebung `release` an und speichert alle sechs Secrets über die
-GitHub-CLI. Passwörter erscheinen dabei weder auf dem Bildschirm noch in der Kommandozeile.
+`tools/setup_release_signing.sh` performs steps 1 to 3 in one go: it asks for an email address,
+the keystore password and the GPG passphrase (hidden, each twice), creates both keys, creates the
+GitHub environment `release` and stores all six secrets through the GitHub CLI. Passwords never
+appear on screen or on the command line.
 
-Voraussetzungen: `keytool` (JDK; bei Android Studio unter `jbr/bin`), `gpg`, `base64` und die
-angemeldete GitHub-CLI (`gh auth login`). Unter Windows in **Git Bash** ausführen, das `gpg` und
-`base64` mitbringt:
+Requirements: `keytool` (from a JDK; in Android Studio under `jbr/bin`), `gpg`, `base64` and a
+signed-in GitHub CLI (`gh auth login`). On Windows, run it in **Git Bash**, which ships `gpg` and
+`base64`:
 
 ```sh
-export PATH="$PATH:/c/Program Files/Android/Android Studio/jbr/bin"   # nur falls keytool fehlt
-tools/setup_release_signing.sh                 # Schlüssel landen in ~/basalt-release-keys
+export PATH="$PATH:/c/Program Files/Android/Android Studio/jbr/bin"   # only if keytool is missing
+tools/setup_release_signing.sh                 # keys end up in ~/basalt-release-keys
 ```
 
-Das Skript überschreibt keine vorhandenen Schlüssel und verweigert einen Zielordner im Repository.
-Danach den ausgegebenen Ordner sichern (er enthält Keystore, OpenPGP-Schlüsselbund mit
-Widerrufszertifikat und `FINGERPRINTS.txt`) und mit Schritt 4 weitermachen.
+The script never overwrites existing keys and refuses a target folder inside the repository.
+Afterwards, back up the printed folder (it contains the keystore, the OpenPGP keyring with its
+revocation certificate and `FINGERPRINTS.txt`) and continue with step 4.
 
-### Manuell
+### Manually
 
-Alle Befehle lokal auf einem vertrauenswürdigen Rechner ausführen, **nicht** im Repository-Ordner
-(`*.jks` ist zwar per `.gitignore` ausgeschlossen, trotzdem außerhalb ablegen).
+Run all commands locally on a trusted machine, **not** inside the repository folder (`*.jks` is
+excluded by `.gitignore`, but keep it outside anyway).
 
-### 1. Android-Release-Keystore
+### 1. Android release keystore
 
 ```sh
 keytool -genkeypair -v \
@@ -61,41 +60,41 @@ keytool -genkeypair -v \
   -dname "CN=Basalt, O=Basalt"
 ```
 
-`keytool` fragt nach einem Passwort. Bei PKCS12 sind Keystore- und Schlüsselpasswort gleich;
-dasselbe Passwort für beide Secrets eintragen.
+`keytool` asks for a password. With PKCS12, keystore and key password are the same; enter the
+same password for both secrets.
 
-> **Wichtig:** Diesen Keystore und das Passwort sicher sichern (z. B. Passwortmanager plus
-> Offline-Kopie). Geht der Schlüssel verloren, können installierte Apps keine Updates mehr
-> erhalten. Wird er kompromittiert, kann ein Dritter „Updates“ ausliefern.
+> **Important:** Back up this keystore and its password safely (for example in a password manager
+> plus an offline copy). If the key is lost, installed apps can no longer receive updates. If it
+> is compromised, a third party can ship "updates".
 
-### 2. OpenPGP-Schlüssel für Linux-Pakete und Prüfsummen
+### 2. OpenPGP key for Linux packages and checksums
 
 ```sh
-gpg --quick-gen-key "Basalt Release Signing <deine-adresse@example.org>" ed25519 sign 2y
-gpg --list-secret-keys --keyid-format long      # Fingerabdruck notieren
-gpg --armor --export-secret-keys <FINGERABDRUCK> > basalt-release-private.asc
+gpg --quick-gen-key "Basalt Release Signing <your-address@example.org>" ed25519 sign 2y
+gpg --list-secret-keys --keyid-format long      # note the fingerprint
+gpg --armor --export-secret-keys <FINGERPRINT> > basalt-release-private.asc
 ```
 
-Für die CI einen eigenen Schlüssel verwenden, nicht den persönlichen Hauptschlüssel. Das
-Ablaufdatum (2 Jahre) lässt sich später mit `gpg --quick-set-expire` verlängern; das
-Widerrufszertifikat unter `~/.gnupg/openpgp-revocs.d/` sicher aufbewahren.
+Use a dedicated key for CI, not your personal primary key. The expiry (2 years) can be extended
+later with `gpg --quick-set-expire`; keep the revocation certificate from
+`~/.gnupg/openpgp-revocs.d/` in a safe place.
 
-### 3. GitHub-Secrets anlegen
+### 3. Create the GitHub secrets
 
-Unter **Settings → Environments → New environment** eine Umgebung `release` anlegen (optional mit
-„Required reviewers“, damit jeder Release-Lauf bestätigt werden muss) und dort diese Secrets
-eintragen. Alternativ funktionieren auch gleichnamige Repository-Secrets.
+Under **Settings → Environments → New environment**, create an environment `release` (optionally
+with "Required reviewers" so every release run has to be approved) and add these secrets there.
+Repository secrets with the same names work too.
 
-| Secret                              | Inhalt                                                         |
-| ----------------------------------- | -------------------------------------------------------------- |
-| `ANDROID_RELEASE_KEYSTORE`          | `base64 -w0 basalt-release.jks` (eine Zeile)                   |
-| `ANDROID_RELEASE_KEYSTORE_PASSWORD` | Keystore-Passwort                                              |
-| `ANDROID_RELEASE_KEY_ALIAS`         | `basalt` (bzw. der bei `-alias` gewählte Name)                 |
-| `ANDROID_RELEASE_KEY_PASSWORD`      | Schlüsselpasswort (bei PKCS12 identisch zum Keystore-Passwort) |
-| `RELEASE_GPG_PRIVATE_KEY`           | kompletter Inhalt von `basalt-release-private.asc`             |
-| `RELEASE_GPG_PASSPHRASE`            | Passphrase des OpenPGP-Schlüssels                              |
+| Secret                              | Content                                                      |
+| ----------------------------------- | ------------------------------------------------------------ |
+| `ANDROID_RELEASE_KEYSTORE`          | `base64 -w0 basalt-release.jks` (one line)                   |
+| `ANDROID_RELEASE_KEYSTORE_PASSWORD` | keystore password                                            |
+| `ANDROID_RELEASE_KEY_ALIAS`         | `basalt` (or the name chosen with `-alias`)                  |
+| `ANDROID_RELEASE_KEY_PASSWORD`      | key password (identical to the keystore password for PKCS12) |
+| `RELEASE_GPG_PRIVATE_KEY`           | full content of `basalt-release-private.asc`                 |
+| `RELEASE_GPG_PASSPHRASE`            | passphrase of the OpenPGP key                                |
 
-Mit der GitHub-CLI geht das z. B. so:
+With the GitHub CLI, for example:
 
 ```sh
 base64 -w0 basalt-release.jks | gh secret set ANDROID_RELEASE_KEYSTORE --env release
@@ -106,66 +105,65 @@ gh secret set RELEASE_GPG_PRIVATE_KEY --env release < basalt-release-private.asc
 gh secret set RELEASE_GPG_PASSPHRASE --env release
 ```
 
-Danach `basalt-release-private.asc` löschen (`shred -u`) und nur die gesicherte Kopie behalten.
-Das bestehende `ANDROID_DEBUG_KEYSTORE` bleibt für die normalen CI-Vorschau-Builds unverändert.
+Then delete `basalt-release-private.asc` (`shred -u`) and keep only the backed-up copy. The
+existing `ANDROID_DEBUG_KEYSTORE` stays unchanged for the regular CI preview builds.
 
-### 4. Probelauf
+### 4. Dry run
 
-Unter **Actions → Signed release → Run workflow** startet ein Probelauf: Alles wird gebaut und
-signiert, aber nur als Actions-Artefakt `Basalt-v<version>-dryrun-signed` hochgeladen. Ein
-fehlendes Secret bricht den Lauf sofort mit einer klaren Meldung ab.
+**Actions → Signed release → Run workflow** starts a dry run: everything is built and signed, but
+only uploaded as the Actions artifact `Basalt-v<version>-dryrun-signed`. A missing secret stops
+the run immediately with a clear message.
 
-Zwischen den Jobs reisen die Pakete über den Actions-Cache, nicht über Artefakte: Der
-Artefakt-Speicher eines privaten Repositorys (500 MB im Free-Plan) ist für ein Release zu klein und
-wird mit der CI geteilt. Ist er voll, gelingt der Probelauf trotzdem (gebaut, signiert und geprüft),
-nur das Download-Artefakt fehlt dann. Tag-Releases hängen die Dateien direkt an den
-Release-Entwurf.
+Between jobs, packages travel through the Actions cache rather than artifacts: the artifact
+storage of a private repository (500 MB on the free plan) is too small for a release and is
+shared with CI. If it is full, the dry run still succeeds (built, signed and verified); only the
+download artifact is missing. Tag releases attach the files directly to the release draft.
 
-## Release erstellen
+## Creating a release
 
-1. Version in `package.json`, `src-tauri/tauri.conf.json` und `src-tauri/Cargo.toml` gleich
-   setzen (der Workflow prüft das). Android leitet den `versionCode` aus dieser Version ab, daher
-   für jedes Release, das als Update installiert werden soll, die Version erhöhen.
-2. Optional Release-Notizen unter `docs/releases/<version>.md` ablegen, z. B.
-   `docs/releases/0.2.0.md` für das Tag `v0.2.0`. Sie werden in den Release-Text übernommen.
-3. Tag pushen:
+1. Set the same version in `package.json`, `src-tauri/tauri.conf.json` and
+   `src-tauri/Cargo.toml` (the workflow checks this). Android derives its `versionCode` from this
+   version, so bump it for every release that should install as an update.
+2. Optionally add release notes as `docs/releases/<version>.md`, for example
+   `docs/releases/0.2.0.md` for the tag `v0.2.0`. They are copied into the release text.
+3. Push the tag:
 
    ```sh
    git tag -a v0.2.0 -m "Basalt 0.2.0"
    git push origin v0.2.0
    ```
 
-   Ein Tag mit Suffix (`v0.2.0-preview.1`) wird als Vorabversion markiert; der Teil vor dem
-   Bindestrich muss der App-Version entsprechen.
+   A tag with a suffix (`v0.2.0-preview.1`) is marked as a pre-release; the part before the
+   hyphen must match the app version.
 
-4. Den Release-Entwurf auf GitHub prüfen und veröffentlichen.
+4. Review the release draft on GitHub and publish it.
 
-## Downloads prüfen
+## Verifying downloads
 
 ```sh
-gpg --import basalt-release-key.asc        # Fingerabdruck mit README/SIGNING.txt vergleichen
+gpg --import basalt-release-key.asc        # compare the fingerprint with README/SIGNING.txt
 gpg --verify SHA256SUMS.asc SHA256SUMS
 sha256sum --ignore-missing -c SHA256SUMS
 gpg --verify Basalt_0.2.0_amd64.AppImage.asc Basalt_0.2.0_amd64.AppImage
 apksigner verify --print-certs Basalt_0.2.0_android-universal.apk
 ```
 
-Der von `apksigner` gezeigte Zertifikat-SHA-256 muss dem Wert in `SIGNING.txt` entsprechen.
-Beide Fingerabdrücke stehen zusätzlich in der README, damit sie nicht nur über denselben Kanal wie
-die Downloads verteilt werden.
+The certificate SHA-256 shown by `apksigner` must match the value in `SIGNING.txt`. Both
+fingerprints are also listed in the README, so they are not distributed only through the same
+channel as the downloads.
 
-## Grenzen und Hinweise
+## Limits and notes
 
-- **Wechsel vom Vorschau-APK:** Bisherige Vorschau-APKs sind mit dem Entwicklungsschlüssel
-  signiert. Android installiert ein Release-APK nicht als Update darüber; die Vorschau muss
-  zuerst deinstalliert werden. Notizen im privaten App-Vault vorher exportieren.
-- **Google Play:** Die AAB ist mit dem Release-Schlüssel signiert. Mit Play App Signing dient er
-  als Upload-Schlüssel; Google signiert die ausgelieferten APKs dann mit dem eigenen App-Schlüssel.
-  Einen Play-Upload führt der Workflow nicht aus.
-- **Linux-Pakete:** `.deb` und AppImage tragen keine eingebettete Signatur, sondern abgesetzte
-  `.asc`-Dateien. Ein signiertes APT-Repository gibt es noch nicht.
-- **Kein Auto-Update:** Der Tauri-Updater ist nicht eingebaut. Dafür bräuchte es das Plugin
-  `tauri-plugin-updater`, einen eigenen Updater-Schlüssel und einen Update-Endpunkt; das ist ein
-  getrennter Schritt.
-- **Build-Provenance:** GitHub-Attestierungen (Sigstore) stehen für private Repositories nur mit
-  GitHub Enterprise Cloud zur Verfügung und sind deshalb nicht aktiviert.
+- **Switching from a preview APK:** Earlier preview APKs are signed with the development key.
+  Android does not install a release APK as an update over them; uninstall the preview first.
+  Export notes from the app's private vault beforehand.
+- **Google Play:** The AAB is signed with the release key. With Play App Signing it serves as the
+  upload key; Google then signs the delivered APKs with its own app key. The workflow does not
+  upload to Play.
+- **Linux packages:** `.deb` and AppImage carry no embedded signature, only detached `.asc`
+  files. There is no signed APT repository yet.
+- **No auto-update:** The Tauri updater is not included. It would need the
+  `tauri-plugin-updater` plugin, a dedicated updater key and an update endpoint; that is a
+  separate step.
+- **Build provenance:** GitHub attestations (Sigstore) are only available for private
+  repositories with GitHub Enterprise Cloud and are therefore not enabled.

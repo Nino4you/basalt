@@ -1,129 +1,131 @@
 <div align="center">
 
-<img src="public/basalt.svg" width="96" alt="Basalt-Logo" />
+<img src="public/basalt.svg" width="96" alt="Basalt logo" />
 
 # Basalt
 
-**Ein ruhiger Ort für vernetzte Gedanken.**
+**A quiet place for connected thoughts.**
 
-Lokaler Markdown-Arbeitsraum für Linux und Android, mit Rust-Kern und
-Unterstützung für Obsidian-Vaults und ausgewählte Obsidian-Plugins.
+A local-first Markdown workspace for Linux and Android, with a Rust core and support for
+Obsidian vaults and selected Obsidian plugins.
 
-[![Lizenz: MPL-2.0](https://img.shields.io/badge/Lizenz-MPL--2.0-blue.svg)](LICENSE)
-![Plattformen: Linux | Android](https://img.shields.io/badge/Plattformen-Linux%20%7C%20Android-informational)
-![Status: Vorschau](https://img.shields.io/badge/Status-Vorschau%200.2-orange)
+[![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-blue.svg)](LICENSE)
+![Platforms: Linux | Android](https://img.shields.io/badge/Platforms-Linux%20%7C%20Android-informational)
+![Status: preview](https://img.shields.io/badge/Status-Preview%200.2-orange)
 
-[Funktionen](#funktionen) · [Installation](#installation) · [Plugins](#plugins) ·
-[Selbst bauen](#selbst-bauen) · [Mitmachen](#mitmachen)
+[Features](#features) · [Installation](#installation) · [Plugins](#plugins) ·
+[Building from source](#building-from-source) · [Contributing](#contributing)
 
-![Basalt auf dem Desktop: Dateibaum, Tabs, Editor mit Live-Vorschau und Rückverweise](screenshots/01-desktop-dark.png)
+![Basalt on the desktop: file tree, tabs, editor with live preview and backlinks](screenshots/01-desktop-dark.png)
 
 </div>
 
-## Warum Basalt?
+## Why Basalt?
 
-- **Deine Dateien bleiben deine Dateien.** Notizen sind normale Markdown-Dateien in einem
-  Ordner deiner Wahl. Kein Konto, keine Cloud, keine Telemetrie.
-- **Kompatibel mit deinem Vault.** Wiki-Links, Tags, Frontmatter, Callouts, Einbettungen und
-  Canvas-Dateien funktionieren wie gewohnt; bestehende Obsidian-Vaults lassen sich direkt öffnen.
-- **Gebaut für Linux und Android.** Ein gemeinsamer Rust-Kern, eine native Tauri-App für beide
-  Plattformen und eine Oberfläche, die sich an Maus, Tastatur, Touch und Stift anpasst.
-- **Vorsichtig mit deinen Daten.** Jede Änderung wird vor dem Speichern gesichert, externe
-  Änderungen werden erkannt statt überschrieben, und der Dateizugriff ist auf den Vault begrenzt.
+- **Your files stay your files.** Notes are plain Markdown files in a folder you choose. No
+  account, no cloud, no telemetry.
+- **Works with your vault.** Wiki links, tags, frontmatter, callouts, embeds and canvas files
+  behave as you expect; existing Obsidian vaults open directly.
+- **Built for Linux and Android.** One shared Rust core, one native Tauri app for both
+  platforms, and an interface that adapts to mouse, keyboard, touch and pen.
+- **Careful with your data.** Every change is backed up before it is saved, external edits are
+  detected instead of overwritten, and file access is confined to the vault.
 
-## Funktionen
+## Features
 
-**Schreiben**
+**Writing**
 
-- CodeMirror-6-Editor mit Live-Vorschau: Markdown-Zeichen treten zurück, Links und Checkboxen
-  sind klickbar, KaTeX-Formeln, Mermaid-Diagramme und Tabellen werden direkt im Editor
-  dargestellt. Tabellen bearbeitest du Zelle für Zelle; das Markdown bleibt die Quelle.
-- Vervollständigung für `[[Wiki-Links]]` und `#Tags`, Seitenvorschau beim Überfahren von Links,
-  Vorlagen mit Titel- und Datumsplatzhaltern, Quelltextmodus.
-- Leseansicht mit Callouts, Eigenschaften, Notiz-Einbettungen und Syntaxhervorhebung.
-- PDFs, Bilder, Audio und Video öffnen in eigenen Tabs; PDFs werden lokal gerendert.
+- CodeMirror 6 editor with live preview: Markdown syntax fades away, links and checkboxes are
+  clickable, and KaTeX math, Mermaid diagrams and tables render right in the editor. Tables
+  are edited cell by cell while the Markdown stays the source of truth.
+- Completion for `[[wiki links]]` and `#tags`, page previews when hovering links, templates
+  with title and date placeholders, and a source mode.
+- Reading view with callouts, properties, note embeds and syntax highlighting.
+- PDFs, images, audio and video open in their own tabs; PDFs are rendered locally.
 
-**Organisieren**
+**Organizing**
 
-- Dateibaum mit Ordnern, Lesezeichen, Drag & Drop und sicherem Umbenennen, bei dem offene
-  Tabs, Lesezeichen und ungespeicherte Änderungen mitwandern.
-- Rückverweise mit Kontext, ausgehende Links, Tags, Gliederung und Volltextsuche
-  (`tag:`, `path:`, `file:`, Ausschluss mit `-`).
-- Graphansicht für den ganzen Vault und als lokaler Graph der aktiven Notiz, mit Gruppenfarben.
-- Canvas im offenen JSON-Canvas-Format (`.canvas`) mit Text-, Notiz-, Link- und Gruppenkarten.
+- File tree with folders, bookmarks, drag & drop and safe renaming that carries open tabs,
+  bookmarks and unsaved changes along.
+- Backlinks with context, outgoing links, tags, outline and full-text search
+  (`tag:`, `path:`, `file:`, exclusion with `-`).
+- Graph view for the whole vault and as a local graph of the active note, with group colors.
+- Canvas in the open JSON Canvas format (`.canvas`) with text, note, link and group cards.
 
-**Arbeitsfläche**
+**Workspace**
 
-- Tabs mit eigenem Verlauf, geteilte Editoren und frei andockbare Seitenansichten wie in
-  VS Code; das Layout bleibt pro Vault gespeichert.
-- Schnellauswahl (Strg+O), Befehlspalette (Strg+P) und durchgehende Tastaturbedienung.
-- Helles und dunkles Design mit Akzentfarbe; auf dem Handy ein eigenes Layout mit Schubladen,
-  unterer Navigationsleiste und Formatierungsleiste.
+- Tabs with their own history, split editors and freely dockable side views like in VS Code;
+  the layout is saved per vault.
+- Quick switcher (Ctrl+O), command palette (Ctrl+P) and full keyboard navigation.
+- Light and dark theme with an accent color; a dedicated phone layout with drawers, a bottom
+  navigation bar and a formatting toolbar.
 
 <p align="center">
-  <img src="screenshots/02-mobile-dark.png" width="300" alt="Basalt auf dem Handy: Leseansicht mit unterer Navigationsleiste" />
+  <img src="screenshots/02-mobile-dark.png" width="300" alt="Basalt on a phone: reading view with bottom navigation bar" />
 </p>
 
 ## Installation
 
-Fertige Pakete erscheinen unter [Releases](https://github.com/Nino4you/basalt/releases):
+Packages are published under [Releases](https://github.com/Nino4you/basalt/releases):
 
-| Plattform                      | Paket                                    |
+| Platform                       | Package                                  |
 | ------------------------------ | ---------------------------------------- |
-| Linux x86_64                   | `.deb` oder AppImage                     |
+| Linux x86_64                   | `.deb` or AppImage                       |
 | Android (ARM64, ARMv7, x86_64) | `Basalt_<version>_android-universal.apk` |
 
-Alle Downloads sind signiert. Bitte prüfe sie gegen diese Fingerabdrücke, wie in
-[docs/release-signing.md](docs/release-signing.md#downloads-prüfen) beschrieben:
+All downloads are signed. Please verify them against these fingerprints as described in
+[docs/release-signing.md](docs/release-signing.md#verifying-downloads):
 
-| Schlüssel                          | Fingerabdruck                                                                                     |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------- |
-| OpenPGP (Linux-Pakete, Prüfsummen) | `628F A944 F494 AED2 1F0B  6CCD B72F F2A2 4F65 FB22`                                              |
-| Android-Zertifikat (SHA-256)       | `C0:3E:FA:2F:40:12:C4:57:FC:44:D7:68:B2:64:AA:BF:0F:2D:54:D3:3B:C3:06:7B:8C:6D:1B:76:84:83:4A:51` |
+| Key                                 | Fingerprint                                                                                       |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------- |
+| OpenPGP (Linux packages, checksums) | `628F A944 F494 AED2 1F0B  6CCD B72F F2A2 4F65 FB22`                                              |
+| Android certificate (SHA-256)       | `C0:3E:FA:2F:40:12:C4:57:FC:44:D7:68:B2:64:AA:BF:0F:2D:54:D3:3B:C3:06:7B:8C:6D:1B:76:84:83:4A:51` |
 
-Zum Ausprobieren ohne Installation gibt es eine Browser-Demo: `npm ci && npm run dev`
-(siehe [Selbst bauen](#selbst-bauen)). Sie speichert nur im Browser, nicht in echten Dateien.
+To try Basalt without installing it, run the browser demo: `npm ci && npm run dev` (see
+[Building from source](#building-from-source)). It only stores data in the browser, not in real
+files.
 
 ## Status
 
-Basalt ist eine **Vorschau (0.2)** und noch kein vollständiger Ersatz für Obsidian. Der Kern
-ist stabil und getestet, aber einige Dinge fehlen noch:
+Basalt is a **preview (0.2)** and not yet a complete replacement for Obsidian. The core is
+stable and tested, but some things are still missing:
 
-- kein automatisches Update und kein eingebauter Sync,
-- Plugin-Kompatibilität nur für ausgewählte Plugins (siehe unten),
-- Sicherungen aus `.basalt/history/` und `.basalt/trash/` stellst du derzeit von Hand wieder her,
-- kein Play-Store- oder Distributionspaket, nur direkte Downloads.
+- no automatic updates and no built-in sync,
+- plugin compatibility only for selected plugins (see below),
+- backups in `.basalt/history/` and `.basalt/trash/` have to be restored by hand for now,
+- no Play Store or distribution packages yet, only direct downloads.
 
-Mach vor dem ersten Öffnen eines wichtigen Vaults eine Kopie.
+Make a copy of any important vault before opening it for the first time.
 
 ## Plugins
 
-Basalt bringt eine eigene Umsetzung der Obsidian-Plugin-API mit. Plugins liegen im Vault unter
-`Basalt/Plugins/<id>/` (`manifest.json`, `main.js`, optional `styles.css`) und laufen erst,
-nachdem du sie in den Einstellungen einzeln aktiviert hast.
+Basalt ships its own implementation of the Obsidian plugin API. Plugins live in the vault under
+`Basalt/Plugins/<id>/` (`manifest.json`, `main.js`, optional `styles.css`) and only run after
+you enable each one in the settings.
 
 > [!WARNING]
-> Plugin-Code läuft ohne Sandbox mit denselben Rechten wie die App. Aktiviere nur Plugins,
-> denen du vertraust.
+> Plugin code is not sandboxed and runs with the same permissions as the app. Only enable
+> plugins you trust.
 
-Ziel ist eine gute Unterstützung ausgewählter Plugins, nicht jedes Community-Plugins. Welche
-Plugins und APIs geprüft sind und wo es noch Lücken gibt, steht in
-[docs/plugin-compatibility.md](docs/plugin-compatibility.md). Plugins, die Node.js- oder
-Electron-APIs voraussetzen, laufen nicht.
+The goal is good support for selected plugins, not for every community plugin. Which plugins
+and APIs have been checked, and where gaps remain, is listed in
+[docs/plugin-compatibility.md](docs/plugin-compatibility.md). Plugins that require Node.js or
+Electron APIs do not run.
 
-## Selbst bauen
+## Building from source
 
-Voraussetzungen: Node.js 22.13+ und aktuelles stabiles Rust. Für die native App zusätzlich die
-[Tauri-Systemabhängigkeiten](https://v2.tauri.app/start/prerequisites/).
+Requirements: Node.js 22.13+ and current stable Rust. The native app additionally needs the
+[Tauri system dependencies](https://v2.tauri.app/start/prerequisites/).
 
 ```sh
 npm ci
-npm run dev              # Browser-Demo auf http://127.0.0.1:1420
-npm run tauri -- dev     # native Linux-App
-npm run tauri -- build   # Linux-Pakete (.deb, AppImage)
+npm run dev              # browser demo on http://127.0.0.1:1420
+npm run tauri -- dev     # native Linux app
+npm run tauri -- build   # Linux packages (.deb, AppImage)
 ```
 
-Android braucht zusätzlich JDK, Android SDK/NDK und das Rust-Ziel `aarch64-linux-android`:
+Android additionally needs a JDK, the Android SDK/NDK and the Rust target
+`aarch64-linux-android`:
 
 ```sh
 npm run tauri -- android init --ci --skip-targets-install
@@ -135,40 +137,39 @@ npm run tauri -- android build --apk --debug --target aarch64
 Tests:
 
 ```sh
-npm test                                  # Frontend (Vitest)
+npm test                                  # frontend (Vitest)
 npx playwright install chromium && npm run test:e2e
-cargo test --workspace --locked           # Rust-Kern
+cargo test --workspace --locked           # Rust core
 cargo clippy --workspace --all-targets --locked -- -D warnings
 ```
 
-## Aufbau
+## Project layout
 
-| Bereich              | Aufgabe                                                           |
-| -------------------- | ----------------------------------------------------------------- |
-| `crates/vault-core/` | UI-unabhängiger Rust-Kern: Pfade, Speicher, Konfliktprüfung       |
-| `crates/vault-cli/`  | Kommandozeilen-Client für den Kern                                |
-| `src-tauri/`         | Native Shell, auf den Vault begrenzte IPC, Android-Speicher (SAF) |
-| `src/`               | Oberfläche, Editor, Ansichten und Plugin-Kompatibilitätsschicht   |
-| `tools/`             | Android-Patch, Smoke-Tests und Release-Skripte                    |
+| Path                 | Purpose                                                     |
+| -------------------- | ----------------------------------------------------------- |
+| `crates/vault-core/` | UI-independent Rust core: paths, storage, conflict checks   |
+| `crates/vault-cli/`  | Command-line client for the core                            |
+| `src-tauri/`         | Native shell, vault-scoped IPC, Android storage (SAF)       |
+| `src/`               | Interface, editor, views and the plugin compatibility layer |
+| `tools/`             | Android patch, smoke tests and release scripts              |
 
-Mehr Details: [Sicherheitsgrenzen](SECURITY.md), [Plugin-Kompatibilität](docs/plugin-compatibility.md),
-[Release-Signatur](docs/release-signing.md).
+More details: [Security boundaries](SECURITY.md),
+[Plugin compatibility](docs/plugin-compatibility.md), [Release signing](docs/release-signing.md).
 
-## Mitmachen
+## Contributing
 
-Fehlerberichte und Vorschläge sind über [Issues](https://github.com/Nino4you/basalt/issues)
-willkommen. Für Pull Requests gilt: Vor dem Einreichen sollten `npm run build`, `npm test`,
-`cargo fmt --all -- --check`, `cargo test --workspace` und `cargo clippy` grün sein.
-Sicherheitslücken bitte nicht öffentlich melden, sondern wie in [SECURITY.md](SECURITY.md)
-beschrieben.
+Bug reports and suggestions are welcome as [issues](https://github.com/Nino4you/basalt/issues).
+Before opening a pull request, make sure `npm run build`, `npm test`,
+`cargo fmt --all -- --check`, `cargo test --workspace` and `cargo clippy` pass. Please do not
+report security issues publicly; follow [SECURITY.md](SECURITY.md) instead.
 
-## Lizenz
+## License
 
-Basalt steht unter der [Mozilla Public License 2.0](LICENSE). Änderungen an Basalt-Dateien
-müssen bei Weitergabe unter derselben Lizenz offengelegt werden; Plugins und andere Programme,
-die Basalt nutzen, dürfen eine eigene Lizenz haben. Mitgelieferte Abhängigkeiten behalten ihre
-Lizenzen, siehe [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Basalt is licensed under the [Mozilla Public License 2.0](LICENSE). Modified Basalt files must
+be shared under the same license when distributed; plugins and other programs that use Basalt
+may use their own license. Bundled dependencies keep their own licenses, see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-„Obsidian“ ist eine Marke ihres jeweiligen Inhabers. Basalt ist ein unabhängiges Projekt und
-steht in keiner Verbindung zu Obsidian oder dessen Herstellern; der Name wird nur verwendet, um
-die Kompatibilität mit Obsidian-Vaults und -Plugins zu beschreiben.
+"Obsidian" is a trademark of its respective owner. Basalt is an independent project and is not
+affiliated with Obsidian or its makers; the name is used only to describe compatibility with
+Obsidian vaults and plugins.

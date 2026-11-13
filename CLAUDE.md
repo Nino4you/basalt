@@ -8,8 +8,8 @@ Basalt (`basalt-notes`) is a local-first Markdown workspace for **Linux and Andr
 core, a Tauri 2 shell, and a framework-free TypeScript WebView UI built on CodeMirror 6. It is an
 independent reimplementation with an Obsidian-compatible plugin layer, not an Obsidian fork.
 
-README, SECURITY.md, `docs/` and all user-facing UI strings are **German**; identifiers and code
-comments are English. Keep that split. Playwright tests locate elements by their German
+README, SECURITY.md, `docs/`, identifiers and code comments are **English**; the user-facing UI
+strings are currently **German**. Playwright tests locate elements by their German
 accessible names, so renaming a label means updating `tests/e2e/app.spec.ts`.
 
 ## Commands

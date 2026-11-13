@@ -21,28 +21,28 @@ KEY_ALIAS="basalt"
 OUT="${1:-$HOME/basalt-release-keys}"
 
 die() {
-  echo "Fehler: $*" >&2
+  echo "Error: $*" >&2
   exit 1
 }
 
 for tool in keytool gpg base64 gh; do
-  command -v "$tool" > /dev/null || die "'$tool' nicht gefunden (siehe docs/release-signing.md)."
+  command -v "$tool" > /dev/null || die "'$tool' not found (see docs/release-signing.md)."
 done
-gh auth status > /dev/null 2>&1 || die "GitHub-CLI ist nicht angemeldet: zuerst 'gh auth login' ausführen."
+gh auth status > /dev/null 2>&1 || die "GitHub CLI is not signed in: run 'gh auth login' first."
 
 repo_root=$(git rev-parse --show-toplevel 2> /dev/null || true)
 mkdir -p "$OUT"
 OUT=$(cd "$OUT" && pwd)
 if [ -n "$repo_root" ]; then
-  case "$OUT/" in "$(cd "$repo_root" && pwd)/"*) die "$OUT liegt im Repository. Bitte einen Ordner außerhalb wählen." ;; esac
+  case "$OUT/" in "$(cd "$repo_root" && pwd)/"*) die "$OUT is inside the repository. Please choose a folder outside of it." ;; esac
 fi
 chmod 700 "$OUT"
 
 KEYSTORE="$OUT/basalt-release.jks"
 GNUPGHOME="$OUT/gnupg"
 export GNUPGHOME
-[ -e "$KEYSTORE" ] && die "$KEYSTORE existiert bereits. Vorhandene Schlüssel werden nicht überschrieben."
-[ -e "$GNUPGHOME" ] && die "$GNUPGHOME existiert bereits. Vorhandene Schlüssel werden nicht überschrieben."
+[ -e "$KEYSTORE" ] && die "$KEYSTORE already exists. Existing keys are never overwritten."
+[ -e "$GNUPGHOME" ] && die "$GNUPGHOME already exists. Existing keys are never overwritten."
 
 read_secret() {
   # $1 prompt, result in REPLY_SECRET; asks twice and requires 12+ characters.
@@ -50,12 +50,12 @@ read_secret() {
   while true; do
     read -r -s -p "$1: " first
     echo
-    read -r -s -p "$1 (Wiederholung): " second
+    read -r -s -p "$1 (repeat): " second
     echo
     if [ "$first" != "$second" ]; then
-      echo "Die Eingaben stimmen nicht überein." >&2
+      echo "The entries do not match." >&2
     elif [ "${#first}" -lt 12 ]; then
-      echo "Bitte mindestens 12 Zeichen verwenden." >&2
+      echo "Please use at least 12 characters." >&2
     else
       REPLY_SECRET="$first"
       return
@@ -63,16 +63,16 @@ read_secret() {
   done
 }
 
-read -r -p "E-Mail-Adresse für den OpenPGP-Schlüssel: " email
-[ -n "$email" ] || die "Keine E-Mail-Adresse angegeben."
-read_secret "Passwort für den Android-Keystore"
+read -r -p "Email address for the OpenPGP key: " email
+[ -n "$email" ] || die "No email address given."
+read_secret "Password for the Android keystore"
 KS_PASS="$REPLY_SECRET"
-read_secret "Passphrase für den OpenPGP-Schlüssel"
+read_secret "Passphrase for the OpenPGP key"
 GPG_PASS="$REPLY_SECRET"
 export KS_PASS
 
 echo
-echo "== Android-Release-Keystore erzeugen"
+echo "== Creating the Android release keystore"
 umask 077
 keytool -genkeypair -v -keystore "$KEYSTORE" -storetype PKCS12 \
   -alias "$KEY_ALIAS" -keyalg RSA -keysize 4096 -validity 10000 \
@@ -81,21 +81,21 @@ keytool -genkeypair -v -keystore "$KEYSTORE" -storetype PKCS12 \
 android_sha256=$(keytool -list -v -keystore "$KEYSTORE" -storepass:env KS_PASS -alias "$KEY_ALIAS" |
   sed -n 's/^[[:space:]]*SHA256: //p' | head -n1)
 
-echo "== OpenPGP-Schlüssel erzeugen (eigener Schlüsselbund in $GNUPGHOME)"
+echo "== Creating the OpenPGP key (separate keyring in $GNUPGHOME)"
 mkdir -m 700 "$GNUPGHOME"
 printf '%s' "$GPG_PASS" | gpg --batch --pinentry-mode loopback --passphrase-fd 0 \
   --quick-gen-key "Basalt Release Signing <$email>" ed25519 sign 2y
 GPG_FPR=$(gpg --batch --with-colons --list-secret-keys | awk -F: '/^fpr:/ {print $10; exit}')
-[ -n "$GPG_FPR" ] || die "OpenPGP-Schlüssel wurde nicht erzeugt."
+[ -n "$GPG_FPR" ] || die "The OpenPGP key was not created."
 gpg --batch --armor --export "$GPG_FPR" > "$OUT/basalt-release-key.asc"
 
-echo "== GitHub-Umgebung '$ENV_NAME' in $REPO anlegen"
+echo "== Creating the GitHub environment '$ENV_NAME' in $REPO"
 gh api --silent -X PUT "repos/$REPO/environments/$ENV_NAME"
 
-echo "== Secrets in '$ENV_NAME' speichern"
+echo "== Storing secrets in '$ENV_NAME'"
 set_secret() {
   gh secret set "$1" --repo "$REPO" --env "$ENV_NAME" > /dev/null
-  echo "   $1 gesetzt"
+  echo "   $1 set"
 }
 base64 < "$KEYSTORE" | tr -d '\r\n' | set_secret ANDROID_RELEASE_KEYSTORE
 printf '%s' "$KS_PASS" | set_secret ANDROID_RELEASE_KEYSTORE_PASSWORD
@@ -114,14 +114,14 @@ EOF
 
 cat << EOF
 
-Fertig. Alle sechs Secrets liegen in der Umgebung '$ENV_NAME' von $REPO.
+Done. All six secrets are stored in the environment '$ENV_NAME' of $REPO.
 
-Jetzt unbedingt den Ordner sichern (Passwortmanager plus Offline-Kopie):
+Back up this folder now (password manager plus an offline copy):
   $OUT
-Er enthält den Android-Keystore, den OpenPGP-Schlüsselbund mit
-Widerrufszertifikat (gnupg/openpgp-revocs.d/) und die Fingerabdrücke.
-Ohne Keystore und Passwort kann Basalt auf Android keine Updates mehr erhalten.
+It contains the Android keystore, the OpenPGP keyring with its
+revocation certificate (gnupg/openpgp-revocs.d/) and the fingerprints.
+Without the keystore and its password, Basalt on Android can no longer receive updates.
 
-Fingerabdrücke (öffentlich, für README und Prüfung der Downloads):
+Fingerprints (public, for the README and for verifying downloads):
 $(cat "$OUT/FINGERPRINTS.txt")
 EOF

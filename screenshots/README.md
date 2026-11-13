@@ -1,15 +1,15 @@
-# Basalt – erste Einblicke
+# Basalt – first look
 
 ## Desktop
 
-![Desktop: Dateibaum, Notiz-Tabs, Editor mit Live-Vorschau und Rückverweise](01-desktop-dark.png)
+![Desktop: file tree, note tabs, editor with live preview and backlinks](01-desktop-dark.png)
 
-## Mobiles Layout
+## Mobile layout
 
-<img src="02-mobile-dark.png" width="360" alt="Mobiles Layout mit Markdown-Leseansicht und unterer Navigationsleiste" />
+<img src="02-mobile-dark.png" width="360" alt="Mobile layout with Markdown reading view and bottom navigation bar" />
 
-Beide Bilder zeigen die **Browser-Demo** in Desktop-Auflösung und einem emulierten
-Android-Viewport: lokaler Markdown-Arbeitsraum mit Dateibaum, Tabs, Live-Vorschau,
-Leseansicht, Wiki-Links und Rückverweisen.
+Both images show the **browser demo** at desktop resolution and in an emulated Android viewport:
+a local Markdown workspace with file tree, tabs, live preview, reading view, wiki links and
+backlinks.
 
-Weitere Aufnahmen entstehen beim Ausführen von `npm run test:e2e` unter `test-results/`.
+More screenshots are written to `test-results/` when running `npm run test:e2e`.
