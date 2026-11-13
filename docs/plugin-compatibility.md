@@ -152,8 +152,10 @@ promise shortcuts `.json`, `.text` and `.arrayBuffer`. In the native app it runs
 outside the WebView, so it is not subject to CORS (see `SECURITY.md`); the browser demo keeps
 using `fetch`. API contract: https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts.
 
-`FileManager.renameFile` moves the file but does not rewrite links to it yet; renames and moves
-made in the app itself do (see `SECURITY.md`).
+`FileManager.renameFile` moves the file and, when "Automatically update internal links" is on,
+rewrites links to it in notes and canvases exactly like a rename in the app: only links whose
+target would change, each file through a version-checked `Vault.process`. Files that fail keep
+their content; the call then rejects with an `AggregateError` after trying all of them.
 
 `FileManager.processFrontMatter` parses the YAML frontmatter with the `yaml` package and calls the
 callback with the mutable object. Only changed or deleted keys are written back; comments and

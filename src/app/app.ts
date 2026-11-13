@@ -567,6 +567,7 @@ export class App {
         ribbonEl: this.shell.pluginRibbon,
         statusBarEl: this.shell.pluginStatus,
         requestUrl: nativeRequestUrl(),
+        updateLinks: () => this.settings.get("updateLinks"),
       });
       if (this.vault !== next) {
         await session.dispose().catch((error) => this.report(error));

@@ -100,7 +100,9 @@ it("does not rewrite the note when the callback changes nothing", async () => {
 });
 
 it("preserves both concurrent frontmatter changes", async () => {
-  const { vault, file, manager } = await setup("---\ntitle: Alt\n---\n\nBody\n");
+  const { vault, file, manager } = await setup(
+    "---\ntitle: Alt\n---\n\nBody\n",
+  );
 
   await Promise.all([
     manager.processFrontMatter(file, (frontmatter) => {
@@ -126,16 +128,68 @@ it("rejects an external change after reading without retrying the callback", asy
   const external = "---\ntitle: External\n---\n\nChanged body\n";
   vi.spyOn(port, "read").mockImplementationOnce(async (path) => {
     const snapshot = await read(path);
-    await port.write(path, new TextEncoder().encode(external), snapshot.version);
+    await port.write(
+      path,
+      new TextEncoder().encode(external),
+      snapshot.version,
+    );
     return snapshot;
   });
   const callback = vi.fn((frontmatter: Record<string, unknown>) => {
     frontmatter.status = "offen";
   });
 
-  await expect(new FileManager(vault).processFrontMatter(file, callback))
-    .rejects.toThrow("conflict");
+  await expect(
+    new FileManager(vault).processFrontMatter(file, callback),
+  ).rejects.toThrow("conflict");
 
   expect(callback).toHaveBeenCalledTimes(1);
   expect(await vault.read(file)).toBe(external);
+});
+
+it("renameFile rewrites links to the file when the user wants that", async () => {
+  const files = {
+    "Plan.md": "# Plan",
+    "Home.md": "See [[Plan]] and [x](Plan.md#Goals).",
+    "Other.md": "Nothing here.",
+    "Board.canvas": JSON.stringify({
+      nodes: [
+        {
+          id: "a",
+          type: "file",
+          file: "Plan.md",
+          x: 0,
+          y: 0,
+          width: 1,
+          height: 1,
+        },
+      ],
+      edges: [],
+    }),
+  };
+  const vault = await memoryVault(files);
+  const manager = new FileManager(vault, () => true);
+  await manager.renameFile(
+    vault.getFileByPath("Plan.md")!,
+    "Projects/Roadmap.md",
+  );
+  const read = (path: string) => vault.read(vault.getFileByPath(path)!);
+  expect(vault.getFileByPath("Plan.md")).toBeNull();
+  expect(await read("Projects/Roadmap.md")).toBe("# Plan");
+  expect(await read("Home.md")).toBe(
+    "See [[Roadmap]] and [x](Roadmap.md#Goals).",
+  );
+  expect(await read("Other.md")).toBe("Nothing here.");
+  expect(JSON.parse(await read("Board.canvas")).nodes[0].file).toBe(
+    "Projects/Roadmap.md",
+  );
+
+  const plain = await memoryVault(files);
+  await new FileManager(plain).renameFile(
+    plain.getFileByPath("Plan.md")!,
+    "Roadmap.md",
+  );
+  expect(await plain.read(plain.getFileByPath("Home.md")!)).toBe(
+    files["Home.md"],
+  );
 });

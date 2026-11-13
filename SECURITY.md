@@ -99,8 +99,8 @@ will get a response once the report has been reviewed.
   "Automatically update internal links", on by default). Only links whose target would
   otherwise change are touched; each affected note or canvas goes through the normal
   version-checked save, so its previous content is backed up. A file that fails to save keeps
-  its content and is named in a notice. The plugin API `FileManager.renameFile` does not update
-  links yet.
+  its content and is named in a notice. The plugin API `FileManager.renameFile` follows the
+  same setting and writes each affected file with a version-checked `Vault.process`.
 - These plugin file operations are limited to 64 MiB per file. Trash and version backups are
   not cleaned up automatically; they keep using storage and are not secure deletion.
 - File recovery lists only backups of notes and canvases (`backup_list`) and reads only such
