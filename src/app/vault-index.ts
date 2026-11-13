@@ -19,6 +19,8 @@ export interface LinkRef {
 export interface NoteMeta {
   links: LinkRef[];
   tags: string[];
+  /** Other names from the frontmatter (`aliases:` or `alias:`). */
+  aliases: string[];
   /** Same tags with their source position, in first-seen order. */
   tagRefs: TagRef[];
 }
@@ -97,6 +99,41 @@ function frontmatterTags(lines: readonly string[], end: number): TagRef[] {
   return tags;
 }
 
+/** One frontmatter value as written: unquoted, without surrounding spaces. */
+function unquote(value: string): string {
+  const trimmed = value.trim();
+  const quoted = /^(["'])(.*)\1$/.exec(trimmed);
+  return (quoted ? quoted[2] : trimmed).trim();
+}
+
+/**
+ * `aliases:` / `alias:` as an inline list (`[a, "b"]`), a comma-separated or
+ * single value, or a block list. Good enough for what people write by hand;
+ * the YAML parser of the plugin layer handles the rest.
+ */
+function frontmatterAliases(lines: readonly string[], end: number): string[] {
+  const aliases: string[] = [];
+  for (let i = 1; i < end - 1; i++) {
+    const key = /^alias(?:es)?:\s*(.*)$/i.exec(lines[i]);
+    if (!key) continue;
+    const rest = key[1].trim();
+    if (rest) {
+      const inner = /^\[(.*)\]$/.exec(rest)?.[1] ?? rest;
+      for (const part of inner.match(/\s*"[^"]*"\s*|\s*'[^']*'\s*|[^,]+/g) ?? []) {
+        const alias = unquote(part);
+        if (alias) aliases.push(alias);
+      }
+    } else
+      for (let j = i + 1; j < end - 1; j++) {
+        const item = /^\s*-\s+(.+)$/.exec(lines[j]);
+        if (!item) break;
+        const alias = unquote(item[1]);
+        if (alias) aliases.push(alias);
+      }
+  }
+  return [...new Set(aliases)];
+}
+
 export function scanNote(text: string): NoteMeta {
   const links: LinkRef[] = [];
   const tags = new Map<string, TagRef>();
@@ -167,7 +204,12 @@ export function scanNote(text: string): NoteMeta {
       }
     }
   }
-  return { links, tags: [...tags.keys()], tagRefs: [...tags.values()] };
+  return {
+    links,
+    tags: [...tags.keys()],
+    tagRefs: [...tags.values()],
+    aliases: frontmatterAliases(lines, start),
+  };
 }
 
 /**
@@ -518,17 +560,37 @@ export class VaultIndex {
    * place and its line, for "Unlinked mentions".
    */
   unlinkedMentions(path: string): Mention[] {
-    const name = path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/i, "");
-    const needle = name.toLowerCase();
+    const names = this.namesOf(path);
     const result: Mention[] = [];
     for (const [source, text] of this.contents) {
       if (source === path || !isNote(source)) continue;
-      if (!this.lower(source).includes(needle)) continue;
+      const lower = this.lower(source);
+      const present = names.filter((name) => lower.includes(name.toLowerCase()));
+      if (!present.length) continue;
       const lines = text.split("\n");
-      for (const place of findUnlinkedMentions(text, name))
+      const places = present
+        .flatMap((name) => findUnlinkedMentions(text, name))
+        .sort((a, b) => a.line - b.line || a.col - b.col || b.length - a.length);
+      // A longer name wins where two overlap ("Basalt" inside "Basalt rock").
+      let end = { line: -1, col: -1 };
+      for (const place of places) {
+        if (place.line === end.line && place.col < end.col) continue;
+        end = { line: place.line, col: place.col + place.length };
         result.push({ source, ...place, text: lines[place.line] });
+      }
     }
     return result;
+  }
+
+  /** Frontmatter aliases of a note. */
+  aliasesOf(path: string): string[] {
+    return this.meta.get(path)?.aliases ?? [];
+  }
+
+  /** The note's name followed by its aliases. */
+  namesOf(path: string): string[] {
+    const name = path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/i, "");
+    return [name, ...this.aliasesOf(path).filter((alias) => alias !== name)];
   }
 
   backlinks(path: string): Mention[] {

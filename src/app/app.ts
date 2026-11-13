@@ -1299,21 +1299,29 @@ export class App {
     return ids;
   }
 
-  private linkCandidates(): Array<{ link: string; detail: string }> {
+  private linkCandidates(): Array<{
+    link: string;
+    detail: string;
+    alias?: string;
+  }> {
     const counts = new Map<string, number>();
     const notes = this.index.files.filter((path) => /\.md$/i.test(path));
     for (const path of notes) {
       const name = basename(path).toLowerCase();
       counts.set(name, (counts.get(name) ?? 0) + 1);
     }
-    return notes.map((path) => {
+    return notes.flatMap((path) => {
       const name = basename(path);
       // Ambiguous names need the full path to resolve.
       const unique = counts.get(name.toLowerCase()) === 1;
-      return {
-        link: unique ? name : path.replace(/\.md$/i, ""),
-        detail: dirname(path),
-      };
+      const link = unique ? name : path.replace(/\.md$/i, "");
+      return [
+        { link, detail: dirname(path) },
+        // An alias links to the note and shows the alias: [[Note|Alias]].
+        ...this.index
+          .aliasesOf(path)
+          .map((alias) => ({ link, alias, detail: `→ ${name}` })),
+      ];
     });
   }
 
@@ -1798,7 +1806,11 @@ export class App {
     const line = lines[place.line] ?? "";
     const written = line.slice(place.col, place.col + place.length);
     const name = basename(target);
-    if (written.toLowerCase() !== name.toLowerCase())
+    if (
+      !this.index
+        .namesOf(target)
+        .some((candidate) => candidate.toLowerCase() === written.toLowerCase())
+    )
       throw new Error(t("Die Stelle hat sich inzwischen geändert. Bitte erneut versuchen."));
     const link =
       this.index.resolve(name, source) === target
