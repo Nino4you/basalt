@@ -16,7 +16,7 @@ export interface CompletionHost {
    */
   subpaths?(
     target: string,
-    kind: "heading" | "block",
+    blocks: boolean,
   ): Array<{ label: string; detail?: string }>;
 }
 
@@ -72,7 +72,7 @@ export function completionSources(host: CompletionHost): CompletionSource[] {
     const target = match.text.slice(2, hash);
     const block = match.text[hash + 1] === "^";
     const from = match.from + hash + (block ? 2 : 1);
-    const options = host.subpaths(target, block ? "block" : "heading");
+    const options = host.subpaths(target, block);
     if (!options.length) return null;
     return {
       from,

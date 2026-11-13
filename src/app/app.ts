@@ -267,7 +267,7 @@ export class App {
       openTag: (tag) => this.searchFor(`tag:#${tag}`),
       notes: () => this.linkCandidates(),
       tags: () => [...this.index.tags().keys()].sort(),
-      subpaths: (target, kind) => this.subpathCandidates(target, kind),
+      subpaths: (target, blocks) => this.subpathCandidates(target, blocks),
       editorSuggests: () =>
         (this.compatibility?.services.getEditorSuggests() ??
           []) as EditorSuggestRegistration[],
@@ -1270,10 +1270,10 @@ export class App {
     this.search.setQuery(query);
   }
 
-  /** Headings or block ids a `[[target#` link can point to. */
+  /** Headings, or block ids when asked for those, that `[[target#` can name. */
   private subpathCandidates(
     target: string,
-    kind: "heading" | "block",
+    blocks: boolean,
   ): Array<{ label: string; detail?: string }> {
     const source = this.activePath;
     if (!source) return [];
@@ -1281,22 +1281,22 @@ export class App {
     if (!path || !/\.md$/i.test(path)) return [];
     const text =
       this.store?.notes.get(path)?.text ?? this.index.content(path) ?? "";
-    if (kind === "heading") {
+    if (!blocks) {
       const seen = new Set<string>();
       return documentOutline(text)
         .filter((entry) => !seen.has(entry.text) && seen.add(entry.text))
         .map((entry) => ({ label: entry.text, detail: `H${entry.depth}` }));
     }
-    const blocks: Array<{ label: string; detail?: string }> = [];
+    const ids: Array<{ label: string; detail?: string }> = [];
     for (const line of text.split("\n")) {
       const id = /\s\^([A-Za-z0-9-]+)\s*$/.exec(line);
       if (id)
-        blocks.push({
+        ids.push({
           label: id[1],
           detail: line.slice(0, id.index).trim().slice(0, 60),
         });
     }
-    return blocks;
+    return ids;
   }
 
   private linkCandidates(): Array<{ link: string; detail: string }> {
