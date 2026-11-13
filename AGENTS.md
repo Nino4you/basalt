@@ -30,6 +30,7 @@ Use Node.js 22+ and stable Rust; install JS dependencies with `npm ci`.
 - `.github/workflows/ci.yml` is the full check/build recipe, including Linux system packages, Python tool syntax checks, Android SDK/NDK versions and signing. Native commands need platform prerequisites; the default bundle targets are Linux-only.
 - Android generation order: `npm run tauri -- android init --ci --skip-targets-install`, then `node tools/patch_android.mjs` (forwards system bar and keyboard insets to the page; without it the app draws under the navigation bar and the keyboard), then `npm run tauri -- icon public/basalt.svg`, then the Android build command from CI. `src-tauri/gen/android/` is generated, not checked-in source.
 - Local Android builds on Windows need Developer Mode: Tauri symlinks the Rust library into `jniLibs`.
+- Project page: `site/` is the static GitHub Pages landing page (English markup, German table in `site/main.js`, no third-party requests). `node tools/build_site.mjs` writes it plus the browser demo (`demo/`, relative asset paths) to `_site/`; `.github/workflows/pages.yml` deploys that from `main` and is skipped while the repository is private. `site/showcase-vault.js` seeds the demo for visitors without demo data and feeds `node tools/site_screenshots.mjs` (regenerates `site/assets/shot-*.png` from a running demo). Update the page when features or the README status change.
 
 ## Test coverage traps
 

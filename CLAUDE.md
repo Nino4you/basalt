@@ -8,9 +8,11 @@ Basalt (`basalt-notes`) is a local-first Markdown workspace for **Linux and Andr
 core, a Tauri 2 shell, and a framework-free TypeScript WebView UI built on CodeMirror 6. It is an
 independent reimplementation with an Obsidian-compatible plugin layer, not an Obsidian fork.
 
-README, SECURITY.md, `docs/`, identifiers and code comments are **English**; the user-facing UI
-strings are currently **German**. Playwright tests locate elements by their German
-accessible names, so renaming a label means updating `tests/e2e/app.spec.ts`.
+README, SECURITY.md, `docs/`, identifiers and code comments are **English**. The UI defaults to
+**English** with German selectable; the German source strings are the message keys
+(`src/i18n/`, see `docs/localization.md`). Existing Playwright and unit suites select German and
+locate elements by their German accessible names, so renaming a label means updating its key,
+`src/i18n/en.ts` and `tests/e2e/app.spec.ts`.
 
 ## Commands
 
@@ -72,6 +74,17 @@ Coverage traps:
   `jniLibs`.
 
 TypeScript/config files are formatted with Prettier defaults (no config file, no npm script).
+
+### Project page (`site/`)
+
+`site/` is the static landing page for GitHub Pages (plain HTML/CSS/JS, English markup with a
+German table in `site/main.js`, no third-party requests). `node tools/build_site.mjs` copies it
+to `_site/` and builds the browser demo into `_site/demo/` with relative asset paths;
+`.github/workflows/pages.yml` deploys that on pushes to `main` and is skipped while the
+repository is private. The page seeds the demo with `site/showcase-vault.js` only when the
+visitor has no demo data; the same vault feeds `node tools/site_screenshots.mjs`, which
+regenerates `site/assets/shot-*.png` from a running demo. Update the page when features or the
+status in the README change.
 
 ## Architecture
 

@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0e1213" />
+    <title>Basalt — a quiet place for connected thoughts</title>
+    <meta
+      name="description"
+      content="Basalt is a local-first Markdown workspace for Linux and Android, with a Rust core and support for Obsidian vaults and selected Obsidian plugins."
+    />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:title"
+      content="Basalt — a quiet place for connected thoughts"
+    />
+    <meta
+      property="og:description"
+      content="A local-first Markdown workspace for Linux and Android. Plain files, no account, no cloud."
+    />
+    <meta
+      property="og:image"
+      content="https://nino4you.github.io/basalt/assets/shot-editor.png"
+    />
+    <link rel="icon" type="image/svg+xml" href="assets/basalt.svg" />
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="main.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main" data-i18n="skip">Skip to content</a>
+
+    <header class="nav">
+      <div class="wrap nav-inner">
+        <a class="brand" href="#top" aria-label="Basalt">
+          <img src="assets/basalt.svg" width="28" height="28" alt="" />
+          <span>Basalt</span>
+        </a>
+        <nav class="nav-links" aria-label="Sections">
+          <a href="#features" data-i18n="nav.features">Features</a>
+          <a href="#plugins" data-i18n="nav.plugins">Plugins</a>
+          <a href="#core" data-i18n="nav.core">Under the hood</a>
+          <a href="#download" data-i18n="nav.download">Download</a>
+        </nav>
+        <div class="nav-side">
+          <div class="lang" role="group" aria-label="Language">
+            <button type="button" data-lang="en" aria-pressed="true">EN</button>
+            <button type="button" data-lang="de" aria-pressed="false">
+              DE
+            </button>
+          </div>
+          <a class="nav-gh" href="https://github.com/Nino4you/basalt">GitHub</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- Hero -->
+      <section class="hero" id="top">
+        <svg class="hexfield" aria-hidden="true"></svg>
+        <div class="wrap hero-inner">
+          <p class="chip">
+            <span class="chip-dot"></span>
+            <span data-i18n="hero.chip"
+              >Preview 0.2 · Linux &amp; Android · open source</span
+            >
+          </p>
+          <h1 data-i18n="hero.title">
+            A quiet place for
+            <span class="wikilink"><i>[[</i>connected<i>]]</i></span>
+            thoughts.
+          </h1>
+          <p class="lead" data-i18n="hero.lead">
+            Basalt is a local-first Markdown workspace for Linux and Android.
+            Your notes are plain files in a folder you choose, and existing
+            Obsidian vaults open directly.
+          </p>
+          <div class="cta">
+            <a
+              class="btn btn-primary"
+              href="#download"
+              data-i18n="hero.download"
+              >Download Basalt</a
+            >
+            <a
+              class="btn btn-ghost"
+              href="demo/"
+              data-demo-link
+              data-i18n="hero.demo"
+            >
+              Try it in your browser
+            </a>
+          </div>
+          <p class="hero-note" data-i18n="hero.note">
+            No account. No cloud. No telemetry.
+          </p>
+
+          <figure class="window hero-window" id="demo-frame">
+            <img
+              src="assets/shot-editor.png"
+              width="2880"
+              height="1800"
+              alt="Basalt on the desktop: file tree, a note in live preview with task list, math and a table, and backlinks on the right"
+              data-i18n-alt="hero.alt"
+            />
+            <button class="demo-launch" type="button" data-demo-launch>
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                aria-hidden="true"
+              >
+                <path d="M7 4.5v15l12-7.5z" fill="currentColor" />
+              </svg>
+              <span data-i18n="hero.launch">Run the demo right here</span>
+            </button>
+          </figure>
+          <p class="caption" data-i18n="hero.caption">
+            That is the real app, not a mock-up. The demo keeps its notes in
+            your browser only.
+          </p>
+        </div>
+      </section>
+
+      <!-- Pillars -->
+      <section class="pillars">
+        <div class="wrap grid-4">
+          <article class="pillar">
+            <span class="hex" aria-hidden="true"></span>
+            <h3 data-i18n="p1.title">Your files stay your files</h3>
+            <p data-i18n="p1.text">
+              Notes are plain Markdown in a folder you choose. No account, no
+              cloud, no telemetry.
+            </p>
+          </article>
+          <article class="pillar">
+            <span class="hex" aria-hidden="true"></span>
+            <h3 data-i18n="p2.title">Works with your vault</h3>
+            <p data-i18n="p2.text">
+              Wiki links, tags, frontmatter, callouts, embeds and canvas files
+              behave the way you expect.
+            </p>
+          </article>
+          <article class="pillar">
+            <span class="hex" aria-hidden="true"></span>
+            <h3 data-i18n="p3.title">Built for Linux and Android</h3>
+            <p data-i18n="p3.text">
+              One shared Rust core, one native app, and an interface for mouse,
+              keyboard, touch and pen.
+            </p>
+          </article>
+          <article class="pillar">
+            <span class="hex" aria-hidden="true"></span>
+            <h3 data-i18n="p4.title">Careful with your data</h3>
+            <p data-i18n="p4.text">
+              Every change is backed up before it is saved. External edits are
+              detected instead of overwritten.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <!-- Features -->
+      <section class="features" id="features">
+        <div class="wrap">
+          <div class="feature">
+            <div class="feature-text">
+              <p class="tag">#writing</p>
+              <h2 data-i18n="f1.title">Markdown that gets out of your way</h2>
+              <p data-i18n="f1.text">
+                In live preview the syntax fades while you write. Links and
+                checkboxes are clickable, and math, diagrams and tables render
+                right in the editor. The Markdown underneath stays the source of
+                truth.
+              </p>
+              <ul class="ticks">
+                <li data-i18n="f1.a">
+                  Completion for <code>[[wiki links]]</code> and
+                  <code>#tags</code>
+                </li>
+                <li data-i18n="f1.b">
+                  KaTeX math, Mermaid diagrams, tables edited cell by cell
+                </li>
+                <li data-i18n="f1.c">
+                  Page previews on hover, templates, a source mode
+                </li>
+                <li data-i18n="f1.d">
+                  Reading view with callouts, properties and embeds
+                </li>
+              </ul>
+            </div>
+            <div class="feature-art">
+              <div
+                class="duo"
+                role="img"
+                aria-label="Markdown source on the left, the same note in live preview on the right"
+                data-i18n-aria="f1.alt"
+              >
+                <div class="duo-pane duo-source">
+                  <p class="duo-label" data-i18n="f1.source">what you type</p>
+                  <pre><span class="m">##</span> Hexagons, briefly
+
+<span class="m">- [x]</span> Write it down
+<span class="m">- [ ]</span> Link it to <span class="m">[[</span>Svartifoss<span class="m">]]</span>
+
+<span class="m">&gt;</span> Slow cooling, wide columns.
+
+<span class="m">$</span>A = \frac{3\sqrt{3}}{2}s^2<span class="m">$</span></pre>
+                </div>
+                <div class="duo-pane duo-preview">
+                  <p class="duo-label" data-i18n="f1.preview">what you see</p>
+                  <div class="rendered">
+                    <h4>Hexagons, briefly</h4>
+                    <p class="task done">
+                      <span class="box"></span><s>Write it down</s>
+                    </p>
+                    <p class="task">
+                      <span class="box"></span>Link it to <u>Svartifoss</u>
+                    </p>
+                    <blockquote>Slow cooling, wide columns.</blockquote>
+                    <p class="math">
+                      <i>A</i> =
+                      <span class="frac"><span>3√3</span><span>2</span></span>
+                      <span><i>s</i><sup>2</sup></span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="feature flip">
+            <div class="feature-text">
+              <p class="tag">#linking</p>
+              <h2 data-i18n="f2.title">See how it all hangs together</h2>
+              <p data-i18n="f2.text">
+                Every link works in both directions. Backlinks show the sentence
+                around each mention, and the graph draws your vault as what it
+                is: a network.
+              </p>
+              <ul class="ticks">
+                <li data-i18n="f2.a">
+                  Backlinks with context, outgoing links, tags and outline
+                </li>
+                <li data-i18n="f2.b">
+                  Full-text search with <code>tag:</code>,
+                  <code>path:</code> and
+                  <code>file:</code>
+                </li>
+                <li data-i18n="f2.c">
+                  Graph of the whole vault, or a local graph of one note
+                </li>
+              </ul>
+            </div>
+            <div class="feature-art">
+              <figure class="window">
+                <img
+                  loading="lazy"
+                  src="assets/shot-graph.png"
+                  width="2240"
+                  height="1460"
+                  alt="Graph view: eight notes as connected nodes, with filter settings"
+                  data-i18n-alt="f2.alt"
+                />
+              </figure>
+            </div>
+          </div>
+
+          <div class="feature">
+            <div class="feature-text">
+              <p class="tag">#canvas</p>
+              <h2 data-i18n="f3.title">Room to lay things out</h2>
+              <p data-i18n="f3.text">
+                Some thoughts are not a list. Put notes, text, links and groups
+                on an endless canvas and connect them with arrows.
+              </p>
+              <ul class="ticks">
+                <li data-i18n="f3.a">
+                  Stored in the open JSON Canvas format (<code>.canvas</code>)
+                </li>
+                <li data-i18n="f3.b">
+                  Boards written by other apps round-trip without loss
+                </li>
+                <li data-i18n="f3.c">
+                  Mouse, touch and pen, with pinch to zoom
+                </li>
+              </ul>
+            </div>
+            <div class="feature-art">
+              <figure class="window">
+                <img
+                  loading="lazy"
+                  src="assets/shot-canvas.png"
+                  width="2240"
+                  height="1460"
+                  alt="Canvas with text cards, embedded notes and arrows between them"
+                  data-i18n-alt="f3.alt"
+                />
+              </figure>
+            </div>
+          </div>
+
+          <div class="feature flip">
+            <div class="feature-text">
+              <p class="tag">#workspace</p>
+              <h2 data-i18n="f4.title">A workspace that bends to you</h2>
+              <p data-i18n="f4.text">
+                Split the editor, dock side views where you want them and keep a
+                second note next to the first. The layout is remembered per
+                vault.
+              </p>
+              <ul class="ticks">
+                <li data-i18n="f4.a">
+                  Tabs with their own history, splits, dockable panels
+                </li>
+                <li data-i18n="f4.b">
+                  Quick switcher <kbd>Ctrl</kbd> <kbd>O</kbd>, command palette
+                  <kbd>Ctrl</kbd>
+                  <kbd>P</kbd>
+                </li>
+                <li data-i18n="f4.c">
+                  Light and dark theme, with an accent color of your choice
+                </li>
+                <li data-i18n="f4.d">
+                  PDFs, images, audio and video open in their own tabs
+                </li>
+              </ul>
+            </div>
+            <div class="feature-art">
+              <figure class="window">
+                <img
+                  loading="lazy"
+                  src="assets/shot-split.png"
+                  width="2240"
+                  height="1460"
+                  alt="Two notes side by side, with the local graph of the active note in the sidebar"
+                  data-i18n-alt="f4.alt"
+                />
+              </figure>
+            </div>
+          </div>
+
+          <div class="feature feature-phone">
+            <div class="feature-text">
+              <p class="tag">#android</p>
+              <h2 data-i18n="f5.title">The same vault in your pocket</h2>
+              <p data-i18n="f5.text">
+                The Android app is not a shrunken desktop. It has its own layout
+                with drawers, a bottom bar and a formatting toolbar above the
+                keyboard, and it runs on the same Rust core.
+              </p>
+              <ul class="ticks">
+                <li data-i18n="f5.a">
+                  Opens a folder you pick through Android's storage access
+                </li>
+                <li data-i18n="f5.b">Made for touch and pen</li>
+                <li data-i18n="f5.c">
+                  One universal APK for ARM64, ARMv7 and x86_64
+                </li>
+              </ul>
+            </div>
+            <div class="feature-art">
+              <figure class="phone">
+                <img
+                  loading="lazy"
+                  src="assets/shot-phone.png"
+                  width="1082"
+                  height="2202"
+                  alt="Basalt on a phone: a note in reading view with a bottom navigation bar"
+                  data-i18n-alt="f5.alt"
+                />
+              </figure>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Plugins -->
+      <section class="band" id="plugins">
+        <div class="wrap narrow center">
+          <p class="tag">#plugins</p>
+          <h2 data-i18n="pl.title">
+            Bring your plugins. The selected ones, for now.
+          </h2>
+          <p class="lead" data-i18n="pl.text">
+            Basalt ships its own implementation of the Obsidian plugin API. The
+            goal is solid support for a chosen set of plugins rather than a
+            vague promise for all of them.
+          </p>
+          <div class="grid-3 left">
+            <article class="card">
+              <h3 data-i18n="pl.a.title">Opt-in, one by one</h3>
+              <p data-i18n="pl.a.text">
+                Plugins live in the vault under <code>Basalt/Plugins/</code> and
+                only run after you enable each one in the settings.
+              </p>
+            </article>
+            <article class="card">
+              <h3 data-i18n="pl.b.title">Honest about gaps</h3>
+              <p data-i18n="pl.b.text">
+                A missing API fails visibly instead of pretending to work.
+                Plugins that need Node.js or Electron do not run.
+              </p>
+            </article>
+            <article class="card warn">
+              <h3 data-i18n="pl.c.title">Trusted, not sandboxed</h3>
+              <p data-i18n="pl.c.text">
+                Plugin code runs with the same permissions as the app. Only
+                enable plugins you trust.
+              </p>
+            </article>
+          </div>
+          <p>
+            <a
+              class="more"
+              href="https://github.com/Nino4you/basalt/blob/main/docs/plugin-compatibility.md"
+              data-i18n="pl.more"
+              >What has been verified, and what has not →</a
+            >
+          </p>
+        </div>
+      </section>
+
+      <!-- Under the hood -->
+      <section class="core" id="core">
+        <div class="wrap core-inner">
+          <div class="core-text">
+            <p class="tag">#bedrock</p>
+            <h2 data-i18n="c.title">Solid all the way down</h2>
+            <p data-i18n="c.text">
+              Basalt is three layers with a narrow seam between each. The part
+              that touches your files is a small Rust library that knows nothing
+              about the interface, and it is deliberately cautious.
+            </p>
+            <ul class="ticks">
+              <li data-i18n="c.a">
+                File access cannot leave the vault folder, not even through
+                symlinks
+              </li>
+              <li data-i18n="c.b">
+                Saving compares against what was loaded, so nothing is
+                overwritten blindly
+              </li>
+              <li data-i18n="c.c">
+                A backup goes to <code>.basalt/history/</code> first; deleted
+                files go to
+                <code>.basalt/trash/</code>
+              </li>
+            </ul>
+            <p>
+              <a
+                class="more"
+                href="https://github.com/Nino4you/basalt/blob/main/SECURITY.md"
+                data-i18n="c.more"
+                >Read the security boundaries →</a
+              >
+            </p>
+          </div>
+          <ol
+            class="strata"
+            aria-label="Architecture layers"
+            data-i18n-aria="c.aria"
+          >
+            <li>
+              <strong data-i18n="c.l1.title">Interface</strong>
+              <span data-i18n="c.l1.text"
+                >TypeScript without a framework, CodeMirror 6 editor</span
+              >
+            </li>
+            <li>
+              <strong data-i18n="c.l2.title">Native shell</strong>
+              <span data-i18n="c.l2.text"
+                >Tauri 2, commands scoped to the open vault</span
+              >
+            </li>
+            <li>
+              <strong data-i18n="c.l3.title">Vault core</strong>
+              <span data-i18n="c.l3.text"
+                >Rust: validated paths, version checks, backups</span
+              >
+            </li>
+            <li class="ground">
+              <span data-i18n="c.l4.text">Your folder of Markdown files</span>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- Status -->
+      <section class="status">
+        <div class="wrap narrow">
+          <div class="status-box">
+            <p class="tag">#status</p>
+            <h2 data-i18n="s.title">Still cooling</h2>
+            <p data-i18n="s.text">
+              Basalt is a preview (0.2) and not yet a complete replacement for
+              Obsidian. The core is stable and tested, but a few things are
+              missing:
+            </p>
+            <ul class="plain">
+              <li data-i18n="s.a">no automatic updates and no built-in sync</li>
+              <li data-i18n="s.b">plugin support for selected plugins only</li>
+              <li data-i18n="s.c">
+                backups have to be restored by hand for now
+              </li>
+              <li data-i18n="s.d">
+                direct downloads only, no Play Store or distribution packages
+                yet
+              </li>
+            </ul>
+            <p class="status-tip" data-i18n="s.tip">
+              Make a copy of any important vault before opening it for the first
+              time.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Download -->
+      <section class="download" id="download">
+        <div class="wrap narrow center">
+          <img
+            class="download-logo"
+            src="assets/basalt.svg"
+            width="72"
+            height="72"
+            alt=""
+          />
+          <h2 data-i18n="d.title">Get Basalt</h2>
+          <p class="lead" data-i18n="d.text">
+            Free and open source. Signed packages are published on GitHub.
+          </p>
+          <div class="grid-2 left">
+            <article class="card dl">
+              <h3>Linux</h3>
+              <p data-i18n="d.linux">
+                x86_64, as a <code>.deb</code> package or an AppImage.
+              </p>
+              <a
+                class="btn btn-primary"
+                href="https://github.com/Nino4you/basalt/releases"
+                data-i18n="d.linux.btn"
+                >Download for Linux</a
+              >
+            </article>
+            <article class="card dl">
+              <h3>Android</h3>
+              <p data-i18n="d.android">
+                One universal APK for ARM64, ARMv7 and x86_64.
+              </p>
+              <a
+                class="btn btn-primary"
+                href="https://github.com/Nino4you/basalt/releases"
+                data-i18n="d.android.btn"
+                >Download for Android</a
+              >
+            </article>
+          </div>
+          <details class="verify left">
+            <summary data-i18n="d.verify">Verify your download</summary>
+            <p data-i18n="d.verify.text">
+              All downloads are signed. Check them against these fingerprints as
+              described in the
+              <a
+                href="https://github.com/Nino4you/basalt/blob/main/docs/release-signing.md#verifying-downloads"
+                >release signing notes</a
+              >.
+            </p>
+            <dl>
+              <dt data-i18n="d.pgp">OpenPGP (Linux packages, checksums)</dt>
+              <dd>
+                <code>628F A944 F494 AED2 1F0B 6CCD B72F F2A2 4F65 FB22</code>
+              </dd>
+              <dt data-i18n="d.cert">Android certificate (SHA-256)</dt>
+              <dd>
+                <code
+                  >C0:3E:FA:2F:40:12:C4:57:FC:44:D7:68:B2:64:AA:BF:0F:2D:54:D3:3B:C3:06:7B:8C:6D:1B:76:84:83:4A:51</code
+                >
+              </dd>
+            </dl>
+          </details>
+          <p class="alt-links">
+            <a href="demo/" data-demo-link data-i18n="d.demo"
+              >Try the browser demo</a
+            >
+            <span aria-hidden="true">·</span>
+            <a
+              href="https://github.com/Nino4you/basalt#building-from-source"
+              data-i18n="d.source"
+              >Build from source</a
+            >
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="columns" aria-hidden="true"></div>
+      <div class="wrap footer-inner">
+        <div class="footer-brand">
+          <a class="brand" href="#top" aria-label="Basalt">
+            <img src="assets/basalt.svg" width="24" height="24" alt="" />
+            <span>Basalt</span>
+          </a>
+          <p data-i18n="ft.tagline">A quiet place for connected thoughts.</p>
+        </div>
+        <nav class="footer-links" aria-label="Project">
+          <a href="https://github.com/Nino4you/basalt" data-i18n="ft.source"
+            >Source code</a
+          >
+          <a
+            href="https://github.com/Nino4you/basalt/issues"
+            data-i18n="ft.issues"
+            >Report an issue</a
+          >
+          <a
+            href="https://github.com/Nino4you/basalt/blob/main/SECURITY.md"
+            data-i18n="ft.security"
+            >Security</a
+          >
+          <a
+            href="https://github.com/Nino4you/basalt/blob/main/docs/plugin-compatibility.md"
+            data-i18n="ft.plugins"
+            >Plugin compatibility</a
+          >
+          <a
+            href="https://github.com/Nino4you/basalt/blob/main/LICENSE"
+            data-i18n="ft.license"
+            >License: MPL-2.0</a
+          >
+          <a
+            href="https://github.com/Nino4you/basalt/blob/main/THIRD_PARTY_NOTICES.md"
+            data-i18n="ft.notices"
+            >Third-party notices</a
+          >
+        </nav>
+        <div class="footer-legal">
+          <p data-i18n="ft.private">
+            This page loads no fonts, scripts or trackers from third parties,
+            and sets no cookies.
+          </p>
+          <p data-i18n="ft.trademark">
+            “Obsidian” is a trademark of its respective owner. Basalt is an
+            independent project and is not affiliated with Obsidian or its
+            makers; the name is used only to describe compatibility with
+            Obsidian vaults and plugins.
+          </p>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

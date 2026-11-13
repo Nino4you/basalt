@@ -13,6 +13,7 @@ Obsidian vaults and selected Obsidian plugins.
 ![Platforms: Linux | Android](https://img.shields.io/badge/Platforms-Linux%20%7C%20Android-informational)
 ![Status: preview](https://img.shields.io/badge/Status-Preview%200.2-orange)
 
+[Website](https://nino4you.github.io/basalt/) · [Live demo](https://nino4you.github.io/basalt/demo/) ·
 [Features](#features) · [Installation](#installation) · [Plugins](#plugins) ·
 [Building from source](#building-from-source) · [Contributing](#contributing)
 
@@ -81,9 +82,10 @@ All downloads are signed. Please verify them against these fingerprints as descr
 | OpenPGP (Linux packages, checksums) | `628F A944 F494 AED2 1F0B  6CCD B72F F2A2 4F65 FB22`                                              |
 | Android certificate (SHA-256)       | `C0:3E:FA:2F:40:12:C4:57:FC:44:D7:68:B2:64:AA:BF:0F:2D:54:D3:3B:C3:06:7B:8C:6D:1B:76:84:83:4A:51` |
 
-To try Basalt without installing it, run the browser demo: `npm ci && npm run dev` (see
-[Building from source](#building-from-source)). It only stores data in the browser, not in real
-files.
+To try Basalt without installing it, open the
+[live demo](https://nino4you.github.io/basalt/demo/) or run it locally with
+`npm ci && npm run dev` (see [Building from source](#building-from-source)). The demo only stores
+data in the browser, not in real files.
 
 ## Status
 
@@ -151,6 +153,7 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 | `crates/vault-cli/`  | Command-line client for the core                            |
 | `src-tauri/`         | Native shell, vault-scoped IPC, Android storage (SAF)       |
 | `src/`               | Interface, editor, views and the plugin compatibility layer |
+| `site/`              | Project page, published with the demo via GitHub Pages      |
 | `tools/`             | Android patch, smoke tests and release scripts              |
 
 More details: [Security boundaries](SECURITY.md),

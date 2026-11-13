@@ -1,0 +1,65 @@
+name: Project page
+
+# Publishes site/ and the browser demo to GitHub Pages.
+#
+# One-time setup after the repository becomes public:
+# Settings → Pages → Build and deployment → Source: "GitHub Actions".
+# Then run this workflow once by hand (Actions → Project page → Run workflow);
+# afterwards every push to main redeploys.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "package-lock.json"
+      - "vite.config.ts"
+      - "tools/build_site.mjs"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Let a running deployment finish; only the newest waiting one is kept.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build page and demo
+    # GitHub Pages needs a public repository on the free plan. While the
+    # repository is private this job is skipped instead of failing every push.
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node tools/build_site.mjs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
