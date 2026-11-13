@@ -22,6 +22,12 @@ export interface Settings {
   showRibbon: boolean;
   /** Rewrite links to a file when it is renamed or moved. */
   updateLinks: boolean;
+  /** Folder for daily notes ("" is the vault root). */
+  dailyFolder: string;
+  /** Moment-style name of a daily note, such as `YYYY-MM-DD`. */
+  dailyFormat: string;
+  /** Template for new daily notes; "" for none. */
+  dailyTemplate: string;
 }
 
 export const DEFAULT_ACCENT = "#8a5cf5";
@@ -41,6 +47,9 @@ export const defaults: Settings = {
   newNoteLocation: "root",
   showRibbon: true,
   updateLinks: true,
+  dailyFolder: "",
+  dailyFormat: "YYYY-MM-DD",
+  dailyTemplate: "",
 };
 
 const KEY = "basalt-settings";

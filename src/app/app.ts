@@ -1,4 +1,4 @@
-import { plural, t, type Locale } from "../i18n";
+import { getLocale, plural, t, type Locale } from "../i18n";
 import type { EditorState } from "@codemirror/state";
 import {
   backend,
@@ -48,6 +48,7 @@ import { ReadingView } from "./reading";
 import { LinkPreview } from "./link-preview";
 import { SearchView } from "./search";
 import { expandTemplate, templatePaths } from "./templates";
+import { formatDate, parseDate } from "../dates";
 import { SettingsStore } from "./settings";
 import { openSettings } from "./settings-modal";
 import {
@@ -2441,13 +2442,87 @@ export class App {
     }
   }
 
-  async dailyNote(): Promise<void> {
-    const now = new Date();
-    const pad = (value: number) => String(value).padStart(2, "0");
-    const name = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    const path = `${name}.md`;
-    if (this.index.has(path)) await this.openPath(path);
-    else await this.createNote(name);
+  /** Path of the daily note for `date`, after the daily note settings. */
+  dailyNotePath(date: Date): string {
+    const folder = this.settings.get("dailyFolder").replace(/^\/+|\/+$/g, "");
+    const name = formatDate(
+      date,
+      this.settings.get("dailyFormat").trim() || "YYYY-MM-DD",
+      getLocale(),
+    );
+    return `${folder ? `${folder}/` : ""}${name}.md`;
+  }
+
+  /** The day a note stands for, if it is a daily note. */
+  private dailyNoteDate(path: string): Date | null {
+    const folder = this.settings.get("dailyFolder").replace(/^\/+|\/+$/g, "");
+    const prefix = folder ? `${folder}/` : "";
+    if (!path.startsWith(prefix) || !/\.md$/i.test(path)) return null;
+    return parseDate(
+      path.slice(prefix.length, -3),
+      this.settings.get("dailyFormat").trim() || "YYYY-MM-DD",
+      getLocale(),
+    );
+  }
+
+  /** Opens the daily note for `date`, creating it (and its folders) from the template. */
+  async dailyNote(date = new Date()): Promise<void> {
+    const vault = this.vault;
+    if (!vault) return;
+    const path = this.dailyNotePath(date);
+    if (this.index.has(path)) return this.openPath(path);
+    try {
+      const template = this.settings.get("dailyTemplate");
+      const text =
+        template && this.index.has(template)
+          ? expandTemplate(
+              await backend.read(template, vault.id),
+              basename(path),
+              date,
+            )
+          : undefined;
+      await this.ensureFolder(dirname(path));
+      await this.createNote(path, { text, throwOnError: true });
+    } catch (error) {
+      this.report(error);
+    }
+  }
+
+  /** Steps to the closest earlier or later daily note that exists. */
+  async adjacentDailyNote(direction: 1 | -1): Promise<void> {
+    const from =
+      (this.activePath ? this.dailyNoteDate(this.activePath) : null) ?? new Date();
+    const day = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime();
+    let best: { path: string; time: number } | null = null;
+    for (const path of this.index.files) {
+      const date = this.dailyNoteDate(path);
+      if (!date) continue;
+      const time = date.getTime();
+      if (direction > 0 ? time <= day : time >= day) continue;
+      if (!best || (direction > 0 ? time < best.time : time > best.time))
+        best = { path, time };
+    }
+    if (best) await this.openPath(best.path);
+    else
+      notify(
+        direction > 0
+          ? t("Keine spätere Tagesnotiz gefunden.")
+          : t("Keine frühere Tagesnotiz gefunden."),
+      );
+  }
+
+  /** Creates the missing folders of `folder`, one level at a time. */
+  private async ensureFolder(folder: string): Promise<void> {
+    if (!folder) return;
+    const existing = new Set(this.folders());
+    const parts = folder.split("/");
+    for (let i = 1; i <= parts.length; i++) {
+      const path = parts.slice(0, i).join("/");
+      if (existing.has(path)) continue;
+      // The browser demo has no folders of its own; files carry their path.
+      if (!this.compatibility) return;
+      await this.compatibility.vault.createFolder(path);
+    }
   }
 
   // ── bookmarks ─────────────────────────────────────────────────────────────
@@ -3978,6 +4053,18 @@ export class App {
       name: t("Heutige Tagesnotiz öffnen"),
       icon: "calendar",
       run: () => void this.dailyNote(),
+    });
+    add({
+      id: "daily-note-previous",
+      name: t("Vorherige Tagesnotiz öffnen"),
+      icon: "chevron-left",
+      run: () => void this.adjacentDailyNote(-1),
+    });
+    add({
+      id: "daily-note-next",
+      name: t("Nächste Tagesnotiz öffnen"),
+      icon: "chevron-right",
+      run: () => void this.adjacentDailyNote(1),
     });
     add({
       id: "insert-template",

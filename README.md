@@ -51,6 +51,8 @@ Obsidian vaults and selected Obsidian plugins.
   bookmarks and unsaved changes along; links to a renamed or moved note are updated.
 - Backlinks with context, unlinked mentions that become links with one click, outgoing links,
   tags, outline and full-text search (`tag:`, `path:`, `file:`, exclusion with `-`).
+- Daily notes with their own folder, date format (Moment.js style) and template, and commands
+  to step to the previous or next one.
 - Graph view for the whole vault and as a local graph of the active note, with group colors.
 - Canvas in the open JSON Canvas format (`.canvas`) with text, note, link and group cards.
 - File recovery: every earlier version of a note or canvas and every deleted file can be

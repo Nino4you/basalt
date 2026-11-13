@@ -13,6 +13,8 @@ import {
 import { Modal } from "../ui/modal";
 import { notify } from "../ui/notice";
 import { eventHotkey, isAssignable, type Command } from "./commands";
+import { formatDate } from "../dates";
+import { templatePaths } from "./templates";
 import type { App } from "./app";
 import { DEFAULT_ACCENT, type Settings } from "./settings";
 
@@ -183,6 +185,24 @@ function dropdown<T extends string>(
   );
   select.addEventListener("change", () => onChange(select.value as T));
   target.control.append(select);
+}
+
+/** A text field that applies its value when it is committed (Enter or leaving it). */
+function textField(
+  target: Row,
+  label: string,
+  value: string,
+  onChange: (value: string) => void,
+  placeholder = "",
+): HTMLInputElement {
+  const input = h("input", {
+    label,
+    attrs: { type: "text", placeholder, spellcheck: "false", autocomplete: "off" },
+  });
+  input.value = value;
+  input.addEventListener("change", () => onChange(input.value.trim()));
+  target.control.append(input);
+  return input;
 }
 
 type CoreTab =
@@ -462,6 +482,58 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         t("Interne Links automatisch aktualisieren"),
         settings.get("updateLinks"),
         set("updateLinks"),
+      );
+      heading(content, t("Tagesnotizen"));
+      textField(
+        row(
+          content,
+          t("Ordner für neue Tagesnotizen"),
+          t("Leer lassen für den Vault-Stammordner. Fehlende Ordner werden angelegt."),
+        ),
+        t("Ordner für neue Tagesnotizen"),
+        settings.get("dailyFolder"),
+        set("dailyFolder"),
+        t("Tagebuch"),
+      );
+      const formatRow = row(
+        content,
+        t("Datumsformat"),
+        t("Moment.js-Format, Text in [eckigen Klammern] bleibt wörtlich."),
+      );
+      const example = h("div", { class: "setting-item-description" });
+      formatRow.el.querySelector(".setting-item-info")!.append(example);
+      const showExample = (pattern: string) => {
+        example.textContent = t("Beispiel: {name}", {
+          name: formatDate(new Date(), pattern || "YYYY-MM-DD", getLocale()),
+        });
+      };
+      const formatInput = textField(
+        formatRow,
+        t("Datumsformat"),
+        settings.get("dailyFormat"),
+        (value) => settings.set("dailyFormat", value || "YYYY-MM-DD"),
+        "YYYY-MM-DD",
+      );
+      formatInput.addEventListener("input", () => showExample(formatInput.value.trim()));
+      showExample(settings.get("dailyFormat"));
+      dropdown(
+        row(
+          content,
+          t("Vorlage"),
+          t("Vorlagen liegen in einem Ordner „_templates“. {date} und {title} werden ersetzt.", {
+            date: "{{date}}",
+            title: "{{title}}",
+          }),
+        ),
+        t("Vorlage"),
+        [
+          ["", t("Keine Vorlage")],
+          ...templatePaths(app.index.files).map(
+            (path) => [path, path] as [string, string],
+          ),
+        ],
+        settings.get("dailyTemplate"),
+        set("dailyTemplate"),
       );
       heading(content, t("Archivierte Entwürfe"));
       content.append(
