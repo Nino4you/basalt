@@ -917,6 +917,34 @@ body.hide-ribbon .sidebar-toggle-button.mod-inline {
 .pane-section-header:not(:first-child) {
   margin-top: 12px;
 }
+/* "Unlinked mentions": a header that folds its section. */
+.pane-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: auto;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+  font-size: inherit;
+}
+.pane-section-toggle:hover {
+  background: var(--background-modifier-hover);
+}
+.pane-section-toggle > .svg-icon {
+  flex: none;
+  color: var(--text-faint);
+}
+.mention-link-button {
+  display: block;
+  margin: 6px 0 0 auto;
+  padding: 2px 10px;
+  height: auto;
+  font-size: var(--font-ui-smaller);
+}
 .pane-file-row {
   gap: 6px;
   padding-left: 8px;

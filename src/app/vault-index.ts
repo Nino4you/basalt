@@ -170,6 +170,56 @@ export function scanNote(text: string): NoteMeta {
   return { links, tags: [...tags.keys()], tagRefs: [...tags.values()] };
 }
 
+/**
+ * Places where `name` appears as plain text in a note: whole words only,
+ * case-insensitive, outside frontmatter, code, existing links, tags and URLs.
+ * Columns refer to the original line.
+ */
+export function findUnlinkedMentions(
+  text: string,
+  name: string,
+): Array<{ line: number; col: number; length: number }> {
+  const needle = name.trim();
+  if (!needle || !text.toLowerCase().includes(needle.toLowerCase())) return [];
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const word = new RegExp(
+    `(?<![\\p{L}\\p{N}_#/])${escaped}(?![\\p{L}\\p{N}_])`,
+    "giu",
+  );
+  const lines = text.split("\n");
+  const links = new Map<number, LinkRef[]>();
+  for (const link of scanNote(text).links) {
+    const list = links.get(link.line);
+    if (list) list.push(link);
+    else links.set(link.line, [link]);
+  }
+  const found: Array<{ line: number; col: number; length: number }> = [];
+  let fence: string | null = null;
+  for (let i = frontmatterEnd(lines); i < lines.length; i++) {
+    const raw = lines[i];
+    const delimiter = FENCE.exec(raw);
+    if (delimiter) {
+      if (!fence) fence = delimiter[1];
+      else if (delimiter[1][0] === fence[0] && delimiter[1].length >= fence.length)
+        fence = null;
+      continue;
+    }
+    if (fence) continue;
+    let line = maskInlineCode(raw).replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, (url) =>
+      " ".repeat(url.length),
+    );
+    for (const link of links.get(i) ?? [])
+      line =
+        line.slice(0, link.col) +
+        " ".repeat(link.length) +
+        line.slice(link.col + link.length);
+    word.lastIndex = 0;
+    for (let m = word.exec(line); m; m = word.exec(line))
+      found.push({ line: i, col: m.index, length: m[0].length });
+  }
+  return found;
+}
+
 /** Cached marker for links that point at their own source note. */
 const SELF = "\0self";
 
@@ -459,6 +509,24 @@ export class VaultIndex {
           text: "",
         });
       }
+    }
+    return result;
+  }
+
+  /**
+   * Notes that name `path` in plain text without linking to it, with each
+   * place and its line, for "Unlinked mentions".
+   */
+  unlinkedMentions(path: string): Mention[] {
+    const name = path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/i, "");
+    const needle = name.toLowerCase();
+    const result: Mention[] = [];
+    for (const [source, text] of this.contents) {
+      if (source === path || !isNote(source)) continue;
+      if (!this.lower(source).includes(needle)) continue;
+      const lines = text.split("\n");
+      for (const place of findUnlinkedMentions(text, name))
+        result.push({ source, ...place, text: lines[place.line] });
     }
     return result;
   }

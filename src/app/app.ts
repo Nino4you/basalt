@@ -1752,6 +1752,35 @@ export class App {
     await this.replaceText(note, text);
   }
 
+  /**
+   * Turns a plain-text mention of `target` in `source` into a link. Refuses
+   * when the text at that place no longer names the target.
+   */
+  async linkMention(
+    source: string,
+    place: { line: number; col: number; length: number },
+    target: string,
+  ): Promise<void> {
+    const store = this.store;
+    if (!store) throw new Error(t("Kein Vault geöffnet."));
+    const note = await store.load(source);
+    const lines = note.text.split("\n");
+    const line = lines[place.line] ?? "";
+    const written = line.slice(place.col, place.col + place.length);
+    const name = basename(target);
+    if (written.toLowerCase() !== name.toLowerCase())
+      throw new Error(t("Die Stelle hat sich inzwischen geändert. Bitte erneut versuchen."));
+    const link =
+      this.index.resolve(name, source) === target
+        ? name
+        : target.replace(/\.md$/i, "");
+    lines[place.line] =
+      line.slice(0, place.col) +
+      (link === written ? `[[${link}]]` : `[[${link}|${written}]]`) +
+      line.slice(place.col + place.length);
+    await this.replaceText(note, lines.join("\n"));
+  }
+
   /** Saves new content for a loaded document and shows it wherever it is open. */
   private async replaceText(note: Note, text: string): Promise<void> {
     const store = this.store;

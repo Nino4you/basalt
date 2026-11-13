@@ -74,6 +74,7 @@ export class SidePanels {
   private readonly renderedKeys = new Map<InfoPanel, string>();
   private readonly panes: Record<InfoPanel, HTMLElement>;
   private readonly localGraph: LocalGraph;
+  private unlinkedOpen = false;
 
   constructor(
     private readonly app: App,
@@ -138,7 +139,7 @@ export class SidePanels {
       else bySource.set(mention.source, [mention]);
     }
     pane.append(sectionHeader(t("Verlinkte Erwähnungen"), bySource.size));
-    if (!bySource.size) {
+    if (!bySource.size)
       pane.append(
         empty(
           this.app.indexing
@@ -146,8 +147,55 @@ export class SidePanels {
             : t("Keine Rückverweise gefunden."),
         ),
       );
+    else this.renderMentionGroups(pane, bySource, null);
+    this.renderUnlinked(pane, path);
+  }
+
+  /** Collapsed by default, like Obsidian: the search reads every note. */
+  private renderUnlinked(pane: HTMLElement, path: string): void {
+    const open = this.unlinkedOpen;
+    const mentions = open ? this.app.index.unlinkedMentions(path) : [];
+    const bySource = new Map<string, Mention[]>();
+    for (const mention of mentions) {
+      const list = bySource.get(mention.source);
+      if (list) list.push(mention);
+      else bySource.set(mention.source, [mention]);
+    }
+    const toggle = h(
+      "button",
+      {
+        class: "tree-item-self pane-section-header pane-section-toggle",
+        attrs: { type: "button", "aria-expanded": String(open) },
+        on: {
+          click: (event) => {
+            event.stopPropagation();
+            this.unlinkedOpen = !this.unlinkedOpen;
+            this.renderedKeys.delete("backlinks");
+            this.render();
+          },
+        },
+      },
+      icon(open ? "chevron-down" : "chevron-right", 14),
+      h("div", { class: "tree-item-inner", text: t("Unverlinkte Erwähnungen") }),
+      open
+        ? h("div", { class: "tree-item-flair", text: String(bySource.size) })
+        : null,
+    );
+    pane.append(toggle);
+    if (!open) return;
+    if (!bySource.size) {
+      pane.append(empty(t("Keine unverlinkten Erwähnungen gefunden.")));
       return;
     }
+    this.renderMentionGroups(pane, bySource, path);
+  }
+
+  /** `target` set: rows get a button that turns the mention into a link. */
+  private renderMentionGroups(
+    pane: HTMLElement,
+    bySource: Map<string, Mention[]>,
+    target: string | null,
+  ): void {
     const sources = [...bySource.keys()].sort((a, b) =>
       basename(a).localeCompare(basename(b), getLocale()),
     );
@@ -166,7 +214,26 @@ export class SidePanels {
           h(
             "div",
             "search-result-file-matches",
-            ...bySource.get(source)!.map(mentionRow),
+            ...bySource.get(source)!.map((mention) => {
+              const row = mentionRow(mention);
+              if (target)
+                row.append(
+                  h("button", {
+                    class: "mention-link-button",
+                    text: t("Verknüpfen"),
+                    attrs: { type: "button" },
+                    on: {
+                      click: (event) => {
+                        event.stopPropagation();
+                        void this.app
+                          .linkMention(mention.source, mention, target)
+                          .catch((error) => this.app.report(error));
+                      },
+                    },
+                  }),
+                );
+              return row;
+            }),
           ),
         ),
       );

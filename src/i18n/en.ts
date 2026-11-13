@@ -555,4 +555,8 @@ export const en = {
   "Links in {count} Datei aktualisiert.": "Updated links in {count} file.",
   "Links in {count} Dateien aktualisiert.": "Updated links in {count} files.",
   "Links in {files} konnten nicht aktualisiert werden. Die Dateien sind unverändert.": "Links in {files} could not be updated. These files are unchanged.",
+  "Unverlinkte Erwähnungen": "Unlinked mentions",
+  "Keine unverlinkten Erwähnungen gefunden.": "No unlinked mentions found.",
+  "Verknüpfen": "Link",
+  "Die Stelle hat sich inzwischen geändert. Bitte erneut versuchen.": "That text has changed in the meantime. Try again.",
 } as const;

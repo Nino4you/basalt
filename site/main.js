@@ -52,7 +52,8 @@ const de = {
   "f2.title": "Sieh, wie alles zusammenhängt",
   "f2.text":
     "Jeder Link funktioniert in beide Richtungen. Rückverweise zeigen den Satz um jede Erwähnung, und der Graph zeichnet deinen Vault als das, was er ist: ein Netz.",
-  "f2.a": "Rückverweise mit Kontext, ausgehende Links, Tags und Gliederung",
+  "f2.a":
+    "Rückverweise mit Kontext und unverlinkte Erwähnungen, die zu Links werden",
   "f2.b":
     "Volltextsuche mit <code>tag:</code>, <code>path:</code> und <code>file:</code>",
   "f2.c": "Graph des ganzen Vaults oder lokaler Graph einer Notiz",

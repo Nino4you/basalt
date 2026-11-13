@@ -146,7 +146,8 @@ No UI framework: DOM is built with the `h()` / `icon()` helpers in `src/ui/dom.t
 - `src/store.ts` — `NoteStore` serializes saves and keeps localStorage drafts that remember the
   original conflict base, so recovery cannot silently overwrite external changes.
 - `src/app/vault-index.ts` — in-memory link/tag/heading index and the search query parser
-  (`tag:`, `path:`, `file:`) behind backlinks, outgoing links, tags and search. `LinkResolver`
+  (`tag:`, `path:`, `file:`) behind backlinks, unlinked mentions, outgoing links, tags and
+  search. `LinkResolver`
   resolves links for any file list; `src/app/link-update.ts` compares resolution before and
   after a rename/move and rewrites only links whose target would change (wiki links, embeds,
   Markdown links, canvas file cards), saved through `NoteStore` like any edit; the plugin
