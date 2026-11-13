@@ -77,6 +77,12 @@ try {
   await expect(page.locator("#environment")).toContainText("Android", {
     timeout: 30000,
   });
+  // Keep the native smoke assertions independent of the English app default.
+  await page.evaluate(() => {
+    const settings = JSON.parse(localStorage.getItem("basalt-settings") ?? "{}");
+    localStorage.setItem("basalt-settings", JSON.stringify({ ...settings, language: "de" }));
+  });
+  await page.reload();
   await expect(page.locator("#tab-name")).toHaveText("Willkommen");
   // Phones get the drawer layout; larger emulators the desktop workspace.
   const mobile = await page.evaluate(() =>

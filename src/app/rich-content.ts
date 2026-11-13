@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /**
  * Progressive enhancements that are only downloaded when a note uses them.
  * Keeping them out of the initial bundle protects vault opening performance.
@@ -66,7 +67,7 @@ export function enhanceMath(
     .then((katex) => {
       if (isCurrent()) renderMath(root, katex);
     })
-    .catch((error) => console.warn("Formeln konnten nicht dargestellt werden", error))
+    .catch((error) => console.warn(t("Formeln konnten nicht dargestellt werden"), error))
     .finally(() => {
       if (isCurrent()) onSettled?.();
     });
@@ -174,13 +175,13 @@ export function enhanceMermaid(
           const { svg } = await mermaid.render(`basalt-diagram-${++diagramId}`, source);
           if (isCurrent()) holder.innerHTML = svg;
         } catch (error) {
-          console.warn("Mermaid-Diagramm konnte nicht dargestellt werden", error);
+          console.warn(t("Mermaid-Diagramm konnte nicht dargestellt werden"), error);
           showSource(holder, source);
         }
       }
     })
     .catch((error) => {
-      console.warn("Mermaid konnte nicht geladen werden", error);
+      console.warn(t("Mermaid konnte nicht geladen werden"), error);
       for (const { holder, source } of sources) showSource(holder, source);
     })
     .finally(() => {

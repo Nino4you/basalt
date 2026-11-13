@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 export interface PreviewNote {
   title: string;
   text: string;
@@ -75,7 +76,7 @@ export class LinkPreview {
       body.className = "link-preview-body";
       const lines = previewExcerpt(note.text).split("\n");
       if (lines[0] === note.title) lines.shift();
-      body.textContent = lines.join("\n").trim() || "Leere Notiz";
+      body.textContent = lines.join("\n").trim() || t("Leere Notiz");
       card.append(title, body);
       document.body.append(card);
       this.card = card;

@@ -1,3 +1,4 @@
+import { getLocale, t } from "../i18n";
 import { documentOutline } from "../markdown";
 import { basename, clear, debounce, dirname, h, icon } from "../ui/dom";
 import { showMenu } from "../ui/menu";
@@ -121,7 +122,7 @@ export class SidePanels {
     const scroll = pane.scrollTop;
     clear(pane);
     if (tab === "tags") this.renderTags(pane);
-    else if (!path) pane.append(empty("Keine Datei geöffnet."));
+    else if (!path) pane.append(empty(t("Keine Datei geöffnet.")));
     else if (tab === "backlinks") this.renderBacklinks(pane, path);
     else if (tab === "outgoing") this.renderOutgoing(pane, path);
     else this.renderOutline(pane);
@@ -136,19 +137,19 @@ export class SidePanels {
       if (list) list.push(mention);
       else bySource.set(mention.source, [mention]);
     }
-    pane.append(sectionHeader("Verlinkte Erwähnungen", bySource.size));
+    pane.append(sectionHeader(t("Verlinkte Erwähnungen"), bySource.size));
     if (!bySource.size) {
       pane.append(
         empty(
           this.app.indexing
-            ? "Index wird aufgebaut …"
-            : "Keine Rückverweise gefunden.",
+            ? t("Index wird aufgebaut …")
+            : t("Keine Rückverweise gefunden."),
         ),
       );
       return;
     }
     const sources = [...bySource.keys()].sort((a, b) =>
-      basename(a).localeCompare(basename(b), "de"),
+      basename(a).localeCompare(basename(b), getLocale()),
     );
     for (const source of sources)
       pane.append(
@@ -175,8 +176,8 @@ export class SidePanels {
     const links = this.app.index.outgoing(path);
     const resolved = links.filter((link) => link.resolved);
     const unresolved = links.filter((link) => !link.resolved);
-    pane.append(sectionHeader("Links", resolved.length));
-    if (!resolved.length) pane.append(empty("Keine ausgehenden Links."));
+    pane.append(sectionHeader(t("Links"), resolved.length));
+    if (!resolved.length) pane.append(empty(t("Keine ausgehenden Links.")));
     for (const link of resolved)
       pane.append(
         h(
@@ -186,7 +187,7 @@ export class SidePanels {
         ),
       );
     if (unresolved.length) {
-      pane.append(sectionHeader("Unaufgelöste Links", unresolved.length));
+      pane.append(sectionHeader(t("Unaufgelöste Links"), unresolved.length));
       for (const link of unresolved)
         pane.append(
           h(
@@ -205,12 +206,12 @@ export class SidePanels {
 
   private renderTags(pane: HTMLElement): void {
     const tags = [...this.app.index.tags()].sort(
-      (a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "de"),
+      (a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], getLocale()),
     );
     if (!tags.length) {
       pane.append(
         empty(
-          this.app.indexing ? "Index wird aufgebaut …" : "Keine Tags gefunden.",
+          this.app.indexing ? t("Index wird aufgebaut …") : t("Keine Tags gefunden."),
         ),
       );
       return;
@@ -239,7 +240,7 @@ export class SidePanels {
     const note = this.app.activeNote;
     const headings = note ? documentOutline(note.text) : [];
     if (!headings.length) {
-      pane.append(empty("Keine Überschriften gefunden."));
+      pane.append(empty(t("Keine Überschriften gefunden.")));
       return;
     }
     const base = Math.min(...headings.map((heading) => heading.depth));
@@ -340,11 +341,11 @@ export class BookmarksView {
       this.app.index.has(path),
     );
     clear(this.container);
-    this.container.append(sectionHeader("Lesezeichen", paths.length));
+    this.container.append(sectionHeader(t("Lesezeichen"), paths.length));
     if (!paths.length) {
       this.container.append(
         empty(
-          "Noch keine Lesezeichen. Füge Notizen über das Kontextmenü hinzu.",
+          t("Noch keine Lesezeichen. Füge Notizen über das Kontextmenü hinzu."),
         ),
       );
       return;

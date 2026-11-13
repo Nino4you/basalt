@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { LanguageDescription } from "@codemirror/language";
 import { highlightTree } from "@lezer/highlight";
 import type { Component } from "../compat/component";
@@ -161,7 +162,7 @@ export class ReadingView {
         "button",
         {
           class: "copy-code-button",
-          label: "Code kopieren",
+          label: t("Code kopieren"),
           attrs: { type: "button" },
         },
         icon("copy", 14),
@@ -217,7 +218,7 @@ export class ReadingView {
       fragment.append(text.slice(position));
       code.replaceChildren(fragment);
     } catch (error) {
-      console.warn("Code konnte nicht hervorgehoben werden", error);
+      console.warn(t("Code konnte nicht hervorgehoben werden"), error);
     }
   }
 
@@ -277,7 +278,7 @@ export class ReadingView {
       "a",
       {
         class: "markdown-embed-link internal-link",
-        label: "Notiz öffnen",
+        label: t("Notiz öffnen"),
         attrs: { href: "#" },
         data: { note: resolved, source },
       },
@@ -313,12 +314,12 @@ export class ReadingView {
     const file = session?.vault.getAbstractFileByPath(path);
     if (!session || !mime || !(file instanceof TFile)) {
       image.classList.add("is-unavailable");
-      image.alt = `${image.alt || path} (Bild nicht verfügbar)`;
+      image.alt = t("{name} (Bild nicht verfügbar)", { name: image.alt || path });
       return;
     }
     if (file.stat.size > MAX_ATTACHMENT_BYTES) {
       image.classList.add("is-unavailable");
-      image.alt = `${image.alt || path} (größer als 64 MiB)`;
+      image.alt = t("{name} (größer als 64 MiB)", { name: image.alt || path });
       return;
     }
     try {
@@ -329,7 +330,7 @@ export class ReadingView {
       image.src = url;
     } catch (error) {
       image.classList.add("is-unavailable");
-      console.warn("Bild konnte nicht geladen werden", error);
+      console.warn(t("Bild konnte nicht geladen werden"), error);
     }
   }
 
@@ -349,7 +350,7 @@ export class ReadingView {
     if (file.stat.size > MAX_ATTACHMENT_BYTES) {
       const embed = element.closest<HTMLElement>(".internal-embed");
       embed?.classList.add("is-unavailable");
-      if (embed) embed.title = "Datei ist größer als 64 MiB.";
+      if (embed) embed.title = t("Datei ist größer als 64 MiB.");
       return;
     }
     try {
@@ -369,7 +370,7 @@ export class ReadingView {
       element.setAttribute("src", page ? `${url}#page=${page}` : url);
     } catch (error) {
       element.closest(".internal-embed")?.classList.add("is-unavailable");
-      console.warn("Medien-Datei konnte nicht geladen werden", error);
+      console.warn(t("Medien-Datei konnte nicht geladen werden"), error);
     }
   }
 
@@ -399,8 +400,8 @@ export class ReadingView {
       const code = copy.parentElement?.querySelector("code")?.textContent ?? "";
       void navigator.clipboard
         ?.writeText(code)
-        .then(() => notify("Code kopiert."))
-        .catch(() => notify("Kopieren nicht möglich.", true));
+        .then(() => notify(t("Code kopiert.")))
+        .catch(() => notify(t("Kopieren nicht möglich."), true));
       return;
     }
     const box = target.closest<HTMLElement>(".task-box");

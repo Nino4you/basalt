@@ -1,30 +1,31 @@
+import { t } from "../i18n";
 import { h, icon } from "../ui/dom";
 import { DOCK_AREAS, type DockArea, type PanelSpec } from "./dock";
 
 /** Every dockable side panel with its default area. */
 export const PANELS = [
-  { id: "files", label: "Dateiexplorer", icon: "folder-closed", area: "left" },
-  { id: "search", label: "Suche", icon: "search", area: "left" },
-  { id: "bookmarks", label: "Lesezeichen", icon: "bookmark", area: "left" },
-  { id: "backlinks", label: "Rückverweise", icon: "link", area: "right" },
+  { id: "files", label: t("Dateiexplorer"), icon: "folder-closed", area: "left" },
+  { id: "search", label: t("Suche"), icon: "search", area: "left" },
+  { id: "bookmarks", label: t("Lesezeichen"), icon: "bookmark", area: "left" },
+  { id: "backlinks", label: t("Rückverweise"), icon: "link", area: "right" },
   {
     id: "outgoing",
-    label: "Ausgehende Links",
+    label: t("Ausgehende Links"),
     icon: "arrow-up-right",
     area: "right",
   },
-  { id: "tags", label: "Tags", icon: "tags", area: "right" },
-  { id: "outline", label: "Gliederung", icon: "list", area: "right" },
-  { id: "graph", label: "Lokaler Graph", icon: "waypoints", area: "right" },
+  { id: "tags", label: t("Tags"), icon: "tags", area: "right" },
+  { id: "outline", label: t("Gliederung"), icon: "list", area: "right" },
+  { id: "graph", label: t("Lokaler Graph"), icon: "waypoints", area: "right" },
 ] as const satisfies readonly PanelSpec[];
 
 export type PanelId = (typeof PANELS)[number]["id"];
 
 export const AREA_LABELS: Record<DockArea, string> = {
-  left: "Linke Seitenleiste",
-  "left-bottom": "Links unten",
-  right: "Rechte Seitenleiste",
-  bottom: "Unterer Bereich",
+  left: t("Linke Seitenleiste"),
+  "left-bottom": t("Links unten"),
+  right: t("Rechte Seitenleiste"),
+  bottom: t("Unterer Bereich"),
 };
 
 /** Button that runs a registered command; label and hotkey double as tooltip. */
@@ -80,7 +81,7 @@ function dockSlot(area: DockArea) {
   const tabs = h("div", {
     class: "workspace-tab-header-container mod-dock-header",
     attrs: { role: "tablist" },
-    label: `Ansichten: ${AREA_LABELS[area]}`,
+    label: t("Ansichten: {area}", { area: AREA_LABELS[area] }),
     data: { dockArea: area },
   });
   // Lists the closed panels; only shown while there are any.
@@ -88,7 +89,7 @@ function dockSlot(area: DockArea) {
     "button",
     {
       class: "clickable-icon dock-add-panel",
-      label: "Geschlossene Ansicht öffnen",
+      label: t("Geschlossene Ansicht öffnen"),
       attrs: { type: "button", hidden: true },
       data: { tooltipPosition: "bottom" },
     },
@@ -96,7 +97,7 @@ function dockSlot(area: DockArea) {
   );
   const empty = h("div", {
     class: "dock-empty",
-    text: "Ziehe eine Ansicht hierher oder verschiebe sie über ihr Kontextmenü.",
+    text: t("Ziehe eine Ansicht hierher oder verschiebe sie über ihr Kontextmenü."),
   });
   const content = h(
     "div",
@@ -120,7 +121,7 @@ export function buildGroup(id: number) {
     commandButton(
       "new-tab",
       "plus",
-      "Neuer Tab",
+      t("Neuer Tab"),
       "workspace-tab-header-new-tab",
     ),
     spacer,
@@ -140,11 +141,11 @@ export function buildShell(root: HTMLElement) {
   });
   const ribbon = h(
     "nav",
-    { class: "workspace-ribbon side-dock-ribbon mod-left", label: "Werkzeuge" },
+    { class: "workspace-ribbon side-dock-ribbon mod-left", label: t("Werkzeuge") },
     commandButton(
       "toggle-left-sidebar",
       "panel-left",
-      "Linke Seitenleiste umschalten",
+      t("Linke Seitenleiste umschalten"),
       "sidebar-toggle-button mod-left",
       "right",
     ),
@@ -154,28 +155,28 @@ export function buildShell(root: HTMLElement) {
       commandButton(
         "quick-switcher",
         "file-search",
-        "Schnellauswahl öffnen",
+        t("Schnellauswahl öffnen"),
         "",
         "right",
       ),
       commandButton(
         "daily-note",
         "calendar",
-        "Heutige Tagesnotiz öffnen",
+        t("Heutige Tagesnotiz öffnen"),
         "",
         "right",
       ),
       commandButton(
         "command-palette",
         "terminal",
-        "Befehlspalette öffnen",
+        t("Befehlspalette öffnen"),
         "",
         "right",
       ),
       commandButton(
         "open-graph",
         "git-fork",
-        "Graphansicht öffnen",
+        t("Graphansicht öffnen"),
         "",
         "right",
       ),
@@ -187,11 +188,11 @@ export function buildShell(root: HTMLElement) {
       commandButton(
         "toggle-theme",
         "sun-moon",
-        "Farbschema wechseln",
+        t("Farbschema wechseln"),
         "",
         "right",
       ),
-      commandButton("settings", "settings", "Einstellungen", "", "right"),
+      commandButton("settings", "settings", t("Einstellungen"), "", "right"),
     ),
   );
 
@@ -210,7 +211,7 @@ export function buildShell(root: HTMLElement) {
   });
   const leftBottomHandle = h("div", {
     class: "workspace-resize-handle mod-left-bottom",
-    label: "Höhe links unten",
+    label: t("Höhe links unten"),
     attrs: { role: "separator", "aria-orientation": "horizontal", tabindex: "0" },
   });
   const leftBottomSplit = h(
@@ -219,13 +220,13 @@ export function buildShell(root: HTMLElement) {
     docks["left-bottom"].tabs,
     docks["left-bottom"].content,
   );
-  docks["left-bottom"].empty.textContent = "Ansicht hier ablegen";
+  docks["left-bottom"].empty.textContent = t("Ansicht hier ablegen");
   const leftSplit = h(
     "aside",
     {
       class: "workspace-split mod-left-split",
       id: "left-split",
-      label: "Linke Seitenleiste",
+      label: t("Linke Seitenleiste"),
     },
     h(
       "div",
@@ -242,7 +243,7 @@ export function buildShell(root: HTMLElement) {
           {
             class: "workspace-drawer-vault-switcher",
             id: "choose-vault",
-            label: "Vault wechseln",
+            label: t("Vault wechseln"),
             attrs: { type: "button" },
             data: { command: "open-vault" },
           },
@@ -252,7 +253,7 @@ export function buildShell(root: HTMLElement) {
         commandButton(
           "settings",
           "settings",
-          "Einstellungen",
+          t("Einstellungen"),
           "mobile-only",
           "top",
         ),
@@ -265,26 +266,26 @@ export function buildShell(root: HTMLElement) {
   const modeButton = commandButton(
     "toggle-reading",
     "book-open",
-    "Leseansicht",
+    t("Leseansicht"),
   );
   const moreButton = h(
     "button",
     {
       class: "clickable-icon",
-      label: "Weitere Optionen",
+      label: t("Weitere Optionen"),
       id: "more-options",
       attrs: { type: "button" },
     },
     icon("ellipsis-vertical"),
   );
-  const backButton = commandButton("navigate-back", "arrow-left", "Zurück");
+  const backButton = commandButton("navigate-back", "arrow-left", t("Zurück"));
   const forwardButton = commandButton(
     "navigate-forward",
     "arrow-right",
-    "Vorwärts",
+    t("Vorwärts"),
   );
   const saveWarningText = h("span", {
-    text: "Speichern fehlgeschlagen. Dein Entwurf bleibt erhalten.",
+    text: t("Speichern fehlgeschlagen. Dein Entwurf bleibt erhalten."),
   });
   const saveWarning = h(
     "div",
@@ -297,13 +298,13 @@ export function buildShell(root: HTMLElement) {
     saveWarningText,
     h("button", {
       id: "export-draft",
-      text: "Entwurf exportieren",
+      text: t("Entwurf exportieren"),
       attrs: { type: "button" },
     }),
     h("button", {
       id: "reload-note",
       class: "mod-cta",
-      text: "Dateistand laden",
+      text: t("Dateistand laden"),
       attrs: { type: "button" },
     }),
   );
@@ -362,7 +363,7 @@ export function buildShell(root: HTMLElement) {
       commandButton(
         "toggle-bottom-panel",
         "x",
-        "Unteren Bereich schließen",
+        t("Unteren Bereich schließen"),
         "",
         "top",
       ),
@@ -382,7 +383,7 @@ export function buildShell(root: HTMLElement) {
         commandButton(
           "toggle-left-sidebar",
           "menu",
-          "Seitenleiste öffnen",
+          t("Seitenleiste öffnen"),
           "mobile-only",
         ),
         h("div", "view-header-nav-buttons", backButton, forwardButton),
@@ -397,7 +398,7 @@ export function buildShell(root: HTMLElement) {
   const inlineToggle = commandButton(
     "toggle-left-sidebar",
     "panel-left",
-    "Linke Seitenleiste umschalten",
+    t("Linke Seitenleiste umschalten"),
     "sidebar-toggle-button mod-inline",
   );
   const stripActions = h(
@@ -408,7 +409,7 @@ export function buildShell(root: HTMLElement) {
       {
         class: "clickable-icon",
         id: "tab-list-button",
-        label: "Tab-Liste",
+        label: t("Tab-Liste"),
         attrs: { type: "button" },
       },
       icon("chevron-down"),
@@ -416,13 +417,13 @@ export function buildShell(root: HTMLElement) {
     commandButton(
       "toggle-bottom-panel",
       "panel-bottom",
-      "Unteren Bereich umschalten",
+      t("Unteren Bereich umschalten"),
       "sidebar-toggle-button mod-bottom",
     ),
     commandButton(
       "toggle-right-sidebar",
       "panel-right",
-      "Rechte Seitenleiste umschalten",
+      t("Rechte Seitenleiste umschalten"),
       "sidebar-toggle-button mod-right",
     ),
   );
@@ -442,7 +443,7 @@ export function buildShell(root: HTMLElement) {
     {
       class: "workspace-split mod-right-split",
       id: "right-split",
-      label: "Rechte Seitenleiste",
+      label: t("Rechte Seitenleiste"),
     },
     h("div", "workspace-split-inner", docks.right.tabs, docks.right.content),
   );
@@ -507,23 +508,23 @@ export function buildShell(root: HTMLElement) {
   const tabCount = h("span", { class: "mobile-tab-count", text: "1" });
   const mobileNavbar = h(
     "nav",
-    { class: "mobile-navbar", label: "Navigation" },
-    commandButton("navigate-back", "chevron-left", "Zurück", "", "top"),
-    commandButton("navigate-forward", "chevron-right", "Vorwärts", "", "top"),
+    { class: "mobile-navbar", label: t("Navigation") },
+    commandButton("navigate-back", "chevron-left", t("Zurück"), "", "top"),
+    commandButton("navigate-forward", "chevron-right", t("Vorwärts"), "", "top"),
     commandButton(
       "quick-switcher",
       "search",
-      "Schnellauswahl öffnen",
+      t("Schnellauswahl öffnen"),
       "",
       "top",
     ),
-    commandButton("new-note", "plus", "Neue Notiz", "", "top"),
+    commandButton("new-note", "plus", t("Neue Notiz"), "", "top"),
     h(
       "button",
       {
         class: "clickable-icon mobile-tabs-button",
         id: "mobile-tabs",
-        label: "Tabs",
+        label: t("Tabs"),
         attrs: { type: "button" },
       },
       tabCount,
@@ -533,7 +534,7 @@ export function buildShell(root: HTMLElement) {
       {
         class: "clickable-icon",
         id: "mobile-menu",
-        label: "Menü",
+        label: t("Menü"),
         attrs: { type: "button" },
       },
       icon("menu"),

@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { isolateHistory, undo, undoDepth, redo } from "@codemirror/commands";
 import { EditorView, WidgetType } from "@codemirror/view";
 import { StateEffect, StateField, type EditorState } from "@codemirror/state";
@@ -86,7 +87,7 @@ class TableController {
           cell.tabIndex = 0;
           cell.setAttribute(
             "aria-label",
-            `Tabellenzelle ${row + 1}, ${col + 1}`,
+            t("Tabellenzelle {row}, {column}", { row: row + 1, column: col + 1 }),
           );
           if (model.alignment[col])
             cell.style.textAlign = model.alignment[col]!;
@@ -263,7 +264,7 @@ class TableController {
     const cell = this.cells[row][col];
     const input = document.createElement("input");
     input.className = "cm-table-cell-input";
-    input.setAttribute("aria-label", `Tabellenzelle ${row + 1}, ${col + 1}`);
+    input.setAttribute("aria-label", t("Tabellenzelle {row}, {column}", { row: row + 1, column: col + 1 }));
     input.value = this.model.rows[row][col].text;
     this.input = input;
     cell.replaceChildren(input);

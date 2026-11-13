@@ -10,6 +10,7 @@ test("renders vault PDFs locally and releases attachment resources on switch", a
       load("/src/app/app.ts"), load("/src/compat/session.ts"), load("/tests/helpers/vault-store.ts"),
     ]);
     localStorage.clear();
+    localStorage.setItem("basalt-settings", JSON.stringify({ language: "de" }));
     const app = new App(document.querySelector("#app"));
     await app.start();
     const text = "BT /F1 12 Tf 72 720 Td (Basalt attachment test) Tj ET";
@@ -141,6 +142,7 @@ test("shows an image next to a note in a split editor", async ({ page }, testInf
       load("/src/app/app.ts"), load("/src/compat/session.ts"), load("/tests/helpers/vault-store.ts"),
     ]);
     localStorage.clear();
+    localStorage.setItem("basalt-settings", JSON.stringify({ language: "de" }));
     const app = new App(document.querySelector("#app"));
     await app.start();
     const port = new MemoryPort({});

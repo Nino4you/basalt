@@ -1,3 +1,4 @@
+import { getLocale } from "../i18n";
 import { StateEffect, StateField } from "@codemirror/state";
 import DOMPurify from "dompurify";
 import {
@@ -660,13 +661,13 @@ function installDomHelpers(): void {
 const obsidianMoment = Object.assign(
   () => ({
     format: (pattern: string) => momentFormat(new Date(), pattern),
-    // The host UI is German-only; plugins use this for dictionary selection.
-    locale: () => "de",
+    // Plugins use the active interface language for dictionary selection.
+    locale: getLocale,
   }),
   {
     // Moment also exposes these as statics on the callable itself.
     format: (pattern: string) => momentFormat(new Date(), pattern),
-    locale: () => "de",
+    locale: getLocale,
   },
 );
 
@@ -1862,8 +1863,8 @@ export function createObsidianApi(
     FileSystemAdapter,
     Platform,
     apiVersion: API_VERSION,
-    // Basalt's app interface is currently German-only.
-    getLanguage: () => "de",
+    // Expose the same language as the host UI.
+    getLanguage: getLocale,
     moment: obsidianMoment,
     debounce,
     normalizePath,

@@ -1,3 +1,4 @@
+import { getLocale, languages, t } from "../i18n";
 import { backend, native } from "../backend";
 import {
   basename,
@@ -100,12 +101,12 @@ type CoreTab =
 type TabId = CoreTab | `plugin:${string}`;
 
 const TABS: Array<[CoreTab, string, string]> = [
-  ["general", "Allgemein", "settings"],
-  ["editor", "Editor", "pencil"],
-  ["files", "Dateien und Links", "folder-closed"],
-  ["appearance", "Darstellung", "palette"],
-  ["hotkeys", "Tastenkürzel", "keyboard"],
-  ["plugins", "Community-Plugins", "puzzle"],
+  ["general", t("Allgemein"), "settings"],
+  ["editor", t("Editor"), "pencil"],
+  ["files", t("Dateien und Links"), "folder-closed"],
+  ["appearance", t("Darstellung"), "palette"],
+  ["hotkeys", t("Tastenkürzel"), "keyboard"],
+  ["plugins", t("Community-Plugins"), "puzzle"],
 ];
 
 interface PluginTab {
@@ -147,7 +148,7 @@ let lastTab: TabId = "general";
  */
 export function openSettings(app: App, initial: TabId = lastTab): void {
   const modal = new Modal("mod-settings");
-  modal.modalEl.setAttribute("aria-label", "Einstellungen");
+  modal.modalEl.setAttribute("aria-label", t("Einstellungen"));
   modal.modalEl.id = "settings";
   const content = h("div", {
     class: "vertical-tab-content",
@@ -155,14 +156,14 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
   });
   const nav = h("div", {
     class: "vertical-tab-header",
-    attrs: { role: "tablist", "aria-label": "Kategorien" },
+    attrs: { role: "tablist", "aria-label": t("Kategorien") },
   });
   const pageTitle = h("h2", { class: "settings-page-title" });
   const back = h(
     "button",
     {
       class: "clickable-icon settings-back-button",
-      label: "Zurück",
+      label: t("Zurück"),
       attrs: { type: "button" },
       on: { click: () => showNav() },
     },
@@ -204,45 +205,59 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
             h("div", { class: "settings-about-name", text: "Basalt" }),
             h("div", {
               class: "setting-item-description",
-              text: "Ein ruhiger Ort für vernetzte Gedanken. Lokale Markdown-Dateien, ein Rust-Kern und eine eigenständige Oberfläche.",
+              text: t("Ein ruhiger Ort für vernetzte Gedanken. Lokale Markdown-Dateien, ein Rust-Kern und eine eigenständige Oberfläche."),
             }),
           ),
         ),
       );
-      heading(content, "App");
-      row(content, "Aktuelle Version", "Entwicklungsversion").control.append(
+      heading(content, t("App"));
+      row(content, t("Aktuelle Version"), t("Entwicklungsversion")).control.append(
         h("span", { class: "setting-value", text: "0.2.0" }),
       );
       row(
         content,
-        "Umgebung",
-        native ? "Native App" : "Browser-Demo mit lokalem Speicher",
+        t("Umgebung"),
+        native ? t("Native App") : t("Browser-Demo mit lokalem Speicher"),
       ).control.append(
         h("span", {
           class: "setting-value",
           text: app.shell.environment.textContent ?? "",
         }),
       );
-      row(
+      const language = row(
         content,
-        "Sprache",
-        "Die Oberfläche ist derzeit nur auf Deutsch verfügbar.",
-      ).control.append(h("span", { class: "setting-value", text: "Deutsch" }));
-      heading(content, "Vault");
-      const vault = row(content, app.vault?.name ?? "Vault");
+        t("Sprache"),
+        t("Die Oberfläche wird nach dem Speichern offener Änderungen neu geladen."),
+      );
+      dropdown(
+        language,
+        t("Sprache"),
+        languages.map(({ id, name }) => [id, name]),
+        settings.get("language"),
+        (value) => {
+          const select = language.control.querySelector("select")!;
+          select.disabled = true;
+          void app.changeLanguage(value).finally(() => {
+            select.value = settings.get("language");
+            select.disabled = false;
+          });
+        },
+      );
+      heading(content, t("Vault"));
+      const vault = row(content, app.vault?.name ?? t("Vault"));
       vault.el.querySelector(".setting-item-info")!.append(
         h("div", {
           class: "setting-item-description",
           id: "settings-vault",
           text: native
             ? (app.vault?.id ?? "")
-            : "Browser-Demo · nicht mit einem Ordner verbunden",
+            : t("Browser-Demo · nicht mit einem Ordner verbunden"),
         }),
       );
       vault.control.append(
         h("button", {
           id: "settings-folder",
-          text: "Ordner öffnen",
+          text: t("Ordner öffnen"),
           attrs: { type: "button" },
           on: {
             click: () => {
@@ -258,13 +273,13 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
       dropdown(
         row(
           content,
-          "Standardansicht für neue Tabs",
-          "In welcher Ansicht neue Tabs geöffnet werden.",
+          t("Standardansicht für neue Tabs"),
+          t("In welcher Ansicht neue Tabs geöffnet werden."),
         ),
-        "Standardansicht für neue Tabs",
+        t("Standardansicht für neue Tabs"),
         [
-          ["edit", "Bearbeitungsansicht"],
-          ["read", "Leseansicht"],
+          ["edit", t("Bearbeitungsansicht")],
+          ["read", t("Leseansicht")],
         ],
         settings.get("defaultReading") ? "read" : "edit",
         (value) => settings.set("defaultReading", value === "read"),
@@ -272,62 +287,62 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
       dropdown(
         row(
           content,
-          "Standard-Bearbeitungsmodus",
-          "Die Live-Vorschau blendet Markdown-Zeichen aus, solange der Cursor nicht dort steht. Der Quellcode-Modus zeigt sie immer.",
+          t("Standard-Bearbeitungsmodus"),
+          t("Die Live-Vorschau blendet Markdown-Zeichen aus, solange der Cursor nicht dort steht. Der Quellcode-Modus zeigt sie immer."),
         ),
-        "Standard-Bearbeitungsmodus",
+        t("Standard-Bearbeitungsmodus"),
         [
-          ["live", "Live-Vorschau"],
-          ["source", "Quellcode-Modus"],
+          ["live", t("Live-Vorschau")],
+          ["source", t("Quellcode-Modus")],
         ],
         settings.get("editingMode"),
         set("editingMode"),
       );
-      heading(content, "Anzeige");
+      heading(content, t("Anzeige"));
       toggle(
         row(
           content,
-          "Lesbare Zeilenlänge",
-          "Begrenzt die maximale Zeilenlänge. Weniger Inhalt auf dem Bildschirm, aber lange Absätze lesen sich leichter.",
+          t("Lesbare Zeilenlänge"),
+          t("Begrenzt die maximale Zeilenlänge. Weniger Inhalt auf dem Bildschirm, aber lange Absätze lesen sich leichter."),
         ),
-        "Lesbare Zeilenlänge",
+        t("Lesbare Zeilenlänge"),
         settings.get("readableLineLength"),
         set("readableLineLength"),
       );
       toggle(
         row(
           content,
-          "Inline-Titel anzeigen",
-          "Zeigt den Dateinamen als Titel über dem Inhalt der Notiz.",
+          t("Inline-Titel anzeigen"),
+          t("Zeigt den Dateinamen als Titel über dem Inhalt der Notiz."),
         ),
-        "Inline-Titel anzeigen",
+        t("Inline-Titel anzeigen"),
         settings.get("inlineTitle"),
         set("inlineTitle"),
       );
       toggle(
         row(
           content,
-          "Zeilennummern anzeigen",
-          "Zeilennummern am Rand des Editors.",
+          t("Zeilennummern anzeigen"),
+          t("Zeilennummern am Rand des Editors."),
         ),
-        "Zeilennummern anzeigen",
+        t("Zeilennummern anzeigen"),
         settings.get("lineNumbers"),
         set("lineNumbers"),
       );
-      heading(content, "Verhalten");
+      heading(content, t("Verhalten"));
       toggle(
-        row(content, "Rechtschreibprüfung", "Nutzt die Prüfung des Systems."),
-        "Rechtschreibprüfung",
+        row(content, t("Rechtschreibprüfung"), t("Nutzt die Prüfung des Systems.")),
+        t("Rechtschreibprüfung"),
         settings.get("spellcheck"),
         set("spellcheck"),
       );
       toggle(
         row(
           content,
-          "Klammern automatisch schließen",
-          "Ergänzt schließende Klammern und Anführungszeichen.",
+          t("Klammern automatisch schließen"),
+          t("Ergänzt schließende Klammern und Anführungszeichen."),
         ),
-        "Klammern automatisch schließen",
+        t("Klammern automatisch schließen"),
         settings.get("autoPair"),
         set("autoPair"),
       );
@@ -337,22 +352,22 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
       dropdown(
         row(
           content,
-          "Standard-Speicherort für neue Notizen",
-          "Wo neu erstellte Notizen abgelegt werden.",
+          t("Standard-Speicherort für neue Notizen"),
+          t("Wo neu erstellte Notizen abgelegt werden."),
         ),
-        "Standard-Speicherort für neue Notizen",
+        t("Standard-Speicherort für neue Notizen"),
         [
-          ["root", "Vault-Stammordner"],
-          ["current", "Gleicher Ordner wie aktuelle Datei"],
+          ["root", t("Vault-Stammordner")],
+          ["current", t("Gleicher Ordner wie aktuelle Datei")],
         ],
         settings.get("newNoteLocation"),
         set("newNoteLocation"),
       );
-      heading(content, "Archivierte Entwürfe");
+      heading(content, t("Archivierte Entwürfe"));
       content.append(
         h("p", {
           class: "setting-item-description settings-paragraph",
-          text: "Lokale Fassungen, die beim Laden eines geänderten Dateistands gesichert wurden.",
+          text: t("Lokale Fassungen, die beim Laden eines geänderten Dateistands gesichert wurden."),
         }),
       );
       const list = h("div", { id: "recovery-list" });
@@ -365,17 +380,17 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
       }
       if (!recoveries.length)
         list.append(
-          h("p", { class: "pane-empty", text: "Keine archivierten Entwürfe." }),
+          h("p", { class: "pane-empty", text: t("Keine archivierten Entwürfe.") }),
         );
       for (const recovery of recoveries) {
         const item = row(
           list,
-          `Archivierter Entwurf: ${basename(recovery.path)}`,
-          new Date(recovery.savedAt).toLocaleString("de"),
+          t("Archivierter Entwurf: {name}", { name: basename(recovery.path) }),
+          new Date(recovery.savedAt).toLocaleString(getLocale()),
         );
         item.control.append(
           h("button", {
-            text: "Exportieren",
+            text: t("Exportieren"),
             attrs: { type: "button" },
             on: {
               click: () =>
@@ -390,23 +405,23 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
 
     appearance() {
       dropdown(
-        row(content, "Grundfarbschema", "Wähle das Farbschema von Basalt."),
-        "Grundfarbschema",
+        row(content, t("Grundfarbschema"), t("Wähle das Farbschema von Basalt.")),
+        t("Grundfarbschema"),
         [
-          ["dark", "Dunkel"],
-          ["light", "Hell"],
-          ["system", "An System anpassen"],
+          ["dark", t("Dunkel")],
+          ["light", t("Hell")],
+          ["system", t("An System anpassen")],
         ],
         settings.get("theme"),
         set("theme"),
       );
       const accent = row(
         content,
-        "Akzentfarbe",
-        "Farbe für Links, Auswahl und Schaltflächen.",
+        t("Akzentfarbe"),
+        t("Farbe für Links, Auswahl und Schaltflächen."),
       );
       const color = h("input", {
-        label: "Akzentfarbe",
+        label: t("Akzentfarbe"),
         attrs: { type: "color" },
       });
       color.value = settings.get("accent");
@@ -418,7 +433,7 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
           "button",
           {
             class: "clickable-icon",
-            label: "Standard wiederherstellen",
+            label: t("Standard wiederherstellen"),
             attrs: { type: "button" },
             on: {
               click: () => {
@@ -431,11 +446,11 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         ),
         color,
       );
-      heading(content, "Schrift");
+      heading(content, t("Schrift"));
       const size = row(
         content,
-        "Schriftgröße",
-        "Schriftgröße des Notizinhalts in Pixeln.",
+        t("Schriftgröße"),
+        t("Schriftgröße des Notizinhalts in Pixeln."),
       );
       const value = h("span", {
         class: "setting-slider-value",
@@ -443,7 +458,7 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
       });
       const slider = h("input", {
         class: "slider",
-        label: "Schriftgröße",
+        label: t("Schriftgröße"),
         attrs: { type: "range", min: "12", max: "24", step: "1" },
       });
       slider.value = String(settings.get("fontSize"));
@@ -453,14 +468,14 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         settings.set("fontSize", Number(slider.value));
       });
       size.control.append(value, slider);
-      heading(content, "Oberfläche");
+      heading(content, t("Oberfläche"));
       toggle(
         row(
           content,
-          "Ribbon anzeigen",
-          "Die schmale Werkzeugleiste am linken Rand.",
+          t("Ribbon anzeigen"),
+          t("Die schmale Werkzeugleiste am linken Rand."),
         ),
-        "Ribbon anzeigen",
+        t("Ribbon anzeigen"),
         settings.get("showRibbon"),
         set("showRibbon"),
       );
@@ -469,17 +484,17 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
     hotkeys() {
       const filter = h("input", {
         class: "settings-search-input",
-        label: "Tastenkürzel filtern",
+        label: t("Tastenkürzel filtern"),
         attrs: {
           type: "search",
-          placeholder: "Tastenkürzel filtern …",
+          placeholder: t("Tastenkürzel filtern …"),
           spellcheck: "false",
         },
       });
       const list = h("div", "settings-hotkey-list");
       const empty = h("p", {
         class: "pane-empty",
-        text: "Keine passenden Befehle.",
+        text: t("Keine passenden Befehle."),
       });
       empty.hidden = true;
       content.append(
@@ -489,7 +504,7 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
       );
       const commands = app.commands
         .list()
-        .sort((a, b) => a.name.localeCompare(b.name, "de"));
+        .sort((a, b) => a.name.localeCompare(b.name, getLocale()));
       for (const command of commands) {
         const item = row(list, command.name);
         item.control.append(
@@ -498,30 +513,30 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
                 class: "setting-hotkey",
                 text: formatHotkey(command.hotkey),
               })
-            : h("span", { class: "setting-hotkey mod-empty", text: "Leer" }),
+            : h("span", { class: "setting-hotkey mod-empty", text: t("Leer") }),
         );
       }
-      heading(list, "Im Editor");
+      heading(list, t("Im Editor"));
       for (const [name, hotkey] of [
-        ["Fett", "Mod+B"],
-        ["Kursiv", "Mod+I"],
-        ["Link einfügen", "Mod+K"],
-        ["Aufgabe umschalten", "Mod+L"],
-        ["In aktueller Datei suchen", "Mod+F"],
-        ["Rückgängig", "Mod+Z"],
+        [t("Fett"), "Mod+B"],
+        [t("Kursiv"), "Mod+I"],
+        [t("Link einfügen"), "Mod+K"],
+        [t("Aufgabe umschalten"), "Mod+L"],
+        [t("In aktueller Datei suchen"), "Mod+F"],
+        [t("Rückgängig"), "Mod+Z"],
       ])
         row(list, name).control.append(
           h("kbd", { class: "setting-hotkey", text: formatHotkey(hotkey) }),
         );
       filter.addEventListener("input", () => {
-        const query = filter.value.trim().toLocaleLowerCase("de");
+        const query = filter.value.trim().toLocaleLowerCase(getLocale());
         let visible = 0;
         for (const item of list.querySelectorAll<HTMLElement>(
           ".setting-item:not(.setting-item-heading)",
         )) {
           const match =
             !query ||
-            (item.textContent ?? "").toLocaleLowerCase("de").includes(query);
+            (item.textContent ?? "").toLocaleLowerCase(getLocale()).includes(query);
           item.hidden = !match;
           if (match) visible++;
         }
@@ -538,9 +553,9 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         h(
           "p",
           "settings-note",
-          "Die Plugin-Kompatibilität ist noch unvollständig. Basalt lädt ausschließlich ausdrücklich aktivierte Bundles aus ",
+          t("Die Plugin-Kompatibilität ist noch unvollständig. Basalt lädt ausschließlich ausdrücklich aktivierte Bundles aus "),
           h("code", { text: "Basalt/Plugins/<id>" }),
-          "; fremder Code erhält Zugriff auf die Oberfläche.",
+          t("; fremder Code erhält Zugriff auf die Oberfläche."),
         ),
         h("p", {
           class: "compat-status",
@@ -548,7 +563,7 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
           text: app.compatStatus,
         }),
       );
-      heading(content, "Installierte Plugins");
+      heading(content, t("Installierte Plugins"));
       const bundles = h("div", { id: "plugin-bundles" });
       content.append(bundles);
       const firstTab = (id: string) =>
@@ -579,7 +594,7 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
       section.append(
         h("p", {
           class: "compat-status",
-          text: `Einstellungen konnten nicht gerendert werden: ${errorMessage(error)}`,
+          text: t("Einstellungen konnten nicht gerendert werden: {error}", { error: errorMessage(error) }),
         }),
       );
     }
@@ -657,15 +672,15 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
 
   function renderNav() {
     nav.replaceChildren(
-      h("div", { class: "settings-nav-title", text: "Einstellungen" }),
+      h("div", { class: "settings-nav-title", text: t("Einstellungen") }),
       group(
-        "Optionen",
+        t("Optionen"),
         TABS.map(([id, title, iconId]) => navItem(id, title, iconId)),
       ),
       ...(plugins.length
         ? [
             group(
-              "Community-Plugins",
+              t("Community-Plugins"),
               plugins.map((entry) => navItem(entry.id, entry.title, "plug")),
             ),
           ]
@@ -725,10 +740,10 @@ async function renderBundles(
   const message = (...children: Array<Node | string>) =>
     container.replaceChildren(h("p", "compat-status", ...children));
   if (!session) {
-    message("Der Plugin-Loader ist nur in der nativen App verfügbar.");
+    message(t("Der Plugin-Loader ist nur in der nativen App verfügbar."));
     return;
   }
-  message("Suche nach lokalen Bundles …");
+  message(t("Suche nach lokalen Bundles …"));
   try {
     await session.refresh();
   } catch (error) {
@@ -739,17 +754,17 @@ async function renderBundles(
   try {
     listings = await session.bundleHost.list();
   } catch (error) {
-    message(`Plugin-Ordner konnte nicht gelesen werden: ${String(error)}`);
+    message(t("Plugin-Ordner konnte nicht gelesen werden: {error}", { error: String(error) }));
     return;
   }
   if (session !== app.compatibility) return;
   if (!listings.length) {
     message(
-      "Keine Bundles gefunden. Lege ",
+      t("Keine Bundles gefunden. Lege "),
       h("code", { text: "Basalt/Plugins/<id>/manifest.json" }),
-      " und ",
+      t(" und "),
       h("code", { text: "main.js" }),
-      " im Vault ab.",
+      t(" im Vault ab."),
     );
     return;
   }
@@ -768,7 +783,7 @@ async function renderBundles(
       });
       detail.hidden = !failure;
       const input = h("input", {
-        label: `${name} aktivieren`,
+        label: t("{name} aktivieren", { name }),
         // Broken manifests must not prevent unloading an already-running plugin.
         attrs: {
           type: "checkbox",
@@ -797,8 +812,8 @@ async function renderBundles(
             const status = document.getElementById("compat-status");
             if (status)
               status.textContent = enabled
-                ? `Plugin ${listing.id} deaktiviert.`
-                : `Plugin ${listing.id} aktiviert.`;
+                ? t("Plugin {id} deaktiviert.", { id: listing.id })
+                : t("Plugin {id} aktiviert.", { id: listing.id });
           } catch (error) {
             if (session !== app.compatibility) return;
             app.pluginErrors.set(listing.id, errorMessage(error));
@@ -821,7 +836,7 @@ async function renderBundles(
             "button",
             {
               class: "clickable-icon",
-              label: `Optionen von ${name}`,
+              label: t("Optionen von {name}", { name }),
               attrs: { type: "button" },
               on: { click: () => hooks.openSettings(listing.id) },
             },

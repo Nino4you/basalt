@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { NativeVaultPort } from "./compat/native-port";
 import demoCanvas from "../examples/demo-vault/Ideenboard.canvas?raw";
@@ -88,7 +89,7 @@ export function validateNotePath(path: string): string {
       .some((p) => !p || p === "." || p === ".." || p.startsWith("."))
   ) {
     throw new Error(
-      "Bitte einen relativen Notiznamen ohne versteckte Ordner oder '..' verwenden.",
+      t("Bitte einen relativen Notiznamen ohne versteckte Ordner oder '..' verwenden."),
     );
   }
   return /\.md$/i.test(normalized) ? normalized : `${normalized}.md`;
@@ -127,7 +128,7 @@ export class BrowserBackend implements Backend {
       Object.values(value).some((v) => typeof v !== "string")
     ) {
       throw new Error(
-        "Browser-Speicher beschädigt. Bitte die Demo-Daten sichern, bevor du sie zurücksetzt.",
+        t("Browser-Speicher beschädigt. Bitte die Demo-Daten sichern, bevor du sie zurücksetzt."),
       );
     }
     this.cache = { raw: saved, files: value as Record<string, string> };
@@ -137,7 +138,7 @@ export class BrowserBackend implements Backend {
   async info(): Promise<VaultInfo> {
     return {
       id: this.key,
-      name: "Mein Vault",
+      name: t("Mein Vault"),
       files: Object.keys(this.current())
         .filter((path) => !path.startsWith(".basalt/"))
         .sort(),
@@ -147,14 +148,14 @@ export class BrowserBackend implements Backend {
 
   async read(path: string): Promise<string> {
     const files = this.current();
-    if (!Object.hasOwn(files, path)) throw new Error("Notiz nicht gefunden.");
+    if (!Object.hasOwn(files, path)) throw new Error(t("Notiz nicht gefunden."));
     return files[path];
   }
 
   async create(path: string, text: string): Promise<void> {
     const files = this.files();
     if (Object.hasOwn(files, path))
-      throw new Error("Eine Notiz mit diesem Namen existiert bereits.");
+      throw new Error(t("Eine Notiz mit diesem Namen existiert bereits."));
     files[path] = text;
     localStorage.setItem(this.key, JSON.stringify(files));
   }
@@ -163,7 +164,7 @@ export class BrowserBackend implements Backend {
     const files = this.files();
     if (!Object.hasOwn(files, path) || files[path] !== expected)
       throw new Error(
-        "Die Notiz wurde außerhalb des Editors geändert. Bitte zuerst neu laden.",
+        t("Die Notiz wurde außerhalb des Editors geändert. Bitte zuerst neu laden."),
       );
     files[path] = text;
     localStorage.setItem(this.key, JSON.stringify(files));
@@ -172,10 +173,10 @@ export class BrowserBackend implements Backend {
   async remove(path: string, expected?: string): Promise<void> {
     validateNotePath(path);
     const files = this.files();
-    if (!Object.hasOwn(files, path)) throw new Error("Datei nicht gefunden.");
+    if (!Object.hasOwn(files, path)) throw new Error(t("Datei nicht gefunden."));
     if (expected !== undefined && files[path] !== expected)
       throw new Error(
-        "Die Datei wurde außerhalb des Editors geändert. Bitte zuerst neu laden.",
+        t("Die Datei wurde außerhalb des Editors geändert. Bitte zuerst neu laden."),
       );
     files[`.basalt/trash/${crypto.randomUUID()}/${path}`] = files[path];
     delete files[path];
@@ -187,12 +188,12 @@ export class BrowserBackend implements Backend {
     validateNotePath(from);
     validateNotePath(to);
     const files = this.files();
-    if (!Object.hasOwn(files, from)) throw new Error("Datei nicht gefunden.");
+    if (!Object.hasOwn(files, from)) throw new Error(t("Datei nicht gefunden."));
     if (Object.hasOwn(files, to))
-      throw new Error("Am Ziel existiert bereits eine Datei mit diesem Namen.");
+      throw new Error(t("Am Ziel existiert bereits eine Datei mit diesem Namen."));
     if (expected !== undefined && files[from] !== expected)
       throw new Error(
-        "Die Datei wurde außerhalb des Editors geändert. Bitte zuerst neu laden.",
+        t("Die Datei wurde außerhalb des Editors geändert. Bitte zuerst neu laden."),
       );
     files[to] = files[from];
     delete files[from];
@@ -202,7 +203,7 @@ export class BrowserBackend implements Backend {
 
   async choose(): Promise<null> {
     throw new Error(
-      "Ordner-Vaults sind in der nativen Linux- und Android-App verfügbar. Dies ist die Browser-Demo.",
+      t("Ordner-Vaults sind in der nativen Linux- und Android-App verfügbar. Dies ist die Browser-Demo."),
     );
   }
 
@@ -246,7 +247,7 @@ class NativeBackend implements Backend {
       ) !== expected
     )
       throw new Error(
-        "Die Datei wurde außerhalb des Editors geändert. Bitte zuerst neu laden.",
+        t("Die Datei wurde außerhalb des Editors geändert. Bitte zuerst neu laden."),
       );
     await port.remove(path, current.version);
   }
@@ -265,7 +266,7 @@ class NativeBackend implements Backend {
       ) !== expected
     )
       throw new Error(
-        "Die Datei wurde außerhalb des Editors geändert. Bitte zuerst neu laden.",
+        t("Die Datei wurde außerhalb des Editors geändert. Bitte zuerst neu laden."),
       );
     // Exclusive creation first, so an existing file is never overwritten.
     await port.create(to, current.bytes);
@@ -276,7 +277,7 @@ class NativeBackend implements Backend {
       // Never delete the destination as a rollback: it may by now be the
       // only remaining copy.
       throw new Error(
-        `Verschieben nicht abgeschlossen: Die Kopie unter „${to}“ bleibt erhalten, das Original konnte nicht entfernt werden. Bitte die Dateiliste neu laden.`,
+        t("Verschieben nicht abgeschlossen: Die Kopie unter „{path}“ bleibt erhalten, das Original konnte nicht entfernt werden. Bitte die Dateiliste neu laden.", { path: to }),
         { cause: error },
       );
     }

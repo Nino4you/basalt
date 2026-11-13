@@ -1,3 +1,4 @@
+import { plural, t, type Locale } from "../i18n";
 import type { EditorState } from "@codemirror/state";
 import {
   backend,
@@ -410,7 +411,7 @@ export class App {
     try {
       await this.loadVault(await backend.info());
     } catch (error) {
-      this.setSaveStatus("error", "Vault konnte nicht geöffnet werden");
+      this.setSaveStatus("error", t("Vault konnte nicht geöffnet werden"));
       this.report(error);
     }
   }
@@ -441,8 +442,8 @@ export class App {
     this.ws = loadWorkspace(next.id);
     this.shell.vaultName.textContent = next.name;
     this.shell.environment.textContent = native
-      ? `${next.platform === "android" ? "Android" : "Linux"} · lokal`
-      : "Browser-Demo";
+      ? t("{platform} · lokal", { platform: next.platform === "android" ? "Android" : "Linux" })
+      : t("Browser-Demo");
     document.body.classList.toggle("is-android", next.platform === "android");
     this.setFiles(next.files);
 
@@ -568,7 +569,7 @@ export class App {
         this.pluginErrors.set(id, errorMessage(error));
         console.error(error);
         notify(
-          `Plugin ${id} konnte nicht geladen werden und wurde deaktiviert: ${errorMessage(error)}`,
+          t("Plugin {id} konnte nicht geladen werden und wurde deaktiviert: {error}", { id, error: errorMessage(error) }),
           true,
         );
       }
@@ -627,10 +628,10 @@ export class App {
   /** Plugin-compat status line shown in the settings. */
   get compatStatus(): string {
     if (!native)
-      return "Kompatibilitätsgrundlagen: nur in der nativen App. Kein Plugin-Loader.";
+      return t("Kompatibilitätsgrundlagen: nur in der nativen App. Kein Plugin-Loader.");
     return this.compatibility
-      ? "Vault-, Datei- und Editor-Grundlagen verbunden. Plugin-Loader bereit; kein Bundle wird automatisch aktiviert."
-      : "Kompatibilitätsbrücke konnte nicht initialisiert werden. Notizeditor bleibt verfügbar.";
+      ? t("Vault-, Datei- und Editor-Grundlagen verbunden. Plugin-Loader bereit; kein Bundle wird automatisch aktiviert.")
+      : t("Kompatibilitätsbrücke konnte nicht initialisiert werden. Notizeditor bleibt verfügbar.");
   }
 
   private setFiles(files: string[]): void {
@@ -767,12 +768,12 @@ export class App {
       if (note.text !== note.saved) {
         this.failed.set(
           note.path,
-          "Die Datei wurde außerhalb des Editors geändert.",
+          t("Die Datei wurde außerhalb des Editors geändert."),
         );
         this.updateStatus();
         if (note !== this.activeNote)
           notify(
-            `„${basename(note.path)}“ wurde geändert. Dein lokaler Entwurf bleibt erhalten.`,
+            t("„{name}“ wurde geändert. Dein lokaler Entwurf bleibt erhalten.", { name: basename(note.path) }),
             true,
           );
         return;
@@ -794,23 +795,31 @@ export class App {
     try {
       // Do not leave the vault (and cancel its save timers) when a draft could
       // not be saved. Keep the current note and conflict controls available.
-      await this.store.saveAll();
-      // Plugin buffers live in their views; persist them while the old vault is
-      // still selected and a version conflict can keep the user here safely.
-      if (this.compatibility) {
-        await this.compatibility.workspace.flushPending();
-        const views = new Set<TextFileView>();
-        this.compatibility.workspace.iterateAllLeaves((leaf) => {
-          if (leaf.view instanceof TextFileView) views.add(leaf.view);
-        });
-        for (const view of views) await view.save();
-      }
+      await saveBeforeLeaving(this);
       const next = await backend.choose();
       if (next) await this.loadVault(next);
     } catch (error) {
       this.report(error);
     } finally {
       this.choosingVault = false;
+    }
+  }
+
+  /** Reload host and plugin labels together, only after every open buffer saved. */
+  async changeLanguage(language: Locale): Promise<void> {
+    const previous = this.settings.get("language");
+    if (language === previous) return;
+    try {
+      await saveBeforeLeaving(this);
+      this.writeWorkspace();
+      if (!this.settings.set("language", language)) {
+        this.settings.set("language", previous);
+        throw new Error(t("Die Sprache konnte nicht gespeichert werden. Die Oberfläche wurde nicht neu geladen."));
+      }
+      window.location.reload();
+    } catch (error) {
+      this.report(error);
+      notify(t("Die Sprache konnte nicht gewechselt werden. Offene Änderungen bleiben erhalten."), true);
     }
   }
 
@@ -1082,7 +1091,7 @@ export class App {
   }
 
   tabTitle(tab: Tab): string {
-    return tab.path ? basename(tab.path) : "Neuer Tab";
+    return tab.path ? basename(tab.path) : t("Neuer Tab");
   }
 
   // ── navigation ────────────────────────────────────────────────────────────
@@ -1169,7 +1178,7 @@ export class App {
       this.index.setContent(path, note.text);
       if (note.recovered)
         notify(
-          "Ein ungespeicherter Entwurf wurde wiederhergestellt. Prüfe ihn vor dem Speichern.",
+          t("Ein ungespeicherter Entwurf wurde wiederhergestellt. Prüfe ihn vor dem Speichern."),
         );
     }
     this.ws.recent = [path, ...this.ws.recent.filter((p) => p !== path)].slice(
@@ -1184,7 +1193,7 @@ export class App {
     const path = tab.history[index];
     if (!path) return;
     if (!this.index.has(path)) {
-      notify("Diese Notiz ist nicht mehr vorhanden.");
+      notify(t("Diese Notiz ist nicht mehr vorhanden."));
       return;
     }
     const request = tab.request + 1;
@@ -1218,7 +1227,7 @@ export class App {
     }
     const name = (hash >= 0 ? target.slice(0, hash) : target).trim();
     if (!name || (extension(name) && extension(name) !== "md")) {
-      notify("Diese Datei oder Einbettung ist noch nicht vorhanden.");
+      notify(t("Diese Datei oder Einbettung ist noch nicht vorhanden."));
       return;
     }
     void this.createNote(name, { newTab });
@@ -1231,16 +1240,16 @@ export class App {
       void copied.then(
         () =>
           notify(
-            "Externe Links werden nicht automatisch geöffnet. Adresse kopiert.",
+            t("Externe Links werden nicht automatisch geöffnet. Adresse kopiert."),
           ),
         () =>
           notify(
-            "Externe Links werden aus Sicherheitsgründen nicht automatisch geöffnet.",
+            t("Externe Links werden aus Sicherheitsgründen nicht automatisch geöffnet."),
           ),
       );
     else
       notify(
-        "Externe Links werden aus Sicherheitsgründen nicht automatisch geöffnet.",
+        t("Externe Links werden aus Sicherheitsgründen nicht automatisch geöffnet."),
       );
   }
 
@@ -1387,7 +1396,7 @@ export class App {
     if (wasDirty !== (note.text !== note.saved)) this.emit("tabs");
     this.index.setContent(note.path, text);
     if (note === this.activeDocument)
-      this.setSaveStatus("dirty", "Ungespeicherte Änderungen");
+      this.setSaveStatus("dirty", t("Ungespeicherte Änderungen"));
     this.scheduleSave(note);
     // Other groups may mirror the same canvas.
     if (this.groups.length > 1) this.renderGroups();
@@ -1466,33 +1475,33 @@ export class App {
         h("h1", {
           class: "empty-state-title",
           text: !this.vault
-            ? "Vault wird geöffnet …"
+            ? t("Vault wird geöffnet …")
             : hasNotes
-              ? "Keine Datei geöffnet"
-              : "Dein nächster Gedanke.",
+              ? t("Keine Datei geöffnet")
+              : t("Dein nächster Gedanke."),
         }),
         hasNotes || !this.vault
           ? null
           : h("p", {
               class: "empty-state-description",
-              text: "Dieser Vault ist noch leer. Eine Notiz ist alles, was du zum Loslegen brauchst.",
+              text: t("Dieser Vault ist noch leer. Eine Notiz ist alles, was du zum Loslegen brauchst."),
             }),
         this.vault
           ? h(
               "div",
               "empty-state-action-list",
               hasNotes
-                ? action("Neue Notiz erstellen", "new-note")
+                ? action(t("Neue Notiz erstellen"), "new-note")
                 : h("button", {
                     class: "empty-state-action mod-cta",
-                    text: "Erste Notiz anlegen",
+                    text: t("Erste Notiz anlegen"),
                     attrs: { type: "button" },
                     data: { command: "new-note" },
                   }),
-              hasNotes ? action("Datei öffnen", "quick-switcher") : null,
-              hasNotes ? action("Heutige Tagesnotiz", "daily-note") : null,
-              hasNotes ? action("Neue Canvas erstellen", "new-canvas") : null,
-              this.allTabs.length > 1 ? action("Schließen", "close-tab") : null,
+              hasNotes ? action(t("Datei öffnen"), "quick-switcher") : null,
+              hasNotes ? action(t("Heutige Tagesnotiz"), "daily-note") : null,
+              hasNotes ? action(t("Neue Canvas erstellen"), "new-canvas") : null,
+              this.allTabs.length > 1 ? action(t("Schließen"), "close-tab") : null,
             )
           : null,
       ),
@@ -1521,7 +1530,7 @@ export class App {
     );
     shell.modeButton.setAttribute(
       "aria-label",
-      tab.reading ? "Bearbeiten" : "Leseansicht",
+      tab.reading ? t("Bearbeiten") : t("Leseansicht"),
     );
     shell.backButton.disabled = tab.historyIndex <= 0;
     shell.forwardButton.disabled = tab.historyIndex >= tab.history.length - 1;
@@ -1561,7 +1570,7 @@ export class App {
     const failure = note ? this.failed.get(note.path) : undefined;
     shell.saveWarning.hidden = failure === undefined;
     if (failure !== undefined)
-      shell.saveWarningText.textContent = `Speichern fehlgeschlagen. ${failure} Dein Entwurf bleibt erhalten.`;
+      shell.saveWarningText.textContent = t("Speichern fehlgeschlagen. {error} Dein Entwurf bleibt erhalten.", { error: failure });
     const markdown = tab.kind === "markdown" && !!note;
     shell.wordCount.hidden = shell.charCount.hidden = !markdown;
     shell.backlinkCount.hidden = !markdown;
@@ -1569,30 +1578,36 @@ export class App {
       this.setSaveStatus(
         "idle",
         tab.kind === "plugin"
-          ? "Plugin-Ansicht geöffnet"
+          ? t("Plugin-Ansicht geöffnet")
           : this.vault && !this.index.files.length
-            ? "Leerer Vault · neue Notiz anlegen"
-            : "Bereit",
+            ? t("Leerer Vault · neue Notiz anlegen")
+            : t("Bereit"),
       );
       return;
     }
     if (this.failed.has(note.path))
       this.setSaveStatus(
         "error",
-        "Nicht gespeichert · Entwurf bleibt erhalten",
+        t("Nicht gespeichert · Entwurf bleibt erhalten"),
       );
     else if (note.text !== note.saved)
       this.setSaveStatus(
         "dirty",
         note.recovered
-          ? "Entwurf wiederhergestellt · noch nicht gespeichert"
-          : "Ungespeicherte Änderungen",
+          ? t("Entwurf wiederhergestellt · noch nicht gespeichert")
+          : t("Ungespeicherte Änderungen"),
       );
-    else this.setSaveStatus("saved", "Alle Änderungen gespeichert");
+    else this.setSaveStatus("saved", t("Alle Änderungen gespeichert"));
     if (!markdown) return;
     const words = wordCount(note.text);
-    shell.wordCount.textContent = `${words.toLocaleString("de")} ${words === 1 ? "Wort" : "Wörter"}`;
-    shell.charCount.textContent = `${note.text.length.toLocaleString("de")} Zeichen`;
+    shell.wordCount.textContent = plural(words, {
+      one: "{count} Wort",
+      other: "{count} Wörter",
+    });
+    shell.charCount.textContent = plural(note.text.length, {
+      one: "{count} Schriftzeichen",
+      other: "{count} Zeichen",
+    });
     this.updateBacklinkCount();
   }
 
@@ -1602,7 +1617,10 @@ export class App {
     const count = new Set(
       this.index.backlinks(path).map((mention) => mention.source),
     ).size;
-    this.shell.backlinkCount.textContent = `${count} ${count === 1 ? "Rückverweis" : "Rückverweise"}`;
+    this.shell.backlinkCount.textContent = plural(count, {
+      one: "{count} Rückverweis",
+      other: "{count} Rückverweise",
+    });
   }
 
   // ── editing and saving ────────────────────────────────────────────────────
@@ -1618,7 +1636,7 @@ export class App {
       this.report(error);
     }
     if (wasDirty !== (note.text !== note.saved)) this.emit("tabs");
-    this.setSaveStatus("dirty", "Ungespeicherte Änderungen");
+    this.setSaveStatus("dirty", t("Ungespeicherte Änderungen"));
     this.scheduleSave(note);
     this.docEdited();
   }
@@ -1655,7 +1673,7 @@ export class App {
     clearTimeout(this.saveTimers.get(note));
     this.saveTimers.delete(note);
     if (note === this.activeDocument && note.text !== note.saved)
-      this.setSaveStatus("saving", "Wird gespeichert …");
+      this.setSaveStatus("saving", t("Wird gespeichert …"));
     try {
       await store.save(note);
       this.failed.delete(note.path);
@@ -1701,7 +1719,7 @@ export class App {
       }
       this.emit("tabs");
       notify(
-        "Dateistand geladen. Die lokale Fassung findest du als archivierten Entwurf in den Einstellungen.",
+        t("Dateistand geladen. Die lokale Fassung findest du als archivierten Entwurf in den Einstellungen."),
       );
     } catch (error) {
       this.report(error);
@@ -1715,7 +1733,7 @@ export class App {
     void backend
       .export(path, text)
       .then((done) => {
-        if (done) notify("Markdown-Datei exportiert.");
+        if (done) notify(t("Markdown-Datei exportiert."));
       })
       .catch((error) => this.report(error));
   }
@@ -1761,17 +1779,17 @@ export class App {
     const store = this.store;
     if (!store || !this.index.has(path) || store.isDeleting(path)) return;
     const modal = new Modal();
-    modal.setTitle("Datei löschen");
+    modal.setTitle(t("Datei löschen"));
     const error = h("p", {
       class: "field-error",
       attrs: { role: "alert", hidden: true },
     });
     const cancel = h("button", {
-      text: "Abbrechen",
+      text: t("Abbrechen"),
       on: { click: () => modal.close() },
     });
     const submit = h("button", {
-      text: "In Papierkorb verschieben",
+      text: t("In Papierkorb verschieben"),
       class: "mod-warning",
     });
     submit.addEventListener("click", () => {
@@ -1786,11 +1804,11 @@ export class App {
     });
     modal.contentEl.append(
       h("p", {
-        text: `„${path}“ in den Vault-Papierkorb verschieben? Eine Sicherung bleibt in .basalt/trash/.`,
+        text: t("„{path}“ in den Vault-Papierkorb verschieben? Eine Sicherung bleibt in .basalt/trash/.", { path }),
       }),
       h("p", {
         class: "modal-description",
-        text: "Plugin-Dateien vorher speichern. Die Sicherung enthält den zuletzt gespeicherten Dateistand; die Wiederherstellung erfolgt derzeit manuell.",
+        text: t("Plugin-Dateien vorher speichern. Die Sicherung enthält den zuletzt gespeicherten Dateistand; die Wiederherstellung erfolgt derzeit manuell."),
       }),
       error,
       h("div", "modal-button-container", cancel, submit),
@@ -1801,7 +1819,7 @@ export class App {
 
   private async deleteFile(path: string, store: NoteStore): Promise<void> {
     if (store !== this.store)
-      throw new Error("Der Vault wurde inzwischen gewechselt.");
+      throw new Error(t("Der Vault wurde inzwischen gewechselt."));
     const note = store.notes.get(path);
     if (note) {
       clearTimeout(this.saveTimers.get(note));
@@ -1850,7 +1868,7 @@ export class App {
     try {
       if (this.index.has(target))
         throw new Error(
-          `„${name}“ gibt es in ${folder ? `„${folder}“` : "der obersten Ebene"} bereits.`,
+          t("„{name}“ gibt es in {folder} bereits.", { name, folder: folder ? `„${folder}“` : t("der obersten Ebene") }),
         );
       await this.relocateFile(path, target, folder);
     } catch (error) {
@@ -1862,7 +1880,7 @@ export class App {
     if (!this.index.has(path)) return;
     const current = path.slice(path.lastIndexOf("/") + 1);
     const modal = new Modal("mod-rename");
-    modal.setTitle("Datei umbenennen");
+    modal.setTitle(t("Datei umbenennen"));
     const input = h("input", {
       id: "rename-name",
       attrs: {
@@ -1872,7 +1890,7 @@ export class App {
         spellcheck: "false",
         enterkeyhint: "done",
       },
-      label: "Neuer Dateiname",
+      label: t("Neuer Dateiname"),
     });
     input.value = current;
     const error = h("p", {
@@ -1881,7 +1899,7 @@ export class App {
     });
     const submit = h("button", {
       class: "mod-cta",
-      text: "Umbenennen",
+      text: t("Umbenennen"),
       attrs: { type: "submit" },
     });
     const form = h(
@@ -1893,7 +1911,7 @@ export class App {
         "div",
         "modal-button-container",
         h("button", {
-          text: "Abbrechen",
+          text: t("Abbrechen"),
           attrs: { type: "button" },
           on: { click: () => modal.close() },
         }),
@@ -1922,11 +1940,11 @@ export class App {
 
   private async renameFile(path: string, rawName: string): Promise<void> {
     const name = rawName.trim();
-    if (!name) throw new Error("Der Dateiname darf nicht leer sein.");
+    if (!name) throw new Error(t("Der Dateiname darf nicht leer sein."));
     if (/[\\/]/.test(name))
-      throw new Error("Der Dateiname darf keine Ordnerpfade enthalten.");
+      throw new Error(t("Der Dateiname darf keine Ordnerpfade enthalten."));
     if (name === "." || name === "..")
-      throw new Error("Der Dateiname ist ungültig.");
+      throw new Error(t("Der Dateiname ist ungültig."));
     const current = path.slice(path.lastIndexOf("/") + 1);
     const dot = current.lastIndexOf(".");
     const suffix = dot > 0 ? current.slice(dot) : "";
@@ -1938,7 +1956,7 @@ export class App {
     const target = folder ? `${folder}/${targetName}` : targetName;
     if (target === path) return;
     if (this.index.has(target))
-      throw new Error(`„${targetName}“ gibt es in diesem Ordner bereits.`);
+      throw new Error(t("„{name}“ gibt es in diesem Ordner bereits.", { name: targetName }));
     await this.relocateFile(path, target, folder);
   }
 
@@ -1997,18 +2015,18 @@ export class App {
         ? dirname(this.activePath)
         : "");
     const modal = new Modal("mod-new-note");
-    modal.setTitle("Neue Notiz");
+    modal.setTitle(t("Neue Notiz"));
     const input = h("input", {
       id: "new-name",
       attrs: {
         type: "text",
-        placeholder: "Name der Notiz",
+        placeholder: t("Name der Notiz"),
         maxlength: "180",
         autocomplete: "off",
         spellcheck: "false",
         enterkeyhint: "done",
       },
-      label: "Name der Notiz",
+      label: t("Name der Notiz"),
     });
     input.value = base ? `${base}/` : "";
     const error = h("p", {
@@ -2018,7 +2036,7 @@ export class App {
     });
     const submit = h("button", {
       class: "mod-cta",
-      text: "Notiz anlegen",
+      text: t("Notiz anlegen"),
       attrs: { type: "submit" },
     });
     const form = h(
@@ -2026,7 +2044,7 @@ export class App {
       { attrs: { novalidate: true } },
       h("p", {
         class: "modal-description",
-        text: "Mit „Ordner/Name“ legst du die Notiz in einem Ordner an.",
+        text: t("Mit „Ordner/Name“ legst du die Notiz in einem Ordner an."),
       }),
       input,
       error,
@@ -2034,7 +2052,7 @@ export class App {
         "div",
         "modal-button-container",
         h("button", {
-          text: "Abbrechen",
+          text: t("Abbrechen"),
           attrs: { type: "button" },
           on: { click: () => modal.close() },
         }),
@@ -2104,7 +2122,7 @@ export class App {
     try {
       let path = "";
       for (let n = 0; ; n++) {
-        const name = `${base ? `${base}/` : ""}Unbenannt${n ? ` ${n}` : ""}`;
+        const name = `${base ? `${base}/` : ""}${t("Unbenannt")}${n ? ` ${n}` : ""}`;
         path = validateCanvasPath(name);
         if (!this.index.has(path)) break;
       }
@@ -2125,12 +2143,12 @@ export class App {
     const session = this.compatibility;
     if (!session) return;
     const modal = new Modal("mod-new-note");
-    modal.setTitle("Neuer Ordner");
+    modal.setTitle(t("Neuer Ordner"));
     const input = h("input", {
-      label: "Name des Ordners",
+      label: t("Name des Ordners"),
       attrs: {
         type: "text",
-        placeholder: "Name des Ordners",
+        placeholder: t("Name des Ordners"),
         autocomplete: "off",
       },
     });
@@ -2146,7 +2164,7 @@ export class App {
         "modal-button-container",
         h("button", {
           class: "mod-cta",
-          text: "Ordner anlegen",
+          text: t("Ordner anlegen"),
           attrs: { type: "submit" },
         }),
       ),
@@ -2172,16 +2190,16 @@ export class App {
 
   insertTemplate(): void {
     if (this.active.kind !== "markdown") {
-      notify("Vorlagen lassen sich nur in Markdown-Notizen einfügen.");
+      notify(t("Vorlagen lassen sich nur in Markdown-Notizen einfügen."));
       return;
     }
     const paths = templatePaths(this.index.files);
     if (!paths.length) {
-      notify("Keine Markdown-Vorlagen unter _templates gefunden.");
+      notify(t("Keine Markdown-Vorlagen unter _templates gefunden."));
       return;
     }
     const modal = new Modal("mod-template");
-    modal.setTitle("Vorlage einfügen");
+    modal.setTitle(t("Vorlage einfügen"));
     const list = h("div", "template-list");
     for (const path of paths)
       list.append(h("button", {
@@ -2300,17 +2318,17 @@ export class App {
       host.textContent = message;
     };
     if (!session || !tab.path || !tab.viewType)
-      return fail("Plugin-Ansichten benötigen die native App.");
+      return fail(t("Plugin-Ansichten benötigen die native App."));
     let file = session.vault.getFileByPath(tab.path);
     if (!file) {
       await session.vault.refresh();
       file = session.vault.getFileByPath(tab.path);
     }
     if (tab !== this.active || session !== this.compatibility) return;
-    if (!file) return fail(`Datei nicht im Vault gefunden: ${tab.path}`);
+    if (!file) return fail(t("Datei nicht im Vault gefunden: {path}", { path: tab.path }));
     const factory = session.services.getView(tab.viewType);
     if (!factory)
-      return fail(`Plugin-Ansicht nicht registriert: ${tab.viewType}`);
+      return fail(t("Plugin-Ansicht nicht registriert: {type}", { type: tab.viewType ?? "" }));
     const leaf = this.requestedPluginLeaf ?? session.workspace.getLeaf("tab");
     let mounted: { tab: Tab; view: FileView; leaf: WorkspaceLeaf } | null = null;
     // A newer navigation or vault switch owns the host element by then.
@@ -2326,7 +2344,7 @@ export class App {
       if (stale()) return;
       this.report(error);
       fail(
-        `Plugin-Ansicht konnte nicht geöffnet werden: ${errorMessage(error)}`,
+        t("Plugin-Ansicht konnte nicht geöffnet werden: {error}", { error: errorMessage(error) }),
       );
     }
   }
@@ -2570,7 +2588,7 @@ export class App {
   private closedPanelMenu(area?: DockArea): MenuEntry[] {
     return PANELS.filter((spec) => this.isPanelClosed(spec.id)).map(
       (spec) => ({
-        title: `${spec.label} öffnen`,
+        title: t("{name} öffnen", { name: spec.label }),
         icon: spec.icon,
         onClick: () => {
           this.reopen(spec.id);
@@ -2584,10 +2602,10 @@ export class App {
   private panelMenu(id: PanelId): MenuEntry[] {
     const current = areaOf(this.layout.dock, id);
     const targets: Array<[DockArea, string, string]> = [
-      ["left", "In linke Seitenleiste verschieben", "panel-left"],
-      ["left-bottom", "Nach links unten verschieben", "panel-bottom"],
-      ["right", "In rechte Seitenleiste verschieben", "panel-right"],
-      ["bottom", "In unteren Bereich verschieben", "panel-bottom"],
+      ["left", t("In linke Seitenleiste verschieben"), "panel-left"],
+      ["left-bottom", t("Nach links unten verschieben"), "panel-bottom"],
+      ["right", t("In rechte Seitenleiste verschieben"), "panel-right"],
+      ["bottom", t("In unteren Bereich verschieben"), "panel-bottom"],
     ];
     const shown = withoutPanels(this.layout.dock, this.layout.closedPanels);
     const slot = current ? shown[current] : null;
@@ -2606,20 +2624,20 @@ export class App {
       "separator",
       current &&
         index > 0 && {
-          title: "Nach vorne rücken",
+          title: t("Nach vorne rücken"),
           icon: "arrow-left",
           onClick: () => this.movePanelTo(id, current, index - 1),
         },
       current &&
         slot &&
         index < slot.panels.length - 1 && {
-          title: "Nach hinten rücken",
+          title: t("Nach hinten rücken"),
           icon: "arrow-right",
           onClick: () => this.movePanelTo(id, current, index + 2),
         },
       "separator",
       {
-        title: "Ansicht schließen",
+        title: t("Ansicht schließen"),
         icon: "x",
         onClick: () => this.closePanel(id),
       },
@@ -2627,7 +2645,7 @@ export class App {
       ...this.closedPanelMenu(current ?? undefined),
       "separator",
       {
-        title: "Ansichten-Layout zurücksetzen",
+        title: t("Ansichten-Layout zurücksetzen"),
         icon: "rotate-ccw",
         onClick: () => this.resetPanelLayout(),
       },
@@ -3025,7 +3043,7 @@ export class App {
               "button",
               {
                 class: "workspace-tab-header-inner-close-button",
-                label: "Tab schließen",
+                label: t("Tab schließen"),
                 attrs: { type: "button", tabindex: "-1" },
               },
               icon("x", 14),
@@ -3094,9 +3112,9 @@ export class App {
 
   private tabMenu(tab: Tab): MenuEntry[] {
     return [
-      { title: "Schließen", icon: "x", onClick: () => this.closeTab(tab) },
+      { title: t("Schließen"), icon: "x", onClick: () => this.closeTab(tab) },
       {
-        title: "Andere schließen",
+        title: t("Andere schließen"),
         icon: "copy-x",
         disabled: (this.groupOf(tab)?.tabs.length ?? 0) < 2,
         onClick: () => this.closeOtherTabs(tab),
@@ -3106,12 +3124,12 @@ export class App {
         ? []
         : ([
             {
-              title: "Nach rechts teilen",
+              title: t("Nach rechts teilen"),
               icon: "columns-2",
               onClick: () => this.splitTab(tab, "right"),
             },
             {
-              title: "Nach unten teilen",
+              title: t("Nach unten teilen"),
               icon: "rows-2",
               onClick: () => this.splitTab(tab, "bottom"),
             },
@@ -3156,47 +3174,47 @@ export class App {
   fileMenuItems(path: string): MenuEntry[] {
     return [
       {
-        title: "In neuem Tab öffnen",
+        title: t("In neuem Tab öffnen"),
         icon: "file-plus",
         onClick: () => void this.openPath(path, { newTab: true }),
       },
       {
-        title: "Umbenennen",
+        title: t("Umbenennen"),
         icon: "pencil",
         onClick: () => this.promptRenameFile(path),
       },
       "separator",
       {
         title: this.isBookmarked(path)
-          ? "Lesezeichen entfernen"
-          : "Lesezeichen setzen",
+          ? t("Lesezeichen entfernen")
+          : t("Lesezeichen setzen"),
         icon: "bookmark",
         onClick: () => this.toggleBookmark(path),
       },
       {
-        title: "Im Dateiexplorer anzeigen",
+        title: t("Im Dateiexplorer anzeigen"),
         icon: "folder-closed",
         onClick: () => this.explorer.reveal(path),
       },
       {
-        title: "Pfad kopieren",
+        title: t("Pfad kopieren"),
         icon: "copy",
         onClick: () =>
           void navigator.clipboard
             ?.writeText(path)
-            .then(() => notify("Pfad kopiert."))
-            .catch(() => notify("Kopieren nicht möglich.", true)),
+            .then(() => notify(t("Pfad kopiert.")))
+            .catch(() => notify(t("Kopieren nicht möglich."), true)),
       },
       /\.md$/i.test(path)
         ? {
-            title: "Als Markdown exportieren",
+            title: t("Als Markdown exportieren"),
             icon: "download",
             onClick: () => this.exportNote(path),
           }
         : null,
       "separator",
       {
-        title: "In Papierkorb verschieben",
+        title: t("In Papierkorb verschieben"),
         icon: "trash-2",
         danger: true,
         disabled: this.store?.isDeleting(path),
@@ -3224,12 +3242,12 @@ export class App {
         ]),
         "separator",
         {
-          title: "Neuer Tab",
+          title: t("Neuer Tab"),
           icon: "plus",
           onClick: () => this.commands.run("new-tab"),
         },
         {
-          title: "Aktuellen Tab schließen",
+          title: t("Aktuellen Tab schließen"),
           icon: "x",
           onClick: () => this.closeTab(),
         },
@@ -3270,43 +3288,43 @@ export class App {
       showMenu(
         [
           {
-            title: "Befehlspalette öffnen",
+            title: t("Befehlspalette öffnen"),
             icon: "terminal",
             onClick: () => this.commands.run("command-palette"),
           },
           {
-            title: "Heutige Tagesnotiz öffnen",
+            title: t("Heutige Tagesnotiz öffnen"),
             icon: "calendar",
             onClick: () => this.commands.run("daily-note"),
           },
           {
-            title: "Neue Canvas erstellen",
+            title: t("Neue Canvas erstellen"),
             icon: "layout-dashboard",
             onClick: () => this.commands.run("new-canvas"),
           },
           {
-            title: "Im Vault suchen",
+            title: t("Im Vault suchen"),
             icon: "search",
             onClick: () => this.commands.run("search"),
           },
           "separator",
           {
-            title: "Graphansicht öffnen",
+            title: t("Graphansicht öffnen"),
             icon: "git-fork",
             onClick: () => this.commands.run("open-graph"),
           },
           {
-            title: "Rückverweise",
+            title: t("Rückverweise"),
             icon: "link",
             onClick: () => this.showPanel("backlinks"),
           },
           {
-            title: "Lokaler Graph",
+            title: t("Lokaler Graph"),
             icon: "waypoints",
             onClick: () => this.showPanel("graph"),
           },
           {
-            title: "Gliederung",
+            title: t("Gliederung"),
             icon: "list",
             onClick: () => this.showPanel("outline"),
           },
@@ -3316,13 +3334,13 @@ export class App {
             title:
               button.getAttribute("aria-label") ??
               (button as HTMLElement).title ??
-              "Plugin",
+              t("Plugin"),
             icon: "puzzle",
             onClick: () => (button as HTMLElement).click(),
           })),
           "separator",
           {
-            title: "Einstellungen",
+            title: t("Einstellungen"),
             icon: "settings",
             onClick: () => this.commands.run("settings"),
           },
@@ -3341,7 +3359,7 @@ export class App {
         [
           note
             ? {
-                title: this.active.reading ? "Bearbeiten" : "Leseansicht",
+                title: this.active.reading ? t("Bearbeiten") : t("Leseansicht"),
                 icon: this.active.reading ? "pencil" : "book-open",
                 hotkey: formatHotkey("Mod+E"),
                 onClick: () => this.commands.run("toggle-reading"),
@@ -3349,7 +3367,7 @@ export class App {
             : null,
           note
             ? {
-                title: "Quellcode-Modus",
+                title: t("Quellcode-Modus"),
                 icon: "code-xml",
                 checked: this.settings.get("editingMode") === "source",
                 onClick: () => this.commands.run("toggle-source-mode"),
@@ -3357,7 +3375,7 @@ export class App {
             : null,
           note
             ? {
-                title: "Jetzt speichern",
+                title: t("Jetzt speichern"),
                 icon: "save",
                 hotkey: formatHotkey("Mod+S"),
                 onClick: () => this.commands.run("save"),
@@ -3365,19 +3383,19 @@ export class App {
             : null,
           "separator",
           {
-            title: "Rückverweise anzeigen",
+            title: t("Rückverweise anzeigen"),
             icon: "link",
             onClick: () => this.showPanel("backlinks"),
           },
           {
-            title: "Gliederung anzeigen",
+            title: t("Gliederung anzeigen"),
             icon: "list",
             onClick: () => this.showPanel("outline"),
           },
           "separator",
           ...this.fileMenuItems(path),
           "separator",
-          { title: "Tab schließen", icon: "x", onClick: () => this.closeTab() },
+          { title: t("Tab schließen"), icon: "x", onClick: () => this.closeTab() },
         ],
         "more-options",
       );
@@ -3479,7 +3497,7 @@ export class App {
     const hasNote = () => !!this.activeNote;
     add({
       id: "quick-switcher",
-      name: "Schnellauswahl öffnen",
+      name: t("Schnellauswahl öffnen"),
       hotkey: "Mod+O",
       icon: "file-search",
       global: true,
@@ -3490,7 +3508,7 @@ export class App {
     });
     add({
       id: "command-palette",
-      name: "Befehlspalette öffnen",
+      name: t("Befehlspalette öffnen"),
       hotkey: "Mod+P",
       icon: "terminal",
       global: true,
@@ -3501,34 +3519,34 @@ export class App {
     });
     add({
       id: "new-note",
-      name: "Neue Notiz erstellen",
+      name: t("Neue Notiz erstellen"),
       hotkey: "Mod+N",
       icon: "square-pen",
       run: () => this.promptNewNote(),
     });
     add({
       id: "new-canvas",
-      name: "Neue Canvas erstellen",
+      name: t("Neue Canvas erstellen"),
       icon: "layout-dashboard",
       run: () => void this.createCanvas(),
     });
     add({
       id: "new-tab",
-      name: "Neuer Tab",
+      name: t("Neuer Tab"),
       hotkey: "Mod+T",
       icon: "plus",
       run: () => void this.newTab(),
     });
     add({
       id: "close-tab",
-      name: "Aktuellen Tab schließen",
+      name: t("Aktuellen Tab schließen"),
       hotkey: "Mod+W",
       icon: "x",
       run: () => this.closeTab(),
     });
     add({
       id: "rename-file",
-      name: "Aktuelle Datei umbenennen",
+      name: t("Aktuelle Datei umbenennen"),
       hotkey: "F2",
       icon: "pencil",
       when: () => !!this.activePath,
@@ -3536,13 +3554,13 @@ export class App {
     });
     add({
       id: "next-tab",
-      name: "Zum nächsten Tab wechseln",
+      name: t("Zum nächsten Tab wechseln"),
       hotkey: "Mod+Tab",
       run: () => this.cycleTab(1),
     });
     add({
       id: "previous-tab",
-      name: "Zum vorherigen Tab wechseln",
+      name: t("Zum vorherigen Tab wechseln"),
       hotkey: "Mod+Shift+Tab",
       run: () => this.cycleTab(-1),
     });
@@ -3550,7 +3568,7 @@ export class App {
     const isSplit = () => !this.isMobile && this.groups.length > 1;
     add({
       id: "split-right",
-      name: "Editor nach rechts teilen",
+      name: t("Editor nach rechts teilen"),
       hotkey: "Mod+\\",
       icon: "columns-2",
       when: canSplit,
@@ -3558,32 +3576,32 @@ export class App {
     });
     add({
       id: "split-down",
-      name: "Editor nach unten teilen",
+      name: t("Editor nach unten teilen"),
       icon: "rows-2",
       when: canSplit,
       run: () => this.splitActive("bottom"),
     });
     add({
       id: "focus-next-group",
-      name: "Zur nächsten Editorgruppe wechseln",
+      name: t("Zur nächsten Editorgruppe wechseln"),
       when: isSplit,
       run: () => this.cycleGroup(1),
     });
     add({
       id: "focus-previous-group",
-      name: "Zur vorherigen Editorgruppe wechseln",
+      name: t("Zur vorherigen Editorgruppe wechseln"),
       when: isSplit,
       run: () => this.cycleGroup(-1),
     });
     add({
       id: "close-group",
-      name: "Editorgruppe schließen",
+      name: t("Editorgruppe schließen"),
       when: isSplit,
       run: () => this.closeGroup(this.group),
     });
     add({
       id: "toggle-reading",
-      name: "Lese-/Bearbeitungsansicht umschalten",
+      name: t("Lese-/Bearbeitungsansicht umschalten"),
       hotkey: "Mod+E",
       icon: "book-open",
       when: hasNote,
@@ -3591,7 +3609,7 @@ export class App {
     });
     add({
       id: "toggle-source-mode",
-      name: "Live-Vorschau/Quellcode-Modus umschalten",
+      name: t("Live-Vorschau/Quellcode-Modus umschalten"),
       icon: "code-xml",
       run: () =>
         this.settings.set(
@@ -3601,7 +3619,7 @@ export class App {
     });
     add({
       id: "save",
-      name: "Aktuelle Datei speichern",
+      name: t("Aktuelle Datei speichern"),
       hotkey: "Mod+S",
       icon: "save",
       global: true,
@@ -3613,7 +3631,7 @@ export class App {
     });
     add({
       id: "search",
-      name: "In allen Dateien suchen",
+      name: t("In allen Dateien suchen"),
       hotkey: "Mod+Shift+F",
       icon: "search",
       run: () => {
@@ -3631,70 +3649,70 @@ export class App {
     });
     add({
       id: "navigate-back",
-      name: "Zurück navigieren",
+      name: t("Zurück navigieren"),
       hotkey: "Mod+Alt+ArrowLeft",
       icon: "arrow-left",
       run: () => void this.navigateHistory(-1),
     });
     add({
       id: "navigate-forward",
-      name: "Vorwärts navigieren",
+      name: t("Vorwärts navigieren"),
       hotkey: "Mod+Alt+ArrowRight",
       icon: "arrow-right",
       run: () => void this.navigateHistory(1),
     });
     add({
       id: "toggle-left-sidebar",
-      name: "Linke Seitenleiste umschalten",
+      name: t("Linke Seitenleiste umschalten"),
       icon: "panel-left",
       run: () => this.toggleLeft(),
     });
     add({
       id: "toggle-right-sidebar",
-      name: "Rechte Seitenleiste umschalten",
+      name: t("Rechte Seitenleiste umschalten"),
       icon: "panel-right",
       run: () => this.toggleRight(),
     });
     add({
       id: "toggle-bottom-panel",
-      name: "Unteren Bereich umschalten",
+      name: t("Unteren Bereich umschalten"),
       icon: "panel-bottom",
       run: () => this.toggleBottom(),
     });
     add({
       id: "reset-panel-layout",
-      name: "Ansichten-Layout zurücksetzen",
+      name: t("Ansichten-Layout zurücksetzen"),
       icon: "rotate-ccw",
       run: () => this.resetPanelLayout(),
     });
     add({
       id: "show-explorer",
-      name: "Dateiexplorer anzeigen",
+      name: t("Dateiexplorer anzeigen"),
       icon: "folder-closed",
       run: () => this.showPanel("files"),
     });
     add({
       id: "reveal-active",
-      name: "Aktuelle Datei im Dateiexplorer anzeigen",
+      name: t("Aktuelle Datei im Dateiexplorer anzeigen"),
       icon: "folder-closed",
       when: () => !!this.activePath,
       run: () => this.explorer.reveal(this.activePath!),
     });
     add({
       id: "show-backlinks",
-      name: "Rückverweise anzeigen",
+      name: t("Rückverweise anzeigen"),
       icon: "link",
       run: () => this.showPanel("backlinks"),
     });
     add({
       id: "show-outline",
-      name: "Gliederung anzeigen",
+      name: t("Gliederung anzeigen"),
       icon: "list",
       run: () => this.showPanel("outline"),
     });
     add({
       id: "open-graph",
-      name: "Graphansicht öffnen",
+      name: t("Graphansicht öffnen"),
       icon: "git-fork",
       run: () => {
         closeMenu();
@@ -3704,70 +3722,70 @@ export class App {
     });
     add({
       id: "show-local-graph",
-      name: "Lokalen Graph anzeigen",
+      name: t("Lokalen Graph anzeigen"),
       icon: "waypoints",
       run: () => this.showPanel("graph"),
     });
     add({
       id: "show-tags",
-      name: "Tags anzeigen",
+      name: t("Tags anzeigen"),
       icon: "tags",
       run: () => this.showPanel("tags"),
     });
     add({
       id: "show-bookmarks",
-      name: "Lesezeichen anzeigen",
+      name: t("Lesezeichen anzeigen"),
       icon: "bookmark",
       run: () => this.showPanel("bookmarks"),
     });
     add({
       id: "show-outgoing-links",
-      name: "Ausgehende Links anzeigen",
+      name: t("Ausgehende Links anzeigen"),
       icon: "arrow-up-right",
       run: () => this.showPanel("outgoing"),
     });
     add({
       id: "toggle-bookmark",
-      name: "Lesezeichen für aktuelle Datei umschalten",
+      name: t("Lesezeichen für aktuelle Datei umschalten"),
       icon: "bookmark",
       when: () => !!this.activePath,
       run: () => this.toggleBookmark(this.activePath!),
     });
     add({
       id: "daily-note",
-      name: "Heutige Tagesnotiz öffnen",
+      name: t("Heutige Tagesnotiz öffnen"),
       icon: "calendar",
       run: () => void this.dailyNote(),
     });
     add({
       id: "insert-template",
-      name: "Vorlage einfügen",
+      name: t("Vorlage einfügen"),
       icon: "file-plus",
       when: hasNote,
       run: () => this.insertTemplate(),
     });
     add({
       id: "export-note",
-      name: "Aktuelle Notiz als Markdown exportieren",
+      name: t("Aktuelle Notiz als Markdown exportieren"),
       icon: "download",
       when: hasNote,
       run: () => this.exportNote(),
     });
     add({
       id: "open-vault",
-      name: "Anderen Vault öffnen",
+      name: t("Anderen Vault öffnen"),
       icon: "folder-open",
       run: () => void this.chooseVault(),
     });
     add({
       id: "reload-files",
-      name: "Dateiliste neu laden",
+      name: t("Dateiliste neu laden"),
       icon: "refresh-cw",
       run: () => void this.refreshFiles().catch((error) => this.report(error)),
     });
     add({
       id: "toggle-theme",
-      name: "Helles/dunkles Farbschema umschalten",
+      name: t("Helles/dunkles Farbschema umschalten"),
       icon: "sun-moon",
       run: () =>
         this.settings.set(
@@ -3777,7 +3795,7 @@ export class App {
     });
     add({
       id: "settings",
-      name: "Einstellungen öffnen",
+      name: t("Einstellungen öffnen"),
       hotkey: "Mod+,",
       icon: "settings",
       run: () => {
@@ -3946,4 +3964,17 @@ function syncChildren(parent: HTMLElement, children: HTMLElement[]): void {
 
 export function isCanvas(path: string): boolean {
   return /\.canvas$/i.test(path);
+}
+
+/** Keep note and plugin buffers intact when a save conflict blocks navigation. */
+async function saveBeforeLeaving(app: Pick<App, "store" | "compatibility">): Promise<void> {
+  await app.store?.saveAll();
+  if (app.compatibility) {
+    await app.compatibility.workspace.flushPending();
+    const views = new Set<TextFileView>();
+    app.compatibility.workspace.iterateAllLeaves((leaf) => {
+      if (leaf.view instanceof TextFileView) views.add(leaf.view);
+    });
+    for (const view of views) await view.save();
+  }
 }

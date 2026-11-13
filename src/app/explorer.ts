@@ -1,3 +1,4 @@
+import { getLocale, t } from "../i18n";
 import { basename, clear, extension, h, icon, iconButton } from "../ui/dom";
 import { showMenu } from "../ui/menu";
 import type { App } from "./app";
@@ -30,7 +31,7 @@ interface FolderNode {
   files: string[];
 }
 
-const collator = new Intl.Collator("de", {
+const collator = new Intl.Collator(getLocale(), {
   numeric: true,
   sensitivity: "base",
 });
@@ -56,12 +57,12 @@ export class Explorer extends Component {
     super();
     this.newFolderButton = iconButton(
       "folder-plus",
-      "Neuer Ordner",
+      t("Neuer Ordner"),
       () => void this.app.createFolder(""),
     );
     this.listEl = h("div", {
       class: "nav-files-container",
-      attrs: { role: "tree", "aria-label": "Dateien" },
+      attrs: { role: "tree", "aria-label": t("Dateien") },
     });
     containerEl.append(
       h(
@@ -70,26 +71,26 @@ export class Explorer extends Component {
         h(
           "div",
           "nav-buttons-container",
-          iconButton("square-pen", "Neue Notiz", () =>
+          iconButton("square-pen", t("Neue Notiz"), () =>
             this.app.promptNewNote(),
           ),
           iconButton(
             "layout-dashboard",
-            "Neue Canvas",
+            t("Neue Canvas"),
             () => void this.app.createCanvas(),
           ),
           this.newFolderButton,
           iconButton(
             "arrow-up-narrow-wide",
-            "Sortierreihenfolge ändern",
+            t("Sortierreihenfolge ändern"),
             (event) => this.sortMenu(event.currentTarget as HTMLElement),
           ),
-          iconButton("chevrons-down-up", "Alle einklappen", () => {
+          iconButton("chevrons-down-up", t("Alle einklappen"), () => {
             this.app.ws.expanded = [];
             this.app.persist();
             this.render();
           }),
-          iconButton("refresh-cw", "Dateiliste neu laden", () =>
+          iconButton("refresh-cw", t("Dateiliste neu laden"), () =>
             this.app.commands.run("reload-files"),
           ),
         ),
@@ -114,7 +115,7 @@ export class Explorer extends Component {
     return "file-explorer";
   }
   getDisplayText(): string {
-    return "Dateiexplorer";
+    return t("Dateiexplorer");
   }
 
   /**
@@ -217,12 +218,12 @@ export class Explorer extends Component {
     showMenu(
       [
         {
-          title: "Dateiname (A bis Z)",
+          title: t("Dateiname (A bis Z)"),
           checked: this.app.ws.sort === "asc",
           onClick: set("asc"),
         },
         {
-          title: "Dateiname (Z bis A)",
+          title: t("Dateiname (Z bis A)"),
           checked: this.app.ws.sort === "desc",
           onClick: set("desc"),
         },
@@ -266,8 +267,8 @@ export class Explorer extends Component {
           "div",
           "pane-empty",
           this.app.vault
-            ? "Dieser Vault ist noch leer."
-            : "Vault wird geöffnet …",
+            ? t("Dieser Vault ist noch leer.")
+            : t("Vault wird geöffnet …"),
         ),
       );
       return;
@@ -390,7 +391,7 @@ export class Explorer extends Component {
       ["", ...this.allFolders()]
         .filter((folder) => folder !== current)
         .map((folder) => ({
-          title: folder || "Oberste Ebene",
+          title: folder || t("Oberste Ebene"),
           icon: folder ? "folder-closed" : "vault",
           onClick: () => void this.app.moveFile(path, folder),
         })),
@@ -607,18 +608,18 @@ export class Explorer extends Component {
       showMenu(
         [
           {
-            title: "Neue Notiz",
+            title: t("Neue Notiz"),
             icon: "square-pen",
             onClick: () => this.app.promptNewNote(""),
           },
           {
-            title: "Neue Canvas",
+            title: t("Neue Canvas"),
             icon: "layout-dashboard",
             onClick: () => void this.app.createCanvas(""),
           },
           this.app.compatibility
             ? {
-                title: "Neuer Ordner",
+                title: t("Neuer Ordner"),
                 icon: "folder-plus",
                 onClick: () => void this.app.createFolder(""),
               }
@@ -632,30 +633,30 @@ export class Explorer extends Component {
       const folder = row.dataset.folder;
       this.app.showFileMenu(folder, at, [
         {
-          title: "Neue Notiz",
+          title: t("Neue Notiz"),
           icon: "square-pen",
           onClick: () => this.app.promptNewNote(folder),
         },
         {
-          title: "Neue Canvas",
+          title: t("Neue Canvas"),
           icon: "layout-dashboard",
           onClick: () => void this.app.createCanvas(folder),
         },
         this.app.compatibility
           ? {
-              title: "Neuer Ordner",
+              title: t("Neuer Ordner"),
               icon: "folder-plus",
               onClick: () => void this.app.createFolder(folder),
             }
           : null,
         "separator",
         {
-          title: "In Ordner suchen",
+          title: t("In Ordner suchen"),
           icon: "search",
           onClick: () => this.app.searchFor(`path:"${folder}/" `),
         },
         {
-          title: "Pfad kopieren",
+          title: t("Pfad kopieren"),
           icon: "copy",
           onClick: () => void navigator.clipboard?.writeText(folder),
         },
@@ -665,12 +666,12 @@ export class Explorer extends Component {
     const path = row.dataset.path!;
     this.app.showFileMenu(path, at, [
       {
-        title: "Öffnen",
+        title: t("Öffnen"),
         icon: "file-text",
         onClick: () => void this.app.openPath(path),
       },
       {
-        title: "Verschieben nach …",
+        title: t("Verschieben nach …"),
         icon: "folder-input",
         onClick: () => this.moveMenu(path, at),
       },

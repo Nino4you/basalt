@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { createElement as createSvg } from "lucide";
 import { hostIcons } from "./icon-set";
 import { findIcon } from "./icon-library";
@@ -88,8 +89,8 @@ export function formatHotkey(hotkey: string): string {
   return hotkey
     .split("+")
     .map((part) => {
-      if (part === "Mod") return isMac ? "⌘" : "Strg";
-      if (part === "Shift") return isMac ? "⇧" : "Umschalt";
+      if (part === "Mod") return isMac ? "⌘" : t("Strg");
+      if (part === "Shift") return isMac ? "⇧" : t("Umschalt");
       if (part === "Alt") return isMac ? "⌥" : "Alt";
       if (part === "ArrowLeft") return "←";
       if (part === "ArrowRight") return "→";

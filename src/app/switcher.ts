@@ -1,3 +1,4 @@
+import { getLocale, t } from "../i18n";
 import { validateNotePath } from "../backend";
 import { basename, dirname, formatHotkey, h, icon } from "../ui/dom";
 import { fuzzyMatch, highlightMatch } from "../ui/fuzzy";
@@ -69,8 +70,8 @@ export function openQuickSwitcher(app: App): void {
     });
 
     return new SuggestModal(
-      "Notiz suchen oder erstellen …",
-      "Schnellauswahl",
+      t("Notiz suchen oder erstellen …"),
+      t("Schnellauswahl"),
       (raw) => {
         const query = raw.trim().toLowerCase();
         if (!query) {
@@ -134,7 +135,7 @@ export function openQuickSwitcher(app: App): void {
                 ),
                 h("div", {
                   class: "suggestion-aux suggestion-flair",
-                  text: "Enter zum Erstellen",
+                  text: t("Enter zum Erstellen"),
                 }),
               );
             },
@@ -144,11 +145,11 @@ export function openQuickSwitcher(app: App): void {
       },
       [
         ["↑↓", "navigieren"],
-        ["↵", "öffnen"],
-        [`${formatHotkey("Mod")} ↵`, "in neuem Tab öffnen"],
-        ["esc", "schließen"],
+        ["↵", t("öffnen")],
+        [`${formatHotkey("Mod")} ↵`, t("in neuem Tab öffnen")],
+        ["esc", t("schließen")],
       ],
-      "Keine Notizen gefunden.",
+      t("Keine Notizen gefunden."),
     );
   });
 }
@@ -187,11 +188,11 @@ export function openCommandPalette(app: App): void {
           },
         })) ?? [];
     const all = [...own, ...plugin].sort((a, b) =>
-      a.name.localeCompare(b.name, "de"),
+      a.name.localeCompare(b.name, getLocale()),
     );
     return new SuggestModal(
-      "Befehl eingeben …",
-      "Befehlspalette",
+      t("Befehl eingeben …"),
+      t("Befehlspalette"),
       (raw) => {
         const query = raw.trim().toLowerCase();
         const matched = query
@@ -237,10 +238,10 @@ export function openCommandPalette(app: App): void {
       },
       [
         ["↑↓", "navigieren"],
-        ["↵", "ausführen"],
-        ["esc", "schließen"],
+        ["↵", t("ausführen")],
+        ["esc", t("schließen")],
       ],
-      "Kein passender Befehl.",
+      t("Kein passender Befehl."),
     );
   });
 }

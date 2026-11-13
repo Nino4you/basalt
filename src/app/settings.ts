@@ -1,9 +1,11 @@
 import { setSystemBarTheme } from "../ui/android-insets";
+import { getLocale, resolveLocale, type Locale } from "../i18n";
 
 export type ThemeChoice = "dark" | "light" | "system";
 export type EditingMode = "live" | "source";
 
 export interface Settings {
+  language: Locale;
   theme: ThemeChoice;
   accent: string;
   fontSize: number;
@@ -23,6 +25,7 @@ export interface Settings {
 export const DEFAULT_ACCENT = "#8a5cf5";
 
 export const defaults: Settings = {
+  language: "en",
   theme: "dark",
   accent: DEFAULT_ACCENT,
   fontSize: 16,
@@ -81,10 +84,15 @@ export class SettingsStore {
       if (typeof candidate === typeof defaults[key])
         (this.value as unknown as Record<string, unknown>)[key] = candidate;
     }
+    this.value.language = resolveLocale(stored.language);
     // Earlier versions stored only the theme.
-    if (!localStorage.getItem(KEY)) {
-      const legacy = localStorage.getItem("basalt-theme");
-      if (legacy === "light" || legacy === "dark") this.value.theme = legacy;
+    try {
+      if (!localStorage.getItem(KEY)) {
+        const legacy = localStorage.getItem("basalt-theme");
+        if (legacy === "light" || legacy === "dark") this.value.theme = legacy;
+      }
+    } catch {
+      // Settings also work for the session when storage access is denied.
     }
     this.media.addEventListener("change", () => {
       if (this.value.theme === "system") this.apply();
@@ -96,16 +104,19 @@ export class SettingsStore {
     return this.value[key];
   }
 
-  set<K extends keyof Settings>(key: K, next: Settings[K]): void {
-    if (this.value[key] === next) return;
+  set<K extends keyof Settings>(key: K, next: Settings[K]): boolean {
+    if (this.value[key] === next) return true;
     this.value[key] = next;
+    let persisted = true;
     try {
       localStorage.setItem(KEY, JSON.stringify(this.value));
     } catch {
       // Storage full or blocked: the setting still applies for this session.
+      persisted = false;
     }
     this.apply();
     for (const listener of this.listeners) listener(key);
+    return persisted;
   }
 
   onChange(listener: (key: keyof Settings) => void): void {
@@ -121,6 +132,7 @@ export class SettingsStore {
   /** Mirrors settings onto the document; all styling follows from CSS variables. */
   apply(): void {
     const root = document.documentElement;
+    root.lang = getLocale();
     const body = document.body;
     const theme = this.resolvedTheme;
     root.dataset.theme = theme;

@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { CanvasView } from "../canvas/view";
 import { MarkdownEditor, type EditorOptions } from "../editor";
 import { basename, dirname, h, icon } from "../ui/dom";
@@ -128,13 +129,13 @@ export class GroupMirror {
           ),
           h("div", {
             class: "empty-state-title",
-            text: tab.path ? basename(tab.path) : "Keine Datei geöffnet",
+            text: tab.path ? basename(tab.path) : t("Keine Datei geöffnet"),
           }),
           h("p", {
             class: "empty-state-description",
             text: tab.path
-              ? "Klicken, um diese Ansicht zu aktivieren."
-              : "Klicken, um diese Gruppe zu aktivieren.",
+              ? t("Klicken, um diese Ansicht zu aktivieren.")
+              : t("Klicken, um diese Gruppe zu aktivieren."),
           }),
         ),
       );

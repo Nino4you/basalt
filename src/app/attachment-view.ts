@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { attachmentKind, MAX_ATTACHMENT_BYTES, mimeFor } from "../attachments";
 import type { CompatibilitySession } from "../compat/session";
 import { basename, errorMessage, h } from "../ui/dom";
@@ -43,13 +44,13 @@ export class AttachmentView {
     const message = (text: string) =>
       host.append(h("div", { class: "attachment-message", text }));
     if (kind === "unsupported")
-      return message("Dieses Dateiformat kann nicht angezeigt werden.");
+      return message(t("Dieses Dateiformat kann nicht angezeigt werden."));
     if (!session)
-      return message("Anhänge werden nur in der nativen App angezeigt.");
-    if (!file) return message(`Datei nicht im Vault gefunden: ${path}`);
+      return message(t("Anhänge werden nur in der nativen App angezeigt."));
+    if (!file) return message(t("Datei nicht im Vault gefunden: {path}", { path }));
     if (file.stat.size > MAX_ATTACHMENT_BYTES)
       return message(
-        "Datei ist größer als 64 MiB und kann nicht direkt angezeigt werden.",
+        t("Datei ist größer als 64 MiB und kann nicht direkt angezeigt werden."),
       );
     this.source = {
       session,
@@ -63,7 +64,7 @@ export class AttachmentView {
       if (!isCurrent()) return;
       this.clear();
       const shown = this.request;
-      const retry = h("button", { text: "Erneut versuchen" });
+      const retry = h("button", { text: t("Erneut versuchen") });
       retry.addEventListener("click", () => {
         if (shown === this.request) void this.show(path, session);
       });
@@ -82,7 +83,7 @@ export class AttachmentView {
     };
     const loading = h("div", {
       class: "attachment-message",
-      text: "Datei wird geladen …",
+      text: t("Datei wird geladen …"),
       attrs: { role: "status" },
     });
     host.append(loading);
@@ -110,7 +111,7 @@ export class AttachmentView {
           "error",
           () =>
             failed(
-              "Bild konnte nicht geladen werden. Die Datei ist beschädigt oder das Format wird nicht unterstützt.",
+              t("Bild konnte nicht geladen werden. Die Datei ist beschädigt oder das Format wird nicht unterstützt."),
             ),
           { once: true },
         );
@@ -125,7 +126,7 @@ export class AttachmentView {
           "error",
           () =>
             failed(
-              "Medien-Datei konnte nicht geladen werden. Die Datei ist beschädigt oder das Format wird nicht unterstützt.",
+              t("Medien-Datei konnte nicht geladen werden. Die Datei ist beschädigt oder das Format wird nicht unterstützt."),
             ),
           { once: true },
         );
@@ -133,7 +134,7 @@ export class AttachmentView {
         host.append(media);
       }
     } catch (error) {
-      failed(`Datei konnte nicht geladen werden: ${errorMessage(error)}`);
+      failed(t("Datei konnte nicht geladen werden: {error}", { error: errorMessage(error) }));
     }
   }
 

@@ -35,6 +35,7 @@ for (const enforceCsp of [false, true]) test(`unchanged Excalidraw creates, draw
       load("/src/app/app.ts"), load("/src/compat/session.ts"), load("/tests/helpers/vault-store.ts"),
     ]);
     localStorage.clear();
+    localStorage.setItem("basalt-settings", JSON.stringify({ language: "de" }));
     const app = new App(document.querySelector("#app"));
     await app.start();
     const port = new MemoryPort(contents);

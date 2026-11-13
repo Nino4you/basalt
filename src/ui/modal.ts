@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { h, icon } from "./dom";
 
 const stack: Modal[] = [];
@@ -24,7 +25,7 @@ export class Modal {
       "button",
       {
         class: "modal-close-button",
-        label: "Schließen",
+        label: t("Schließen"),
         attrs: { type: "button" },
       },
       icon("x", 16),
@@ -138,7 +139,7 @@ export class SuggestModal extends Modal {
     label: string,
     private readonly source: (query: string) => Suggestion[],
     instructions: Array<[string, string]> = [],
-    private readonly emptyText = "Keine Treffer.",
+    private readonly emptyText = t("Keine Treffer."),
   ) {
     super("prompt");
     this.modalEl.setAttribute("aria-label", label);

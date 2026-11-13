@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { syntaxTree } from "@codemirror/language";
 import {
   type EditorState,
@@ -105,7 +106,7 @@ class CheckboxWidget extends WidgetType {
     box.type = "checkbox";
     box.className = "task-list-item-checkbox";
     box.checked = this.checked;
-    box.setAttribute("aria-label", "Aufgabe umschalten");
+    box.setAttribute("aria-label", t("Aufgabe umschalten"));
     box.addEventListener("mousedown", (event) => event.preventDefault());
     box.addEventListener("click", (event) => {
       event.preventDefault();

@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { h, icon, trackSliderFill } from "../ui/dom";
 import { Modal } from "../ui/modal";
 import type { App } from "./app";
@@ -136,7 +137,7 @@ export class GraphView {
       tabindex: "0",
       "aria-label": label,
       "aria-description":
-        "Pfeiltasten verschieben den Graphen, Plus und Minus zoomen. Umschalt beschleunigt. Knoten mit Tab auswählen und mit Enter öffnen.",
+        t("Pfeiltasten verschieben den Graphen, Plus und Minus zoomen. Umschalt beschleunigt. Knoten mit Tab auswählen und mit Enter öffnen."),
     });
     this.svgEl.append(this.viewport);
     this.emptyEl = h("div", {
@@ -147,9 +148,9 @@ export class GraphView {
     const controls = h(
       "div",
       "graph-controls",
-      this.controlButton("plus", "Vergrößern", () => this.zoomBy(1.4)),
-      this.controlButton("minus", "Verkleinern", () => this.zoomBy(1 / 1.4)),
-      this.controlButton("maximize", "Ansicht einpassen", () => {
+      this.controlButton("plus", t("Vergrößern"), () => this.zoomBy(1.4)),
+      this.controlButton("minus", t("Verkleinern"), () => this.zoomBy(1 / 1.4)),
+      this.controlButton("maximize", t("Ansicht einpassen"), () => {
         this.autoFit = true;
         this.fit(false);
       }),
@@ -811,7 +812,7 @@ function toggle(
 /** Global graph of the whole vault in a full-size dialog. */
 export function openGraph(app: App): Modal {
   const modal = new Modal("mod-graph");
-  modal.setTitle("Graphansicht");
+  modal.setTitle(t("Graphansicht"));
   const options = loadOptions();
   const view = new GraphView(
     {
@@ -820,8 +821,8 @@ export function openGraph(app: App): Modal {
         activateGraphNode(app, node, newTab);
       },
     },
-    "Graph aller Notizen",
-    "Keine Notizen für diese Auswahl.",
+    t("Graph aller Notizen"),
+    t("Keine Notizen für diese Auswahl."),
   );
   const count = h("span", { class: "graph-count" });
   const refresh = () => {
@@ -829,14 +830,14 @@ export function openGraph(app: App): Modal {
     const data = buildGraph(app.index, options);
     view.setGroupColors(options.colorGroups);
     view.setData(data, app.activePath);
-    count.textContent = `${data.nodes.length} Knoten · ${data.edges.length} Verbindungen`;
+    count.textContent = t("{nodes} Knoten · {edges} Verbindungen", { nodes: data.nodes.length, edges: data.edges.length });
   };
   const filter = h("input", {
     class: "graph-filter",
-    label: "Graph filtern",
+    label: t("Graph filtern"),
     attrs: {
       type: "search",
-      placeholder: "Dateien filtern …",
+      placeholder: t("Dateien filtern …"),
       autocomplete: "off",
       spellcheck: "false",
     },
@@ -861,29 +862,29 @@ export function openGraph(app: App): Modal {
     { class: "graph-settings", attrs: { open: true } },
     h(
       "summary",
-      { class: "graph-settings-heading", label: "Graph-Einstellungen" },
+      { class: "graph-settings-heading", label: t("Graph-Einstellungen") },
       icon("settings", 16),
-      h("span", { text: "Graph-Einstellungen" }),
+      h("span", { text: t("Graph-Einstellungen") }),
       icon("chevron-down", 14),
     ),
     h(
       "details",
       { class: "graph-settings-section", attrs: { open: true } },
-      h("summary", { text: "Filter" }),
+      h("summary", { text: t("Filter") }),
       filter,
-      toggle("Tags", options.showTags, set("showTags")),
+      toggle(t("Tags"), options.showTags, set("showTags")),
       toggle(
-        "Unaufgelöste Links",
+        t("Unaufgelöste Links"),
         options.showUnresolved,
         set("showUnresolved"),
       ),
-      toggle("Verwaiste Notizen", options.showOrphans, set("showOrphans")),
+      toggle(t("Verwaiste Notizen"), options.showOrphans, set("showOrphans")),
     ),
     h(
       "details",
       { class: "graph-settings-section" },
-      h("summary", { text: "Darstellung" }),
-      toggle("Gruppen einfärben", options.colorGroups, set("colorGroups")),
+      h("summary", { text: t("Darstellung") }),
+      toggle(t("Gruppen einfärben"), options.colorGroups, set("colorGroups")),
     ),
   );
   view.el.append(settings, count);
@@ -922,12 +923,12 @@ export class LocalGraph {
     if (!this.view) {
       this.view = new GraphView(
         { activate: (node, newTab) => activateGraphNode(app, node, newTab) },
-        "Lokaler Graph",
-        "Keine Datei geöffnet.",
+        t("Lokaler Graph"),
+        t("Keine Datei geöffnet."),
       );
       const depth = h("input", {
         class: "graph-depth",
-        label: "Tiefe",
+        label: t("Tiefe"),
         attrs: { type: "range", min: 1, max: 3, step: 1, value: this.depth },
       });
       trackSliderFill(depth);
@@ -943,7 +944,7 @@ export class LocalGraph {
       const depthControl = h(
         "label",
         "graph-toggle",
-        h("span", { text: "Tiefe" }),
+        h("span", { text: t("Tiefe") }),
         depth,
         depthValue,
       );
@@ -954,14 +955,14 @@ export class LocalGraph {
         { class: "graph-local-settings" },
         h(
           "summary",
-          { class: "clickable-icon", label: "Graph-Einstellungen" },
+          { class: "clickable-icon", label: t("Graph-Einstellungen") },
           icon("settings", 16),
         ),
         h(
           "div",
           "graph-local-settings-body",
           depthControl,
-          toggle("Ganzer Vault", this.whole, (value) => {
+          toggle(t("Ganzer Vault"), this.whole, (value) => {
             this.whole = value;
             depthControl.hidden = value;
             this.render(this.app.activePath);

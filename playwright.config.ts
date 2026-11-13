@@ -8,6 +8,19 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:1420",
     trace: "retain-on-failure",
+    // Existing suites assert German labels and German demo-note contents.
+    // i18n.spec.ts overrides this to test the English application default.
+    storageState: {
+      cookies: [],
+      origins: [
+        {
+          origin: "http://127.0.0.1:1420",
+          localStorage: [
+            { name: "basalt-settings", value: '{"language":"de"}' },
+          ],
+        },
+      ],
+    },
   },
   projects: [
     {

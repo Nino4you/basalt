@@ -1,18 +1,19 @@
+import { t } from "../i18n";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, PDFPageProxy, RenderTask } from "pdfjs-dist";
 import type { TextLayer } from "pdfjs-dist";
 import { h } from "../ui/dom";
 
 /** One page at a time bounds raster memory, including for embedded PDFs. */
 export class PdfView {
-  readonly el = h("section", { class: "pdf-view", attrs: { "aria-label": "PDF-Dokument" } });
-  private readonly previous = h("button", { text: "‹", label: "Vorherige PDF-Seite" });
-  private readonly next = h("button", { text: "›", label: "Nächste PDF-Seite" });
+  readonly el = h("section", { class: "pdf-view", attrs: { "aria-label": t("PDF-Dokument") } });
+  private readonly previous = h("button", { text: "‹", label: t("Vorherige PDF-Seite") });
+  private readonly next = h("button", { text: "›", label: t("Nächste PDF-Seite") });
   private readonly pageNumber = h("input", {
-    class: "pdf-page-number", attrs: { type: "number", min: "1", "aria-label": "PDF-Seite" },
+    class: "pdf-page-number", attrs: { type: "number", min: "1", "aria-label": t("PDF-Seite") },
   });
   private readonly count = h("span");
-  private readonly zoom = h("select", { class: "dropdown", attrs: { "aria-label": "PDF-Vergrößerung" } },
-    ...[["width", "Breite"], ["1", "100 %"], ["1.25", "125 %"], ["1.5", "150 %"], ["2", "200 %"]]
+  private readonly zoom = h("select", { class: "dropdown", attrs: { "aria-label": t("PDF-Vergrößerung") } },
+    ...[["width", t("Breite")], ["1", "100 %"], ["1.25", "125 %"], ["1.5", "150 %"], ["2", "200 %"]]
       .map(([value, text]) => h("option", { text, attrs: { value } })));
   private readonly status = h("div", { class: "pdf-status", attrs: { role: "status" } });
   private readonly viewport = h("div", "pdf-viewport");
@@ -27,7 +28,7 @@ export class PdfView {
   private readonly observer: ResizeObserver;
 
   constructor() {
-    const toolbar = h("div", { class: "pdf-toolbar", attrs: { role: "group", "aria-label": "PDF-Seitennavigation" } },
+    const toolbar = h("div", { class: "pdf-toolbar", attrs: { role: "group", "aria-label": t("PDF-Seitennavigation") } },
       this.previous, this.pageNumber, this.count, this.next, this.zoom);
     this.el.append(toolbar, this.status, this.viewport);
     this.previous.disabled = this.next.disabled = this.pageNumber.disabled = this.zoom.disabled = true;
@@ -43,7 +44,7 @@ export class PdfView {
   }
 
   async load(data: ArrayBuffer, page = 1): Promise<void> {
-    this.status.textContent = "PDF wird geladen …";
+    this.status.textContent = t("PDF wird geladen …");
     try {
       const runtime = await import("./pdf-runtime");
       if (this.disposed) return;
@@ -52,7 +53,7 @@ export class PdfView {
       if (this.disposed) return;
       await this.render(page);
     } catch {
-      if (!this.disposed) this.status.textContent = "PDF konnte nicht angezeigt werden. Die Datei ist beschädigt oder passwortgeschützt.";
+      if (!this.disposed) this.status.textContent = t("PDF konnte nicht angezeigt werden. Die Datei ist beschädigt oder passwortgeschützt.");
     }
   }
 
@@ -82,7 +83,7 @@ export class PdfView {
     this.count.textContent = `/ ${pdf.numPages}`;
     this.previous.disabled = this.page === 1;
     this.next.disabled = this.page === pdf.numPages;
-    this.status.textContent = `Seite ${this.page} wird geladen …`;
+    this.status.textContent = t("Seite {page} wird geladen …", { page: this.page });
     let page: PDFPageProxy | null = null;
     try {
       page = await pdf.getPage(this.page);
@@ -114,10 +115,10 @@ export class PdfView {
       this.textLayer = new runtime.TextLayer({ textContentSource: textContent, container: text, viewport });
       await this.textLayer.render();
       if (generation !== this.generation) return;
-      this.status.textContent = `Seite ${this.page} von ${pdf.numPages}`;
+      this.status.textContent = t("Seite {page} von {total}", { page: this.page, total: pdf.numPages });
     } catch {
       if (generation === this.generation && !this.disposed)
-        this.status.textContent = "PDF-Seite konnte nicht angezeigt werden.";
+        this.status.textContent = t("PDF-Seite konnte nicht angezeigt werden.");
     } finally {
       page?.cleanup();
     }

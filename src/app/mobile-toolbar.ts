@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { indentLess, indentMore, redo, undo } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
 import {
@@ -11,15 +12,15 @@ import { h, icon } from "../ui/dom";
 type Action = (view: EditorView) => boolean;
 
 const ACTIONS: Array<[icon: string, label: string, run: Action]> = [
-  ["undo-2", "Rückgängig", undo],
-  ["redo-2", "Wiederholen", redo],
-  ["indent-decrease", "Ausrücken", indentLess],
-  ["indent-increase", "Einrücken", indentMore],
-  ["list-checks", "Aufgabe umschalten", toggleTask],
-  ["list", "Liste umschalten", toggleBulletList],
-  ["bold", "Fett", toggleWrap("**")],
-  ["italic", "Kursiv", toggleWrap("*")],
-  ["brackets", "Interner Link", insertWikiLink],
+  ["undo-2", t("Rückgängig"), undo],
+  ["redo-2", t("Wiederholen"), redo],
+  ["indent-decrease", t("Ausrücken"), indentLess],
+  ["indent-increase", t("Einrücken"), indentMore],
+  ["list-checks", t("Aufgabe umschalten"), toggleTask],
+  ["list", t("Liste umschalten"), toggleBulletList],
+  ["bold", t("Fett"), toggleWrap("**")],
+  ["italic", t("Kursiv"), toggleWrap("*")],
+  ["brackets", t("Interner Link"), insertWikiLink],
 ];
 
 /**
@@ -50,7 +51,7 @@ export function buildMobileToolbar(view: () => EditorView | null): HTMLElement {
     "div",
     {
       class: "mobile-toolbar",
-      attrs: { role: "toolbar", "aria-label": "Bearbeiten" },
+      attrs: { role: "toolbar", "aria-label": t("Bearbeiten") },
     },
     h(
       "div",
@@ -59,7 +60,7 @@ export function buildMobileToolbar(view: () => EditorView | null): HTMLElement {
         button(id, label, () => run(action)),
       ),
     ),
-    button("keyboard-off", "Tastatur ausblenden", () =>
+    button("keyboard-off", t("Tastatur ausblenden"), () =>
       view()?.contentDOM.blur(),
     ),
   );

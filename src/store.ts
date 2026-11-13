@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import type { Backend } from "./backend";
 
 export interface Note {
@@ -33,7 +34,7 @@ export class NoteStore {
 
   async load(path: string): Promise<Note> {
     if (this.isDeleting(path))
-      throw new Error("Die Datei wird gerade gelöscht.");
+      throw new Error(t("Die Datei wird gerade gelöscht."));
     return this.loadSnapshot(path);
   }
 
@@ -44,7 +45,7 @@ export class NoteStore {
     const saved = await this.api.read(path, this.vaultId);
     if (generation !== this.removals.get(path))
       throw new Error(
-        "Die Datei wurde inzwischen gelöscht. Bitte erneut öffnen.",
+        t("Die Datei wurde inzwischen gelöscht. Bitte erneut öffnen."),
       );
     const raw = localStorage.getItem(this.draftKey(path));
     const draft: { text: string; base: string } | null = raw
@@ -54,7 +55,7 @@ export class NoteStore {
       draft &&
       (typeof draft.text !== "string" || typeof draft.base !== "string")
     )
-      throw new Error("Ungültiger Entwurf. Die Datei wurde nicht verändert.");
+      throw new Error(t("Ungültiger Entwurf. Die Datei wurde nicht verändert."));
     const note = {
       path,
       saved: draft?.base ?? saved,
@@ -66,9 +67,9 @@ export class NoteStore {
   }
 
   edit(note: Note, text: string): void {
-    if (this.deleted.has(note)) throw new Error("Die Datei wurde gelöscht.");
+    if (this.deleted.has(note)) throw new Error(t("Die Datei wurde gelöscht."));
     if (this.isDeleting(note.path))
-      throw new Error("Die Datei wird gerade gelöscht.");
+      throw new Error(t("Die Datei wird gerade gelöscht."));
     note.text = text;
     if (text === note.saved) localStorage.removeItem(this.draftKey(note.path));
     else
@@ -109,7 +110,7 @@ export class NoteStore {
 
   remove(path: string): Promise<void> {
     if (this.isDeleting(path))
-      return Promise.reject(new Error("Die Datei wird gerade gelöscht."));
+      return Promise.reject(new Error(t("Die Datei wird gerade gelöscht.")));
     this.deleting.add(path);
     this.removals.set(path, (this.removals.get(path) ?? 0) + 1);
     const operation = this.pending
@@ -136,7 +137,7 @@ export class NoteStore {
   move(from: string, to: string): Promise<void> {
     if (this.isDeleting(from) || this.isDeleting(to))
       return Promise.reject(
-        new Error("Die Datei wird gerade verschoben oder gelöscht."),
+        new Error(t("Die Datei wird gerade verschoben oder gelöscht.")),
       );
     // Blocks edits and loads of the old path until the move has settled.
     this.deleting.add(from);
@@ -192,7 +193,7 @@ export class NoteStore {
     const current = await this.api.read(path, this.vaultId);
     if (generation !== this.removals.get(path))
       throw new Error(
-        "Die Datei wurde inzwischen gelöscht. Bitte erneut öffnen.",
+        t("Die Datei wurde inzwischen gelöscht. Bitte erneut öffnen."),
       );
     const old = this.notes.get(path);
     if (old && old.text !== old.saved) {

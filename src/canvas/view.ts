@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { renderMarkdown } from "../markdown";
 import { basename, dirname, extension, h, icon, isMac } from "../ui/dom";
 import { fuzzyMatch } from "../ui/fuzzy";
@@ -107,12 +108,12 @@ const HISTORY_LIMIT = 100;
 const SVG = "http://www.w3.org/2000/svg";
 const IMAGE = /^(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
 const COLOR_NAMES: Record<string, string> = {
-  "1": "Rot",
-  "2": "Orange",
-  "3": "Gelb",
-  "4": "Grün",
-  "5": "Cyan",
-  "6": "Lila",
+  "1": t("Rot"),
+  "2": t("Orange"),
+  "3": t("Gelb"),
+  "4": t("Grün"),
+  "5": t("Cyan"),
+  "6": t("Lila"),
 };
 
 /** Viewport per canvas path, kept while the app runs so tab switches keep the view. */
@@ -188,13 +189,13 @@ export class CanvasView {
       { class: "canvas-toolbar-group", attrs: { hidden: true } },
       button(
         "palette",
-        "Farbe ändern",
+        t("Farbe ändern"),
         (event) => this.colorMenu(event.currentTarget as HTMLElement),
         "color",
       ),
       button(
         "trash-2",
-        "Auswahl löschen",
+        t("Auswahl löschen"),
         () => this.deleteSelection(),
         "delete",
       ),
@@ -203,32 +204,32 @@ export class CanvasView {
       "div",
       {
         class: "canvas-toolbar",
-        attrs: { role: "toolbar", "aria-label": "Canvas" },
+        attrs: { role: "toolbar", "aria-label": t("Canvas") },
       },
       h(
         "div",
         "canvas-toolbar-group",
         button(
           "sticky-note",
-          "Karte hinzufügen",
+          t("Karte hinzufügen"),
           () => this.addTextCard(),
           "add-text",
         ),
         button(
           "file-text",
-          "Notiz hinzufügen",
+          t("Notiz hinzufügen"),
           () => this.pickFile(),
           "add-file",
         ),
         button(
           "link",
-          "Weblink hinzufügen",
+          t("Weblink hinzufügen"),
           () => void this.addLinkCard(),
           "add-link",
         ),
         button(
           "group",
-          "Gruppe hinzufügen",
+          t("Gruppe hinzufügen"),
           () => this.addGroup(),
           "add-group",
         ),
@@ -239,14 +240,14 @@ export class CanvasView {
       "div",
       {
         class: "canvas-controls",
-        attrs: { role: "toolbar", "aria-label": "Zoom" },
+        attrs: { role: "toolbar", "aria-label": t("Zoom") },
       },
-      button("zoom-in", "Vergrößern", () => this.zoomBy(1.25), "zoom-in"),
+      button("zoom-in", t("Vergrößern"), () => this.zoomBy(1.25), "zoom-in"),
       this.zoomLabel,
-      button("zoom-out", "Verkleinern", () => this.zoomBy(0.8), "zoom-out"),
-      button("scan", "Alles anzeigen", () => this.fit(), "fit"),
-      button("undo-2", "Rückgängig", () => this.undo(), "undo"),
-      button("redo-2", "Wiederholen", () => this.redo(), "redo"),
+      button("zoom-out", t("Verkleinern"), () => this.zoomBy(0.8), "zoom-out"),
+      button("scan", t("Alles anzeigen"), () => this.fit(), "fit"),
+      button("undo-2", t("Rückgängig"), () => this.undo(), "undo"),
+      button("redo-2", t("Wiederholen"), () => this.redo(), "redo"),
     );
     this.edgesEl = svg("svg", { class: "canvas-edges" });
     this.overlayEl = svg("svg", { class: "canvas-edges canvas-overlay" });
@@ -259,8 +260,8 @@ export class CanvasView {
         attrs: {
           tabindex: "0",
           role: "application",
-          "aria-label": "Canvas-Fläche",
-          "aria-roledescription": "Canvas",
+          "aria-label": t("Canvas-Fläche"),
+          "aria-roledescription": t("Canvas"),
         },
       },
       this.worldEl,
@@ -334,7 +335,7 @@ export class CanvasView {
       this.data = { nodes: [], edges: [] };
       this.readOnly = true;
       this.errorEl.hidden = false;
-      this.errorEl.textContent = `${error instanceof Error ? error.message : String(error)} Die Datei wird nicht verändert.`;
+      this.errorEl.textContent = t("{error} Die Datei wird nicht verändert.", { error: error instanceof Error ? error.message : String(error) });
     }
     this.el.classList.toggle("is-readonly", this.readOnly);
     for (const id of [...this.selected])
@@ -534,21 +535,21 @@ export class CanvasView {
     let label = "";
     switch (node.type) {
       case "text": {
-        label = "Textkarte";
+        label = t("Textkarte");
         content.classList.add("markdown-rendered");
         if (node.text.trim()) content.innerHTML = renderMarkdown(node.text);
         else
           content.append(
             h("p", {
               class: "canvas-placeholder",
-              text: "Doppelt tippen zum Schreiben",
+              text: t("Doppelt tippen zum Schreiben"),
             }),
           );
         this.decorateLinks(content);
         break;
       }
       case "file": {
-        label = `Datei ${node.file}`;
+        label = t("Datei {path}", { path: node.file });
         const resolved = this.host.resolve(node.file, this.path);
         const header = h(
           "div",
@@ -561,7 +562,7 @@ export class CanvasView {
           content.append(
             h("p", {
               class: "canvas-placeholder",
-              text: "Datei nicht gefunden",
+              text: t("Datei nicht gefunden"),
             }),
           );
         else if (/\.md$/i.test(resolved)) {
@@ -569,7 +570,7 @@ export class CanvasView {
           const text = this.host.noteText(resolved);
           if (text === undefined)
             body.append(
-              h("p", { class: "canvas-placeholder", text: "Wird geladen …" }),
+              h("p", { class: "canvas-placeholder", text: t("Wird geladen …") }),
             );
           else body.innerHTML = renderMarkdown(text);
           this.decorateLinks(body);
@@ -578,14 +579,14 @@ export class CanvasView {
           content.append(
             h("p", {
               class: "canvas-placeholder",
-              text: "Vorschau für diesen Dateityp nicht verfügbar. Doppelt tippen zum Öffnen.",
+              text: t("Vorschau für diesen Dateityp nicht verfügbar. Doppelt tippen zum Öffnen."),
             }),
           );
         el.classList.toggle("is-unresolved", !resolved);
         break;
       }
       case "link": {
-        label = `Weblink ${node.url}`;
+        label = t("Weblink {url}", { url: node.url });
         content.append(
           h(
             "div",
@@ -595,13 +596,13 @@ export class CanvasView {
           ),
           h("p", {
             class: "canvas-placeholder",
-            text: "Webseiten werden aus Datenschutzgründen nicht eingebettet.",
+            text: t("Webseiten werden aus Datenschutzgründen nicht eingebettet."),
           }),
         );
         break;
       }
       case "group": {
-        label = `Gruppe ${node.label ?? ""}`.trim();
+        label = t("Gruppe {name}", { name: node.label ?? "" }).trim();
         break;
       }
     }
@@ -609,7 +610,7 @@ export class CanvasView {
     const children: Node[] = [];
     if (node.type === "group") {
       children.push(
-        h("div", { class: "canvas-group-label", text: node.label || "Gruppe" }),
+        h("div", { class: "canvas-group-label", text: node.label || t("Gruppe") }),
       );
     } else children.push(content);
     children.push(
@@ -755,8 +756,8 @@ export class CanvasView {
       },
     });
     new SuggestModal(
-      "Notiz für die Karte suchen …",
-      "Notiz hinzufügen",
+      t("Notiz für die Karte suchen …"),
+      t("Notiz hinzufügen"),
       (raw) => {
         const query = raw.trim().toLowerCase();
         if (!query) return files.slice(0, 200).map(entry);
@@ -768,13 +769,13 @@ export class CanvasView {
           .map((item) => entry(item.path));
       },
       [],
-      "Keine passende Datei.",
+      t("Keine passende Datei."),
     ).open();
   }
 
   async addLinkCard(at?: { x: number; y: number }): Promise<void> {
     if (this.readOnly) return;
-    const url = await prompt("Weblink hinzufügen", "Adresse", "https://");
+    const url = await prompt(t("Weblink hinzufügen"), t("Adresse"), "https://");
     if (!url || !/^https?:\/\/\S+$/i.test(url.trim())) return;
     addNode(this.data, {
       type: "link",
@@ -821,7 +822,7 @@ export class CanvasView {
     this.editing = id;
     const area = h("textarea", {
       class: "canvas-node-editor",
-      label: "Kartentext",
+      label: t("Kartentext"),
       attrs: { spellcheck: "true" },
     });
     area.value = node.text;
@@ -859,8 +860,8 @@ export class CanvasView {
     node: CanvasNode & { type: "group" },
   ): Promise<void> {
     const label = await prompt(
-      "Gruppe benennen",
-      "Name der Gruppe",
+      t("Gruppe benennen"),
+      t("Name der Gruppe"),
       node.label ?? "",
     );
     if (label === null) return;
@@ -872,8 +873,8 @@ export class CanvasView {
 
   private async editEdgeLabel(edge: CanvasEdge): Promise<void> {
     const label = await prompt(
-      "Verbindung beschriften",
-      "Beschriftung",
+      t("Verbindung beschriften"),
+      t("Beschriftung"),
       edge.label ?? "",
     );
     if (label === null) return;
@@ -913,7 +914,7 @@ export class CanvasView {
     showMenu(
       [
         {
-          title: "Keine Farbe",
+          title: t("Keine Farbe"),
           icon: "circle-off",
           onClick: () => this.setColor(null),
         },
@@ -1426,12 +1427,12 @@ export class CanvasView {
       this.select([], [edge.id]);
       entries = [
         {
-          title: "Beschriften",
+          title: t("Beschriften"),
           icon: "type",
           onClick: () => void this.editEdgeLabel(edge),
         },
         {
-          title: "Richtung umkehren",
+          title: t("Richtung umkehren"),
           icon: "arrow-left-right",
           onClick: () => {
             const { fromNode, fromSide, toNode, toSide } = edge;
@@ -1446,13 +1447,13 @@ export class CanvasView {
           },
         },
         {
-          title: "Farbe ändern",
+          title: t("Farbe ändern"),
           icon: "palette",
           onClick: () => this.colorMenu(at),
         },
         "separator",
         {
-          title: "Verbindung löschen",
+          title: t("Verbindung löschen"),
           icon: "trash-2",
           danger: true,
           onClick: () => this.deleteSelection(),
@@ -1463,7 +1464,7 @@ export class CanvasView {
       entries = [
         node.type === "file"
           ? {
-              title: "Datei öffnen",
+              title: t("Datei öffnen"),
               icon: "file-text",
               onClick: () => {
                 const resolved = this.host.resolve(node.file, this.path);
@@ -1472,24 +1473,24 @@ export class CanvasView {
             }
           : node.type === "text" || node.type === "group"
             ? {
-                title: node.type === "group" ? "Umbenennen" : "Bearbeiten",
+                title: node.type === "group" ? t("Umbenennen") : t("Bearbeiten"),
                 icon: "pencil",
                 onClick: () => this.startEditing(node.id),
               }
             : null,
         {
-          title: "Farbe ändern",
+          title: t("Farbe ändern"),
           icon: "palette",
           onClick: () => this.colorMenu(at),
         },
         {
-          title: "Gruppe um Auswahl",
+          title: t("Gruppe um Auswahl"),
           icon: "group",
           onClick: () => this.addGroup(),
         },
         "separator",
         {
-          title: "Löschen",
+          title: t("Löschen"),
           icon: "trash-2",
           danger: true,
           onClick: () => this.deleteSelection(),
@@ -1498,27 +1499,27 @@ export class CanvasView {
     } else {
       entries = [
         {
-          title: "Karte hinzufügen",
+          title: t("Karte hinzufügen"),
           icon: "sticky-note",
           onClick: () => this.addTextCard(world),
         },
         {
-          title: "Notiz hinzufügen",
+          title: t("Notiz hinzufügen"),
           icon: "file-text",
           onClick: () => this.pickFile(world),
         },
         {
-          title: "Weblink hinzufügen",
+          title: t("Weblink hinzufügen"),
           icon: "link",
           onClick: () => void this.addLinkCard(world),
         },
         {
-          title: "Gruppe hinzufügen",
+          title: t("Gruppe hinzufügen"),
           icon: "group",
           onClick: () => this.addGroup(world),
         },
         "separator",
-        { title: "Alles anzeigen", icon: "scan", onClick: () => this.fit() },
+        { title: t("Alles anzeigen"), icon: "scan", onClick: () => this.fit() },
       ];
     }
     showMenu(entries, at);
@@ -1575,13 +1576,13 @@ function prompt(
         "div",
         "modal-button-container",
         h("button", {
-          text: "Abbrechen",
+          text: t("Abbrechen"),
           attrs: { type: "button" },
           on: { click: () => modal.close() },
         }),
         h("button", {
           class: "mod-cta",
-          text: "Übernehmen",
+          text: t("Übernehmen"),
           attrs: { type: "submit" },
         }),
       ),

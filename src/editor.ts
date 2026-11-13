@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import {
   autocompletion,
   closeBrackets,
@@ -60,26 +61,26 @@ import {
   obsidianSyntax,
 } from "./editor/syntax";
 
-/** German labels for CodeMirror's own panels and announcements. */
+/** Localized labels for CodeMirror's own panels and announcements. */
 const PHRASES: Record<string, string> = {
-  Find: "Suchen",
-  Replace: "Ersetzen",
-  next: "Weiter",
-  previous: "Zurück",
-  all: "Alle",
-  "match case": "Groß/Klein",
-  regexp: "Regex",
-  "by word": "Wort",
-  replace: "Ersetzen",
-  "replace all": "Alle ersetzen",
-  close: "Schließen",
-  "current match": "aktueller Treffer",
-  "replaced $ matches": "$ Treffer ersetzt",
-  "replaced match on line $": "Treffer in Zeile $ ersetzt",
-  "on line": "in Zeile",
-  "Go to line": "Gehe zu Zeile",
-  go: "Los",
-  Completions: "Vorschläge",
+  Find: t("Suchen"),
+  Replace: t("Ersetzen"),
+  next: t("Weiter"),
+  previous: t("Zurück"),
+  all: t("Alle"),
+  "match case": t("Groß/Klein"),
+  regexp: t("Regex"),
+  "by word": t("Wort"),
+  replace: t("Ersetzen"),
+  "replace all": t("Alle ersetzen"),
+  close: t("Schließen"),
+  "current match": t("aktueller Treffer"),
+  "replaced $ matches": t("$ Treffer ersetzt"),
+  "replaced match on line $": t("Treffer in Zeile $ ersetzt"),
+  "on line": t("in Zeile"),
+  "Go to line": t("Gehe zu Zeile"),
+  go: t("Los"),
+  Completions: t("Vorschläge"),
 };
 
 export interface EditorHost extends LinkHost, CompletionHost, EditorSuggestHost {
@@ -244,7 +245,7 @@ export class MarkdownEditor {
 
   private attributeExtension(): Extension {
     return EditorView.contentAttributes.of({
-      "aria-label": "Markdown-Editor",
+      "aria-label": t("Markdown-Editor"),
       spellcheck: String(this.options.spellcheck),
       autocapitalize: "sentences",
     });

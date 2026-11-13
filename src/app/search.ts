@@ -1,3 +1,4 @@
+import { getLocale, plural, t } from "../i18n";
 import { basename, clear, debounce, dirname, h, icon } from "../ui/dom";
 import type { App } from "./app";
 import { parseQuery, searchNote, type SearchResult } from "./vault-index";
@@ -22,10 +23,10 @@ export class SearchView {
   ) {
     this.input = h("input", {
       class: "search-input",
-      label: "Im Vault suchen",
+      label: t("Im Vault suchen"),
       attrs: {
         type: "search",
-        placeholder: "Suchen …",
+        placeholder: t("Suchen …"),
         autocomplete: "off",
         spellcheck: "false",
         enterkeyhint: "search",
@@ -35,7 +36,7 @@ export class SearchView {
       "button",
       {
         class: "search-input-clear-button",
-        label: "Suche leeren",
+        label: t("Suche leeren"),
         attrs: { type: "button", hidden: true },
         on: { click: () => this.setQuery("") },
       },
@@ -145,12 +146,12 @@ export class SearchView {
       h(
         "div",
         "search-suggest",
-        h("div", { class: "search-suggest-heading", text: "Suchoptionen" }),
-        row("tag:", "Notizen mit einem Tag finden"),
-        row("path:", "auf einen Ordnerpfad eingrenzen"),
-        row("file:", "nach Dateinamen filtern"),
-        row('"…"', "exakte Wortfolge"),
-        row("-", "Treffer ausschließen"),
+        h("div", { class: "search-suggest-heading", text: t("Suchoptionen") }),
+        row("tag:", t("Notizen mit einem Tag finden")),
+        row("path:", t("auf einen Ordnerpfad eingrenzen")),
+        row("file:", t("nach Dateinamen filtern")),
+        row('"…"', t("exakte Wortfolge")),
+        row("-", t("Treffer ausschließen")),
       ),
     );
   }
@@ -183,7 +184,7 @@ export class SearchView {
         (a, b) =>
           Number(b.nameMatch) - Number(a.nameMatch) ||
           b.matches.length - a.matches.length ||
-          a.path.localeCompare(b.path, "de"),
+          a.path.localeCompare(b.path, getLocale()),
       );
       this.results = results;
       this.render();
@@ -199,9 +200,14 @@ export class SearchView {
     );
     this.infoEl.textContent = !results.length
       ? this.app.indexing
-        ? "Index wird aufgebaut …"
-        : "Keine Treffer gefunden."
-      : `${results.length} ${results.length === 1 ? "Datei" : "Dateien"}${total ? ` · ${total} Treffer` : ""}${this.app.indexing ? " · Index wird aufgebaut …" : ""}`;
+        ? t("Index wird aufgebaut …")
+        : t("Keine Treffer gefunden.")
+      : plural(results.length, {
+          one: "{count} Datei",
+          other: "{count} Dateien",
+        }) +
+        (total ? t(" · {count} Treffer", { count: total }) : "") +
+        (this.app.indexing ? t(" · Index wird aufgebaut …") : "");
     const fragment = document.createDocumentFragment();
     for (const result of results.slice(0, MAX_FILES)) {
       const closed = this.collapsed.has(result.path);
@@ -243,7 +249,7 @@ export class SearchView {
       fragment.append(
         h("div", {
           class: "search-results-more",
-          text: `${results.length - MAX_FILES} weitere Dateien – verfeinere die Suche.`,
+          text: t("{count} weitere Dateien – verfeinere die Suche.", { count: results.length - MAX_FILES }),
         }),
       );
     this.resultsEl.replaceChildren(fragment);

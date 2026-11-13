@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import DOMPurify from "dompurify";
 import { Marked, type Tokens } from "marked";
 import { mathAt } from "./editor/math-source";
@@ -336,7 +337,7 @@ export function renderMarkdown(source: string): string {
       const inlineRaster = /^data:image\/(png|jpeg|gif|webp);/i.test(source);
       if (url.origin !== location.origin && !inlineRaster) {
         image.removeAttribute("src");
-        image.title = "Externes Bild aus Datenschutzgründen blockiert";
+        image.title = t("Externes Bild aus Datenschutzgründen blockiert");
       }
     } catch {
       image.removeAttribute("src");
