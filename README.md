@@ -47,7 +47,7 @@ Obsidian vaults and selected Obsidian plugins.
 **Organizing**
 
 - File tree with folders, bookmarks, drag & drop and safe renaming that carries open tabs,
-  bookmarks and unsaved changes along.
+  bookmarks and unsaved changes along; links to a renamed or moved note are updated.
 - Backlinks with context, outgoing links, tags, outline and full-text search
   (`tag:`, `path:`, `file:`, exclusion with `-`).
 - Graph view for the whole vault and as a local graph of the active note, with group colors.

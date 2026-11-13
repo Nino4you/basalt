@@ -87,6 +87,7 @@ import {
 import { installTabDrag } from "./tab-drag";
 import { openCommandPalette, openQuickSwitcher } from "./switcher";
 import { openFileRecovery } from "./file-recovery";
+import { LinkUpdate } from "./link-update";
 import { VaultIndex } from "./vault-index";
 
 export interface Tab {
@@ -1739,6 +1740,13 @@ export class App {
     if (store !== this.store) throw new Error(t("Der Vault wurde inzwischen gewechselt."));
     if (note.text !== note.saved) await this.save(note);
     if (note.text === text) return;
+    await this.replaceText(note, text);
+  }
+
+  /** Saves new content for a loaded document and shows it wherever it is open. */
+  private async replaceText(note: Note, text: string): Promise<void> {
+    const store = this.store;
+    if (!store) throw new Error(t("Kein Vault geöffnet."));
     store.edit(note, text);
     await this.save(note);
     for (const tab of this.allTabs) if (tab.note === note) tab.state = null;
@@ -1752,6 +1760,66 @@ export class App {
     }
     this.renderGroups();
     this.emit("tabs");
+  }
+
+  /**
+   * The notes and canvases whose links a move would break, read from the
+   * index (files it has not read yet are read now). Paths before the move.
+   */
+  private async linkSources(update: LinkUpdate): Promise<string[]> {
+    const vault = this.vault;
+    const sources: string[] = [];
+    for (const path of this.index.files) {
+      if (!/\.(md|canvas)$/i.test(path)) continue;
+      if (!this.index.metaOf(path) && vault) {
+        const text =
+          this.store?.notes.get(path)?.text ?? (await backend.read(path, vault.id));
+        this.index.setContent(path, text, true);
+      }
+      const meta = this.index.metaOf(path);
+      if (meta && update.affects(path, meta.links)) sources.push(path);
+    }
+    return sources;
+  }
+
+  /**
+   * Rewrites links after a move, one file at a time through the normal,
+   * version-checked save (each file gets a backup). Files that fail keep
+   * their content; the user is told which.
+   */
+  private async updateLinks(update: LinkUpdate, sources: string[]): Promise<void> {
+    const store = this.store;
+    if (!store) return;
+    let updated = 0;
+    const failed: string[] = [];
+    for (const source of sources) {
+      const path = update.moved(source);
+      try {
+        const note = await store.load(path);
+        if (store !== this.store) return;
+        const next = update.rewrite(note.text, source);
+        if (next === null) continue;
+        await this.replaceText(note, next);
+        updated++;
+      } catch (error) {
+        failed.push(path);
+        console.warn(error);
+      }
+    }
+    if (updated)
+      notify(
+        plural(updated, {
+          one: "Links in {count} Datei aktualisiert.",
+          other: "Links in {count} Dateien aktualisiert.",
+        }),
+      );
+    if (failed.length)
+      notify(
+        t("Links in {files} konnten nicht aktualisiert werden. Die Dateien sind unverändert.", {
+          files: failed.map((path) => `„${basename(path)}“`).join(", "),
+        }),
+        true,
+      );
   }
 
   /**
@@ -2018,6 +2086,12 @@ export class App {
     const store = this.store;
     const vault = this.vault;
     if (!store || !vault || !this.index.has(path)) return;
+    const update = this.settings.get("updateLinks")
+      ? new LinkUpdate(this.index.files, new Map([[path, target]]))
+      : null;
+    // Find the affected files while the index still describes the old paths.
+    const sources = update ? await this.linkSources(update) : [];
+    if (store !== this.store) return;
     const note = store.notes.get(path);
     if (note) {
       // The move saves pending edits itself.
@@ -2054,6 +2128,8 @@ export class App {
     } finally {
       if (store === this.store) this.showActive();
     }
+    if (update && sources.length && store === this.store)
+      await this.updateLinks(update, sources);
   }
 
   promptNewNote(folder?: string): void {

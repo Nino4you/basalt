@@ -93,8 +93,14 @@ will get a response once the report has been reviewed.
   not a test of the native file system.
 - Renaming is currently not atomic: first an exclusive copy, then a checked deletion of the
   original. If the deletion fails in an unclear way, the target copy is kept for recovery and
-  the error is shown. Timestamps and file permissions may change in the process; links are not
-  updated automatically yet. Case-only renames on case-insensitive file systems are not covered.
+  the error is shown. Timestamps and file permissions may change in the process. Case-only
+  renames on case-insensitive file systems are not covered.
+- After a rename or move in the app, links that pointed to the file are rewritten (setting
+  "Automatically update internal links", on by default). Only links whose target would
+  otherwise change are touched; each affected note or canvas goes through the normal
+  version-checked save, so its previous content is backed up. A file that fails to save keeps
+  its content and is named in a notice. The plugin API `FileManager.renameFile` does not update
+  links yet.
 - These plugin file operations are limited to 64 MiB per file. Trash and version backups are
   not cleaned up automatically; they keep using storage and are not secure deletion.
 - File recovery lists only backups of notes and canvases (`backup_list`) and reads only such

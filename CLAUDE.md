@@ -146,7 +146,10 @@ No UI framework: DOM is built with the `h()` / `icon()` helpers in `src/ui/dom.t
 - `src/store.ts` — `NoteStore` serializes saves and keeps localStorage drafts that remember the
   original conflict base, so recovery cannot silently overwrite external changes.
 - `src/app/vault-index.ts` — in-memory link/tag/heading index and the search query parser
-  (`tag:`, `path:`, `file:`) behind backlinks, outgoing links, tags and search.
+  (`tag:`, `path:`, `file:`) behind backlinks, outgoing links, tags and search. `LinkResolver`
+  resolves links for any file list; `src/app/link-update.ts` compares resolution before and
+  after a rename/move and rewrites only links whose target would change (wiki links, embeds,
+  Markdown links, canvas file cards), saved through `NoteStore` like any edit.
 - `src/editor.ts` + `src/editor/` — the CodeMirror 6 editor: live preview decorations, syntax,
   completion for `[[wiki links]]` and `#tags`.
   - **Markdown stays authoritative.** `rich-preview.ts` renders KaTeX, Mermaid and tables as

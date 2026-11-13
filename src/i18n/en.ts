@@ -550,4 +550,9 @@ export const en = {
   "Die aktuelle Fassung bleibt als Sicherung erhalten.": "The current content is kept as a backup.",
   "Der Name ist inzwischen vergeben; die Datei wird als Kopie wiederhergestellt.": "The name is taken now, so the file is restored as a copy.",
   "Die Datei existiert nicht mehr und wird neu angelegt.": "The file no longer exists and will be created again.",
+  "Interne Links automatisch aktualisieren": "Automatically update internal links",
+  "Passt Links an, wenn eine Notiz oder Canvas umbenannt oder verschoben wird. Jede geänderte Datei wird vorher gesichert.": "Rewrites links when a note or canvas is renamed or moved. Every changed file is backed up first.",
+  "Links in {count} Datei aktualisiert.": "Updated links in {count} file.",
+  "Links in {count} Dateien aktualisiert.": "Updated links in {count} files.",
+  "Links in {files} konnten nicht aktualisiert werden. Die Dateien sind unverändert.": "Links in {files} could not be updated. These files are unchanged.",
 } as const;

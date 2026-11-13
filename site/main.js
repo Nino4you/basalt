@@ -56,6 +56,8 @@ const de = {
   "f2.b":
     "Volltextsuche mit <code>tag:</code>, <code>path:</code> und <code>file:</code>",
   "f2.c": "Graph des ganzen Vaults oder lokaler Graph einer Notiz",
+  "f2.d":
+    "Benenne eine Notiz um oder verschiebe sie, und alle Links ziehen mit",
   "f2.alt":
     "Graphansicht: acht Notizen als verbundene Knoten, daneben die Filtereinstellungen",
   "f3.title": "Platz zum Ausbreiten",

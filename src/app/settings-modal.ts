@@ -363,6 +363,16 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         settings.get("newNoteLocation"),
         set("newNoteLocation"),
       );
+      toggle(
+        row(
+          content,
+          t("Interne Links automatisch aktualisieren"),
+          t("Passt Links an, wenn eine Notiz oder Canvas umbenannt oder verschoben wird. Jede geänderte Datei wird vorher gesichert."),
+        ),
+        t("Interne Links automatisch aktualisieren"),
+        settings.get("updateLinks"),
+        set("updateLinks"),
+      );
       heading(content, t("Archivierte Entwürfe"));
       content.append(
         h("p", {

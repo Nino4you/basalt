@@ -242,13 +242,73 @@ export class NoteGraph {
   }
 }
 
+/**
+ * Link resolution for one file list: the same folder first, then the vault
+ * root, then a unique basename (like `resolveNote` in markdown.ts).
+ */
+export class LinkResolver {
+  private readonly fileSet: Set<string>;
+  private readonly byName = new Map<string, string[]>();
+  private readonly lowerPath = new Map<string, string>();
+  /** Results by source folder and target. */
+  private readonly resolved = new Map<string, string | null>();
+
+  constructor(files: Iterable<string>) {
+    this.fileSet = new Set(files);
+    for (const path of this.fileSet) {
+      const name = path.slice(path.lastIndexOf("/") + 1).toLowerCase();
+      const list = this.byName.get(name);
+      if (list) list.push(path);
+      else this.byName.set(name, [path]);
+      this.lowerPath.set(path.toLowerCase(), path);
+    }
+  }
+
+  has(path: string): boolean {
+    return this.fileSet.has(path);
+  }
+
+  resolve(target: string, source: string): string | null {
+    // The answer depends only on the file list and the source's folder, and
+    // backlinks and the graph resolve every link in the vault on each rebuild.
+    const key = `${source.slice(0, source.lastIndexOf("/") + 1)}\0${target}`;
+    let cached = this.resolved.get(key);
+    if (cached === undefined) {
+      cached = this.resolveUncached(target, source);
+      this.resolved.set(key, cached);
+    }
+    // An empty name links to the source itself, which differs per source.
+    return cached === SELF ? source : cached;
+  }
+
+  private resolveUncached(target: string, source: string): string | null {
+    const name = linkName(target);
+    if (!name) return SELF;
+    if (this.fileSet.has(name)) return name;
+    const requested = /\.md$/i.test(name) ? name : `${name}.md`;
+    const slash = source.lastIndexOf("/");
+    if (slash >= 0) {
+      const sibling = source.slice(0, slash + 1) + requested;
+      if (this.fileSet.has(sibling)) return sibling;
+    }
+    if (this.fileSet.has(requested)) return requested;
+    const exact = this.lowerPath.get(requested.toLowerCase());
+    if (exact) return exact;
+    if (requested.includes("/")) return null;
+    const matches = this.byName.get(requested.toLowerCase());
+    return matches?.length === 1 ? matches[0] : null;
+  }
+}
+
+/** The file part of a link target, without `#heading` or `^block`. */
+export function linkName(target: string): string {
+  return target.split("#")[0].split("^")[0].trim();
+}
+
 export class VaultIndex {
   files: string[] = [];
   private fileSet = new Set<string>();
-  private byName = new Map<string, string[]>();
-  private lowerPath = new Map<string, string>();
-  /** `resolve` results by source folder and target; reset with the file list. */
-  private resolved = new Map<string, string | null>();
+  private resolver = new LinkResolver([]);
   private readonly contents = new Map<string, string>();
   private readonly lowered = new Map<string, string>();
   private readonly meta = new Map<string, NoteMeta>();
@@ -273,17 +333,8 @@ export class VaultIndex {
   setFiles(files: string[]): void {
     this.files = files;
     this.fileSet = new Set(files);
-    this.byName = new Map();
-    this.lowerPath = new Map();
-    this.resolved = new Map();
+    this.resolver = new LinkResolver(files);
     this.graph = null;
-    for (const path of files) {
-      const name = path.slice(path.lastIndexOf("/") + 1).toLowerCase();
-      const list = this.byName.get(name);
-      if (list) list.push(path);
-      else this.byName.set(name, [path]);
-      this.lowerPath.set(path.toLowerCase(), path);
-    }
     for (const path of [...this.contents.keys()])
       if (!this.fileSet.has(path)) {
         this.contents.delete(path);
@@ -344,39 +395,9 @@ export class VaultIndex {
     return value;
   }
 
-  /**
-   * Same rules as `resolveNote` in markdown.ts (same folder, vault root, then a
-   * unique basename), backed by maps instead of scanning the file list.
-   */
+  /** See `LinkResolver`; cached until the file list changes. */
   resolve(target: string, source: string): string | null {
-    // The answer depends only on the file list and the source's folder, and
-    // backlinks and the graph resolve every link in the vault on each rebuild.
-    const key = `${source.slice(0, source.lastIndexOf("/") + 1)}\0${target}`;
-    let cached = this.resolved.get(key);
-    if (cached === undefined) {
-      cached = this.resolveUncached(target, source);
-      this.resolved.set(key, cached);
-    }
-    // An empty name links to the source itself, which differs per source.
-    return cached === SELF ? source : cached;
-  }
-
-  private resolveUncached(target: string, source: string): string | null {
-    const name = target.split("#")[0].split("^")[0].trim();
-    if (!name) return SELF;
-    if (this.fileSet.has(name)) return name;
-    const requested = /\.md$/i.test(name) ? name : `${name}.md`;
-    const slash = source.lastIndexOf("/");
-    if (slash >= 0) {
-      const sibling = source.slice(0, slash + 1) + requested;
-      if (this.fileSet.has(sibling)) return sibling;
-    }
-    if (this.fileSet.has(requested)) return requested;
-    const exact = this.lowerPath.get(requested.toLowerCase());
-    if (exact) return exact;
-    if (requested.includes("/")) return null;
-    const matches = this.byName.get(requested.toLowerCase());
-    return matches?.length === 1 ? matches[0] : null;
+    return this.resolver.resolve(target, source);
   }
 
   /** The note link graph, built once per file list and then kept current. */

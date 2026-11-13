@@ -20,6 +20,8 @@ export interface Settings {
   autoPair: boolean;
   newNoteLocation: "root" | "current";
   showRibbon: boolean;
+  /** Rewrite links to a file when it is renamed or moved. */
+  updateLinks: boolean;
 }
 
 export const DEFAULT_ACCENT = "#8a5cf5";
@@ -38,6 +40,7 @@ export const defaults: Settings = {
   autoPair: true,
   newNoteLocation: "root",
   showRibbon: true,
+  updateLinks: true,
 };
 
 const KEY = "basalt-settings";
