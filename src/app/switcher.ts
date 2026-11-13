@@ -163,7 +163,7 @@ export function openCommandPalette(app: App): void {
         name: command.name,
         lower: command.name.toLowerCase(),
         icon: command.icon ?? "terminal",
-        hotkey: command.hotkey ? formatHotkey(command.hotkey) : "",
+        hotkey: formatHotkey(app.commands.hotkeyOf(command.id) ?? ""),
         run: () => app.commands.run(command.id),
       }));
     const session = app.compatibility;

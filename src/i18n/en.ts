@@ -559,4 +559,10 @@ export const en = {
   "Keine unverlinkten Erwähnungen gefunden.": "No unlinked mentions found.",
   "Verknüpfen": "Link",
   "Die Stelle hat sich inzwischen geändert. Bitte erneut versuchen.": "That text has changed in the meantime. Try again.",
+  "Tastenkombination drücken …": "Press a key combination …",
+  "„{name}“ auf das Standardkürzel zurücksetzen": "Reset “{name}” to its default hotkey",
+  "Tastenkürzel von „{name}“ entfernen": "Remove the hotkey of “{name}”",
+  "Tastenkürzel für „{name}“ festlegen": "Set a hotkey for “{name}”",
+  "Bitte mit Strg, Alt oder einer F-Taste kombinieren.": "Combine it with Ctrl, Alt or a function key.",
+  "Das Tastenkürzel wurde von „{name}“ entfernt.": "The hotkey was removed from “{name}”.",
 } as const;

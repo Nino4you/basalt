@@ -7,9 +7,12 @@ import {
   formatHotkey,
   h,
   icon,
+  iconButton,
   trackSliderFill,
 } from "../ui/dom";
 import { Modal } from "../ui/modal";
+import { notify } from "../ui/notice";
+import { eventHotkey, isAssignable, type Command } from "./commands";
 import type { App } from "./app";
 import { DEFAULT_ACCENT, type Settings } from "./settings";
 
@@ -35,6 +38,93 @@ function row(parent: HTMLElement, name: string, description = ""): Row {
   );
   parent.append(el);
   return { el, control };
+}
+
+/**
+ * One command's hotkey with buttons to record a new one, remove it and go
+ * back to the default. Recording takes the next key combination; Escape
+ * cancels, and combinations that would type text are refused.
+ */
+function hotkeyRow(target: Row, app: App, command: Command): void {
+  const registry = app.commands;
+  const name = command.name;
+  const render = (recording = false): void => {
+    const hotkey = registry.hotkeyOf(command.id);
+    const children: HTMLElement[] = [
+      recording
+        ? h("kbd", {
+            class: "setting-hotkey mod-recording",
+            text: t("Tastenkombination drücken …"),
+          })
+        : hotkey
+          ? h("kbd", { class: "setting-hotkey", text: formatHotkey(hotkey) })
+          : h("span", { class: "setting-hotkey mod-empty", text: t("Leer") }),
+    ];
+    if (!recording) {
+      if (registry.isCustomized(command.id))
+        children.push(
+          iconButton(
+            "rotate-ccw",
+            t("„{name}“ auf das Standardkürzel zurücksetzen", { name }),
+            () => {
+              const displaced = registry.resetHotkey(command.id);
+              if (displaced) moved(displaced);
+              render();
+            },
+          ),
+        );
+      if (hotkey)
+        children.push(
+          iconButton("x", t("Tastenkürzel von „{name}“ entfernen", { name }), () => {
+            registry.setHotkey(command.id, null);
+            render();
+          }),
+        );
+      const record = iconButton(
+        "keyboard",
+        t("Tastenkürzel für „{name}“ festlegen", { name }),
+        () => {
+          render(true);
+          const cancel = target.control.querySelector<HTMLElement>(
+            ".mod-recording",
+          );
+          cancel?.setAttribute("tabindex", "-1");
+          cancel?.focus();
+          const listen = (event: KeyboardEvent) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.key === "Escape") return stop();
+            const pressed = eventHotkey(event);
+            if (!pressed) return;
+            if (!isAssignable(pressed)) {
+              notify(t("Bitte mit Strg, Alt oder einer F-Taste kombinieren."), true);
+              return;
+            }
+            const displaced = registry.setHotkey(command.id, pressed);
+            if (displaced) moved(displaced);
+            stop();
+          };
+          const stop = () => {
+            window.removeEventListener("keydown", listen, true);
+            window.removeEventListener("pointerdown", stop, true);
+            render();
+            target.control.querySelector<HTMLElement>("button")?.focus();
+          };
+          // Capture before the modal's own Escape and the app's hotkeys.
+          window.addEventListener("keydown", listen, true);
+          window.addEventListener("pointerdown", stop, true);
+        },
+      );
+      children.push(record);
+    }
+    target.control.replaceChildren(...children);
+  };
+  const moved = (displaced: Command) =>
+    notify(
+      t("Das Tastenkürzel wurde von „{name}“ entfernt.", { name: displaced.name }),
+    );
+  render();
+  target.el.classList.add("mod-hotkey");
 }
 
 function heading(parent: HTMLElement, text: string): void {
@@ -515,17 +605,8 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
       const commands = app.commands
         .list()
         .sort((a, b) => a.name.localeCompare(b.name, getLocale()));
-      for (const command of commands) {
-        const item = row(list, command.name);
-        item.control.append(
-          command.hotkey
-            ? h("kbd", {
-                class: "setting-hotkey",
-                text: formatHotkey(command.hotkey),
-              })
-            : h("span", { class: "setting-hotkey mod-empty", text: t("Leer") }),
-        );
-      }
+      for (const command of commands)
+        hotkeyRow(row(list, command.name), app, command);
       heading(list, t("Im Editor"));
       for (const [name, hotkey] of [
         [t("Fett"), "Mod+B"],

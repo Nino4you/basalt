@@ -61,7 +61,8 @@ Obsidian vaults and selected Obsidian plugins.
 
 - Tabs with their own history, split editors and freely dockable side views like in VS Code;
   the layout is saved per vault.
-- Quick switcher (Ctrl+O), command palette (Ctrl+P) and full keyboard navigation.
+- Quick switcher (Ctrl+O), command palette (Ctrl+P), full keyboard navigation and hotkeys you
+  can change in the settings.
 - Light and dark theme with an accent color; a dedicated phone layout with drawers, a bottom
   navigation bar and a formatting toolbar.
 

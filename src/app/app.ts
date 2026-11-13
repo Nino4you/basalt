@@ -1500,7 +1500,7 @@ export class App {
 
   private renderEmpty(): void {
     const action = (text: string, command: string) => {
-      const hotkey = this.commands.get(command)?.hotkey;
+      const hotkey = this.commands.hotkeyOf(command);
       return h("button", {
         class: "empty-state-action",
         text: hotkey ? `${text} (${formatHotkey(hotkey)})` : text,
@@ -3125,7 +3125,7 @@ export class App {
     };
     const { el, tabList, mirror } = view;
     for (const button of el.querySelectorAll<HTMLElement>("[data-command]")) {
-      const hotkey = this.commands.get(button.dataset.command!)?.hotkey;
+      const hotkey = this.commands.hotkeyOf(button.dataset.command!);
       if (hotkey) button.dataset.hotkey = formatHotkey(hotkey);
     }
     const alive = () => this.groups.includes(group);
@@ -3680,15 +3680,25 @@ export class App {
       { passive: true },
     );
 
-    // Tooltips show the hotkey of the command behind each button.
+    this.showHotkeyHints();
+    this.commands.onChange(() => {
+      this.showHotkeyHints();
+      if (!this.tabs.some((tab) => tab.path)) this.renderEmpty();
+    });
+  }
+
+  /** Tooltips show the hotkey of the command behind each button. */
+  private showHotkeyHints(): void {
+    const shell = this.shell;
     // The strip buttons are not in the document while they change groups.
     for (const button of [
       ...document.querySelectorAll<HTMLElement>("[data-command]"),
       ...shell.stripActions.querySelectorAll<HTMLElement>("[data-command]"),
       shell.inlineToggle,
     ]) {
-      const hotkey = this.commands.get(button.dataset.command!)?.hotkey;
+      const hotkey = this.commands.hotkeyOf(button.dataset.command!);
       if (hotkey) button.dataset.hotkey = formatHotkey(hotkey);
+      else delete button.dataset.hotkey;
     }
   }
 
