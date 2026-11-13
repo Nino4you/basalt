@@ -9,11 +9,13 @@ on:
       - "*.md"
       - "docs/**"
       - "screenshots/**"
+      - "site/**"
   pull_request:
     paths-ignore:
       - "*.md"
       - "docs/**"
       - "screenshots/**"
+      - "site/**"
   workflow_dispatch:
 
 permissions:
