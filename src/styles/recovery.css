@@ -1,0 +1,296 @@
+/* File recovery dialog (src/app/file-recovery.ts). */
+
+.modal.mod-file-recovery {
+  width: min(960px, 100%);
+  height: min(680px, 85vh);
+}
+
+.mod-file-recovery .modal-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: 12px;
+}
+
+.recovery-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 3px;
+  width: fit-content;
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+}
+
+.recovery-tab,
+.recovery-mode-button {
+  padding: 4px 12px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.recovery-tab.is-active,
+.recovery-mode-button.is-active {
+  background: var(--background-primary);
+  color: var(--text-normal);
+  box-shadow: var(--shadow-s);
+}
+
+.recovery-body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(220px, 2fr) minmax(0, 3fr);
+  gap: 16px;
+  min-height: 0;
+}
+
+.recovery-list,
+.recovery-preview {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.recovery-list {
+  gap: 2px;
+  padding-right: 4px;
+  border-right: 1px solid var(--background-modifier-border);
+}
+
+.recovery-filter {
+  margin-bottom: 8px;
+}
+
+.recovery-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recovery-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  height: auto;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+  color: var(--text-normal);
+}
+
+.recovery-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.recovery-row.is-selected {
+  background: var(--background-modifier-active-hover);
+}
+
+.recovery-row-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  font-size: var(--font-ui-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recovery-row-title .svg-icon {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.recovery-row-meta {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recovery-back,
+.recovery-preview-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  padding: 4px 8px 4px 4px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.recovery-preview-back {
+  display: none;
+}
+
+.recovery-list-title {
+  margin: 4px 10px 8px;
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+}
+
+.recovery-more {
+  margin: 8px 10px;
+  width: fit-content;
+}
+
+.recovery-empty,
+.recovery-hint {
+  padding: 16px 10px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.recovery-hint {
+  margin: auto 0 0;
+  padding-bottom: 4px;
+}
+
+.recovery-preview-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.recovery-preview-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.recovery-preview-title span {
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.recovery-mode {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+}
+
+.recovery-content {
+  flex: 1;
+  min-height: 120px;
+  overflow: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-primary-alt);
+}
+
+.recovery-text,
+.recovery-diff {
+  margin: 0;
+  padding: 10px 12px;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-small);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.recovery-legend {
+  display: flex;
+  gap: 16px;
+  padding: 8px 12px 0;
+  font-size: var(--font-ui-smaller);
+}
+
+.recovery-legend .is-add,
+.recovery-diff-line.is-add {
+  color: rgb(var(--color-green-rgb));
+}
+
+.recovery-legend .is-remove,
+.recovery-diff-line.is-remove {
+  color: rgb(var(--color-red-rgb));
+}
+
+.recovery-diff-line {
+  /* Wrapped lines hang below the text, not below the +/− marker. */
+  padding: 0 4px 0 calc(4px + 2ch);
+  text-indent: -2ch;
+  border-radius: 2px;
+}
+
+.recovery-diff-line.is-add {
+  background: rgba(var(--color-green-rgb), 0.1);
+}
+
+.recovery-diff-line.is-remove {
+  background: rgba(var(--color-red-rgb), 0.1);
+}
+
+.recovery-diff-line.is-same {
+  color: var(--text-muted);
+}
+
+.recovery-diff-skip {
+  margin: 4px 0;
+  padding: 2px 4px;
+  color: var(--text-faint);
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-smaller);
+  text-align: center;
+  border-block: 1px dashed var(--background-modifier-border);
+}
+
+.recovery-note {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.mod-file-recovery .modal-button-container {
+  margin-top: 12px;
+}
+
+/* Phones: one column; choosing a backup swaps the list for its preview. */
+@media (max-width: 768px),
+  (any-pointer: coarse) and (max-height: 500px),
+  (hover: none) and (max-height: 500px) {
+  .modal.mod-file-recovery {
+    height: min(92vh, 100%);
+  }
+  .recovery-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .recovery-list {
+    padding-right: 0;
+    border-right: 0;
+  }
+  .mod-file-recovery.is-previewing .recovery-list,
+  .mod-file-recovery:not(.is-previewing) .recovery-preview {
+    display: none;
+  }
+  .recovery-preview-back {
+    display: inline-flex;
+    margin-bottom: 6px;
+  }
+  .recovery-row {
+    min-height: 44px;
+    justify-content: center;
+  }
+}

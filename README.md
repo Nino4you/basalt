@@ -52,6 +52,9 @@ Obsidian vaults and selected Obsidian plugins.
   (`tag:`, `path:`, `file:`, exclusion with `-`).
 - Graph view for the whole vault and as a local graph of the active note, with group colors.
 - Canvas in the open JSON Canvas format (`.canvas`) with text, note, link and group cards.
+- File recovery: every earlier version of a note or canvas and every deleted file can be
+  compared with the current content and restored (command palette → "Open file recovery", or
+  "Version history" in the file menu).
 
 **Workspace**
 
@@ -94,7 +97,8 @@ stable and tested, but some things are still missing:
 
 - no automatic updates and no built-in sync,
 - plugin compatibility only for selected plugins (see below),
-- backups in `.basalt/history/` and `.basalt/trash/` have to be restored by hand for now,
+- backups in `.basalt/history/` and `.basalt/trash/` are never cleaned up automatically yet,
+  and backups of attachments have to be restored by hand,
 - no Play Store or distribution packages yet, only direct downloads.
 
 Make a copy of any important vault before opening it for the first time.

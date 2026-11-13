@@ -3,6 +3,7 @@ import "./styles/editor.css";
 import "./styles/components.css";
 import "./styles/canvas.css";
 import "./styles/graph.css";
+import "./styles/recovery.css";
 import { App } from "./app/app";
 import { installAndroidInsets } from "./ui/android-insets";
 

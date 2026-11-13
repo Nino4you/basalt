@@ -86,6 +86,7 @@ import {
 } from "./split";
 import { installTabDrag } from "./tab-drag";
 import { openCommandPalette, openQuickSwitcher } from "./switcher";
+import { openFileRecovery } from "./file-recovery";
 import { VaultIndex } from "./vault-index";
 
 export interface Tab {
@@ -1726,6 +1727,54 @@ export class App {
     }
   }
 
+  /**
+   * Replaces a document's content with a backup through the normal,
+   * version-checked save, so the replaced content becomes a backup itself.
+   * Unsaved edits are saved first; if that fails, nothing is replaced.
+   */
+  async restoreVersion(path: string, text: string): Promise<void> {
+    const store = this.store;
+    if (!store) throw new Error(t("Kein Vault geöffnet."));
+    const note = await store.load(path);
+    if (store !== this.store) throw new Error(t("Der Vault wurde inzwischen gewechselt."));
+    if (note.text !== note.saved) await this.save(note);
+    if (note.text === text) return;
+    store.edit(note, text);
+    await this.save(note);
+    for (const tab of this.allTabs) if (tab.note === note) tab.state = null;
+    if (this.activeDocument === note) {
+      if (this.active.kind === "canvas") this.canvasView?.setText(text);
+      else {
+        this.editor.setText(text);
+        if (this.active.reading) this.reading.render(note.path, text);
+      }
+      this.updateStatus();
+    }
+    this.renderGroups();
+    this.emit("tabs");
+  }
+
+  /**
+   * Creates a deleted document again. It is never written over an existing
+   * file: a taken name gets a "(restored)" copy instead. Returns the path.
+   */
+  async restoreDeleted(path: string, text: string): Promise<string> {
+    const vault = this.vault;
+    if (!vault) throw new Error(t("Kein Vault geöffnet."));
+    const dot = path.lastIndexOf(".");
+    const stem = path.slice(0, dot);
+    const extension = path.slice(dot);
+    let target = path;
+    for (let n = 1; this.index.has(target); n++)
+      target = `${stem} (${t("wiederhergestellt")}${n > 1 ? ` ${n}` : ""})${extension}`;
+    await backend.create(target, text, vault.id);
+    if (vault !== this.vault) return target;
+    this.setFiles((await backend.info()).files);
+    await this.refreshCompatibility().catch((error) => this.report(error));
+    if (this.compatibility) this.syncVisibleFiles();
+    return target;
+  }
+
   exportNote(path = this.activePath): void {
     if (!path) return;
     const text = this.store?.notes.get(path)?.text ?? this.index.content(path);
@@ -1808,7 +1857,7 @@ export class App {
       }),
       h("p", {
         class: "modal-description",
-        text: t("Plugin-Dateien vorher speichern. Die Sicherung enthält den zuletzt gespeicherten Dateistand; die Wiederherstellung erfolgt derzeit manuell."),
+        text: t("Plugin-Dateien vorher speichern. Die Sicherung enthält den zuletzt gespeicherten Dateistand und lässt sich über die Dateiwiederherstellung zurückholen."),
       }),
       error,
       h("div", "modal-button-container", cancel, submit),
@@ -3205,6 +3254,13 @@ export class App {
             .then(() => notify(t("Pfad kopiert.")))
             .catch(() => notify(t("Kopieren nicht möglich."), true)),
       },
+      /\.(md|canvas)$/i.test(path)
+        ? {
+            title: t("Versionsverlauf"),
+            icon: "history",
+            onClick: () => openFileRecovery(this, path),
+          }
+        : null,
       /\.md$/i.test(path)
         ? {
             title: t("Als Markdown exportieren"),
@@ -3770,6 +3826,25 @@ export class App {
       icon: "download",
       when: hasNote,
       run: () => this.exportNote(),
+    });
+    add({
+      id: "file-recovery",
+      name: t("Dateiwiederherstellung öffnen"),
+      icon: "history",
+      global: true,
+      run: () => {
+        closeMenu();
+        openFileRecovery(this);
+      },
+    });
+    add({
+      id: "version-history",
+      name: t("Versionsverlauf der aktuellen Datei anzeigen"),
+      icon: "history",
+      when: () => !!this.activeDocument,
+      run: () => {
+        if (this.activePath) openFileRecovery(this, this.activePath);
+      },
     });
     add({
       id: "open-vault",

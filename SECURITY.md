@@ -20,7 +20,7 @@ will get a response once the report has been reviewed.
   compare-and-swap that is guaranteed across file systems.
 - Android SAF providers do not guarantee an atomic replace. There, Basalt backs up before
   writing and checks for conflicts again. An interrupted provider write can damage the current
-  file; the previous backup then has to be restored.
+  file; the previous backup can then be restored with File recovery.
 - Reads on Android remember for up to 10 seconds which SAF document belongs to which path, so
   that not every read lists the whole folder again. Size, modification time and content are
   still queried fresh every time, and the name is cross-checked. With providers that use opaque
@@ -96,8 +96,12 @@ will get a response once the report has been reviewed.
   the error is shown. Timestamps and file permissions may change in the process; links are not
   updated automatically yet. Case-only renames on case-insensitive file systems are not covered.
 - These plugin file operations are limited to 64 MiB per file. Trash and version backups are
-  not cleaned up automatically; they keep using storage and are not secure deletion. Restoring
-  is currently manual.
+  not cleaned up automatically; they keep using storage and are not secure deletion.
+- File recovery lists only backups of notes and canvases (`backup_list`) and reads only such
+  backup locations (`backup_read`); other hidden files stay unreadable through it. Restoring a
+  version is a normal version-checked save, so the replaced content becomes a backup itself.
+  Restoring a deleted file is an exclusive creation, under a new name if the old one is taken.
+  Backups of attachments are not listed and still have to be restored by hand.
 - No automatic sync, no account and no telemetry.
 - Debug-signed Android APKs are test artifacts, not production-signed releases. The fixed
   development key is stored as an Actions secret, not in the git history. Production releases

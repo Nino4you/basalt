@@ -111,7 +111,11 @@ src/ (WebView UI)  ──invoke──▶  src-tauri/src/lib.rs (IPC commands)  �
   only compiled with `cfg(target_os = "android")`.
 - There are three IPC families that the frontend uses for different purposes:
   - `vault_info` / `read_note` / `create_note` / `save_note` / `choose_vault` / `export_note` —
-    text notes for the app itself, wrapped by `src/backend.ts`.
+    text notes for the app itself, wrapped by `src/backend.ts`. `backup_list` / `backup_read`
+    list and read the `.basalt/history/` and `.basalt/trash/` backups of notes and canvases
+    (`vault_core::list_backups` / `read_backup`; layouts parsed in `src/backups.ts` too) for
+    the file recovery dialog (`src/app/file-recovery.ts`), which restores through the normal
+    version-checked save or an exclusive create — never by overwriting.
   - `plugin_vault_*` — base64 binary access with opaque SHA-256 version tokens (64 MiB cap,
     deletes backed up to `.basalt/trash/`), wrapped by `src/compat/native-port.ts`.
   - `plugin_resource_grant` / `plugin_resource_revoke` — per-plugin tokens for the read-only

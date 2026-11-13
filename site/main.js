@@ -35,7 +35,7 @@ const de = {
     "Ein gemeinsamer Rust-Kern, eine native App und eine Oberfläche für Maus, Tastatur, Touch und Stift.",
   "p4.title": "Sorgsam mit deinen Daten",
   "p4.text":
-    "Jede Änderung wird vor dem Speichern gesichert. Änderungen von außen werden erkannt statt überschrieben.",
+    "Jede Änderung wird vor dem Speichern gesichert, und frühere Fassungen lassen sich zurückholen. Änderungen von außen werden erkannt statt überschrieben.",
   "f1.title": "Markdown, das dir nicht im Weg steht",
   "f1.text":
     "In der Live-Vorschau tritt die Syntax beim Schreiben zurück. Links und Checkboxen sind anklickbar, Formeln, Diagramme und Tabellen erscheinen direkt im Editor. Maßgeblich bleibt das Markdown darunter.",
@@ -121,7 +121,7 @@ const de = {
     "Basalt ist eine Vorschau (0.2) und noch kein vollständiger Ersatz für Obsidian. Der Kern ist stabil und getestet, aber ein paar Dinge fehlen:",
   "s.a": "keine automatischen Updates, keine eingebaute Synchronisation",
   "s.b": "Plugin-Unterstützung nur für ausgewählte Plugins",
-  "s.c": "Sicherungen müssen vorerst von Hand zurückgespielt werden",
+  "s.c": "Sicherungen werden noch nicht automatisch aufgeräumt",
   "s.d":
     "nur Direktdownloads, noch kein Play Store und keine Distributionspakete",
   "s.tip":
