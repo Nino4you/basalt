@@ -236,6 +236,8 @@ export class App {
   }, 1500);
 
   constructor(root: HTMLElement) {
+    // Until start() has restored the layout, sidebars appear without sliding.
+    document.documentElement.classList.add("is-starting");
     this.shell = buildShell(root);
     this.attachmentView = new AttachmentView(this.shell.attachmentHost);
     this.layout = loadLayout();
@@ -410,11 +412,17 @@ export class App {
   // ── vault lifecycle ───────────────────────────────────────────────────────
 
   async start(): Promise<void> {
+    const root = document.documentElement;
+    root.classList.add("is-starting");
     try {
       await this.loadVault(await backend.info());
     } catch (error) {
       this.setSaveStatus("error", t("Vault konnte nicht geöffnet werden"));
       this.report(error);
+    } finally {
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => root.classList.remove("is-starting")),
+      );
     }
   }
 

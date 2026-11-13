@@ -143,6 +143,11 @@
   --sidebar-duration: 150ms;
 }
 
+/* Set by App.start: the restored layout must not slide in on launch. */
+:root.is-starting {
+  --sidebar-duration: 0ms;
+}
+
 :root[data-theme="light"] {
   color-scheme: light;
   --color-base-00: #ffffff;
