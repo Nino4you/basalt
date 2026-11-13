@@ -21,6 +21,8 @@ pub(crate) trait SafEntry {
     fn uri(&self) -> &Self::Uri;
     fn is_file(&self) -> bool;
     fn is_dir(&self) -> bool;
+    /// File size in bytes; 0 for folders or when the provider does not report one.
+    fn size(&self) -> u64;
 }
 
 /// The provider queries a lookup needs; `android.rs` implements it over `tauri-plugin-android-fs`.
@@ -181,6 +183,61 @@ pub(crate) fn lookup<P: SafProvider>(
     pick(list_cached(provider, cache, dir, now)?, name)
 }
 
+/// Regular files below each backup folder (such as `.basalt/history`) with their sizes.
+///
+/// Walks down from the vault root instead of resolving the folder directly, so a vault
+/// without backups yields an empty list instead of a provider error. Names that cannot be
+/// part of a vault path are skipped; the caller still validates every returned path.
+pub(crate) fn backup_files<P: SafProvider>(
+    provider: &P,
+    roots: &[&str],
+) -> io::Result<Vec<(String, u64)>> {
+    let mut files = Vec::new();
+    let root = provider.resolve_dir("")?;
+    'roots: for path in roots {
+        let mut uri = root.clone();
+        for part in path.split('/') {
+            let mut dirs = provider
+                .list(&uri)?
+                .into_iter()
+                .filter(|entry| entry.is_dir() && entry.name() == part);
+            match (dirs.next(), dirs.next()) {
+                (Some(dir), None) => uri = dir.uri().clone(),
+                // Missing, or ambiguous: either way there is nothing safe to list.
+                _ => continue 'roots,
+            }
+        }
+        collect_files(provider, &uri, path, &mut files, 0)?;
+    }
+    Ok(files)
+}
+
+fn collect_files<P: SafProvider>(
+    provider: &P,
+    dir: &<P::Entry as SafEntry>::Uri,
+    prefix: &str,
+    files: &mut Vec<(String, u64)>,
+    depth: usize,
+) -> io::Result<()> {
+    // Backups mirror vault paths (at most 64 folders) below two extra levels.
+    if depth > 66 {
+        return Err(io::Error::other("Backup folder nesting exceeds 66 levels"));
+    }
+    for entry in provider.list(dir)? {
+        let name = entry.name();
+        if name.is_empty() || name.contains('/') {
+            continue;
+        }
+        let path = format!("{prefix}/{name}");
+        if entry.is_dir() {
+            collect_files(provider, entry.uri(), &path, files, depth + 1)?;
+        } else if entry.is_file() {
+            files.push((path, entry.size()));
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,6 +265,9 @@ mod tests {
         }
         fn is_dir(&self) -> bool {
             self.dir
+        }
+        fn size(&self) -> u64 {
+            self.len
         }
     }
 
@@ -507,5 +567,42 @@ mod tests {
         provider.reset();
         lookup(&provider, &mut cache, "Notes/0.md", now).unwrap();
         assert_eq!((provider.resolves.get(), provider.lists.get()), (1, 1));
+    }
+
+    #[test]
+    fn backup_listing_walks_existing_backup_folders_only() {
+        let provider = FakeProvider::default();
+        assert!(
+            backup_files(&provider, &[".basalt/history", ".basalt/trash"])
+                .unwrap()
+                .is_empty()
+        );
+        let basalt = provider.add(0, ".basalt", true, 0);
+        let history = provider.add(basalt, "history", true, 0);
+        let notes = provider.add(history, "Notes", true, 0);
+        let note = provider.add(notes, "a.md", true, 0);
+        provider.add(note, "1-0.md", false, 3);
+        provider.add(note, "2-0.md", false, 5);
+        provider.add(basalt, "other", true, 0);
+        provider.add(0, "history", true, 0);
+        let mut files = backup_files(&provider, &[".basalt/history", ".basalt/trash"]).unwrap();
+        files.sort();
+        assert_eq!(
+            files,
+            [
+                (".basalt/history/Notes/a.md/1-0.md".to_owned(), 3),
+                (".basalt/history/Notes/a.md/2-0.md".to_owned(), 5),
+            ]
+        );
+
+        let trash = provider.add(basalt, "trash", true, 0);
+        let id = provider.add(trash, "9-1", true, 0);
+        provider.add(id, "gone.canvas", false, 2);
+        // A second folder with the same name makes the listing ambiguous.
+        provider.add(basalt, "history", true, 0);
+        assert_eq!(
+            backup_files(&provider, &[".basalt/history", ".basalt/trash"]).unwrap(),
+            [(".basalt/trash/9-1/gone.canvas".to_owned(), 2)]
+        );
     }
 }

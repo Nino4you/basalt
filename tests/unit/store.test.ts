@@ -52,6 +52,8 @@ it("does not discard edits made during an in-flight save", async () => {
     move: (f, t, e) => real.move(f, t, e),
     choose: () => real.choose(),
     export: (p, t) => real.export(p, t),
+    backups: () => real.backups(),
+    readBackup: (location) => real.readBackup(location),
     save: async (p, t, e) => {
       started();
       await gate;
@@ -99,6 +101,8 @@ it("pins asynchronous reads and saves to the original vault identity", async () 
     move: (f, t, e) => real.move(f, t, e),
     choose: () => real.choose(),
     export: (p, t) => real.export(p, t),
+    backups: () => real.backups(),
+    readBackup: (location) => real.readBackup(location),
     read: async (path, vaultId) => {
       if (vaultId !== selected) throw new Error("vault changed");
       return real.read(path);

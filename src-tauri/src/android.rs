@@ -9,8 +9,8 @@ use std::sync::{Mutex, MutexGuard};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tauri_plugin_android_fs::{AndroidFsExt, Entry, FsUri};
 use vault_core::{
-    BinaryVaultStorage, EntryKind, FileEntry, FileStats, MetadataVaultStorage, VaultPath,
-    VaultStorage, timestamp_millis,
+    BinaryVaultStorage, EntryKind, FileEntry, FileStats, HISTORY_DIR, MetadataVaultStorage,
+    TRASH_DIR, VaultPath, VaultStorage, timestamp_millis,
 };
 
 static NEXT_BACKUP: AtomicU64 = AtomicU64::new(0);
@@ -35,6 +35,9 @@ impl SafEntry for Entry {
     }
     fn is_dir(&self) -> bool {
         Entry::is_dir(self)
+    }
+    fn size(&self) -> u64 {
+        self.file_len().unwrap_or(0)
     }
 }
 
@@ -406,5 +409,12 @@ impl MetadataVaultStorage for AndroidVault {
             ));
         }
         api.remove_file(target.uri()).map_err(io_error)
+    }
+
+    fn backup_files(&self) -> io::Result<Vec<(VaultPath, u64)>> {
+        Ok(saf_cache::backup_files(self, &[HISTORY_DIR, TRASH_DIR])?
+            .into_iter()
+            .filter_map(|(path, size)| Some((VaultPath::parse(&path).ok()?, size)))
+            .collect())
     }
 }

@@ -2,6 +2,15 @@ import { t } from "./i18n";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { NativeVaultPort } from "./compat/native-port";
 import demoCanvas from "../examples/demo-vault/Ideenboard.canvas?raw";
+import {
+  HISTORY_DIR,
+  isDocumentBackup,
+  newBackupId,
+  parseBackup,
+  sortBackups,
+  TRASH_DIR,
+  type BackupEntry,
+} from "./backups";
 
 export interface VaultInfo {
   id: string;
@@ -35,6 +44,10 @@ export interface Backend {
   ): Promise<void>;
   choose(): Promise<VaultInfo | null>;
   export(path: string, text: string): Promise<boolean>;
+  /** Backups of notes and canvases (previous versions and deleted files), newest first. */
+  backups(vaultId?: string): Promise<BackupEntry[]>;
+  /** Text of one backup from `backups()`; other paths are refused. */
+  readBackup(location: string, vaultId?: string): Promise<string>;
 }
 
 export const native = isTauri();
@@ -99,6 +112,18 @@ export function validateNotePath(path: string): string {
 export function validateCanvasPath(path: string): string {
   const note = validateNotePath(path.trim().replace(/\.canvas$/i, ""));
   return `${note.replace(/\.md$/i, "")}.canvas`;
+}
+
+/** Versions the browser demo keeps per note; native vaults keep every one. */
+export const DEMO_VERSIONS = 20;
+
+function freeBackupId(
+  files: Record<string, string>,
+  location: (id: string) => string,
+): string {
+  let id = newBackupId();
+  while (Object.hasOwn(files, location(id))) id = newBackupId();
+  return id;
 }
 
 /** Explicit browser demo, not the native filesystem implementation. */
@@ -166,6 +191,18 @@ export class BrowserBackend implements Backend {
       throw new Error(
         t("Die Notiz wurde außerhalb des Editors geändert. Bitte zuerst neu laden."),
       );
+    if (files[path] === text) return;
+    // Like the native vault, keep the previous content. Browser storage is
+    // small, so the demo keeps only the newest versions of each note.
+    const history = `${HISTORY_DIR}/${path}/`;
+    files[`${history}${freeBackupId(files, (id) => `${history}${id}.md`)}.md`] =
+      files[path];
+    const versions = Object.keys(files)
+      .filter((key) => key.startsWith(history))
+      .map((key) => parseBackup(key))
+      .filter((backup): backup is BackupEntry => !!backup);
+    for (const old of sortBackups(versions).slice(DEMO_VERSIONS))
+      delete files[old.location];
     files[path] = text;
     localStorage.setItem(this.key, JSON.stringify(files));
   }
@@ -178,7 +215,8 @@ export class BrowserBackend implements Backend {
       throw new Error(
         t("Die Datei wurde außerhalb des Editors geändert. Bitte zuerst neu laden."),
       );
-    files[`.basalt/trash/${crypto.randomUUID()}/${path}`] = files[path];
+    const trash = (id: string) => `${TRASH_DIR}/${id}/${path}`;
+    files[trash(freeBackupId(files, trash))] = files[path];
     delete files[path];
     // One storage write commits both backup and removal, or neither.
     localStorage.setItem(this.key, JSON.stringify(files));
@@ -199,6 +237,24 @@ export class BrowserBackend implements Backend {
     delete files[from];
     // One storage write commits the move as a whole, or not at all.
     localStorage.setItem(this.key, JSON.stringify(files));
+  }
+
+  async backups(): Promise<BackupEntry[]> {
+    const encoder = new TextEncoder();
+    const files = this.current();
+    return sortBackups(
+      Object.keys(files)
+        .map((key) => parseBackup(key, encoder.encode(files[key]).length))
+        .filter((backup): backup is BackupEntry => !!backup && isDocumentBackup(backup)),
+    );
+  }
+
+  async readBackup(location: string): Promise<string> {
+    const backup = parseBackup(location);
+    const files = this.current();
+    if (!backup || !isDocumentBackup(backup) || !Object.hasOwn(files, location))
+      throw new Error(t("Sicherung nicht gefunden."));
+    return files[location];
   }
 
   async choose(): Promise<null> {
@@ -299,6 +355,12 @@ class NativeBackend implements Backend {
   }
   export(name: string, text: string): Promise<boolean> {
     return invoke("export_note", { name, text });
+  }
+  backups(vaultId = this.vaultId): Promise<BackupEntry[]> {
+    return invoke("backup_list", { vaultId });
+  }
+  readBackup(location: string, vaultId = this.vaultId): Promise<string> {
+    return invoke("backup_read", { location, vaultId });
   }
 }
 

@@ -513,4 +513,5 @@ export const en = {
     "Folder vaults are available in the native Linux and Android app. This is the browser demo.",
   "Verschieben nicht abgeschlossen: Die Kopie unter „{path}“ bleibt erhalten, das Original konnte nicht entfernt werden. Bitte die Dateiliste neu laden.":
     "Move incomplete: the copy at “{path}” is preserved, but the original could not be removed. Reload the file list.",
+  "Sicherung nicht gefunden.": "Backup not found.",
 } as const;
