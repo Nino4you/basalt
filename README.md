@@ -39,7 +39,8 @@ Obsidian vaults and selected Obsidian plugins.
 - CodeMirror 6 editor with live preview: Markdown syntax fades away, links and checkboxes are
   clickable, and KaTeX math, Mermaid diagrams and tables render right in the editor. Tables
   are edited cell by cell while the Markdown stays the source of truth.
-- Completion for `[[wiki links]]` and `#tags`, page previews when hovering links, templates
+- Completion for `[[wiki links]]` (including `#headings` and `#^blocks`) and `#tags`, page
+  previews when hovering links, templates
   with title and date placeholders, and a source mode.
 - Reading view with callouts, properties, note embeds and syntax highlighting.
 - PDFs, images, audio and video open in their own tabs; PDFs are rendered locally.

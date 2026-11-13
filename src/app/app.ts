@@ -267,6 +267,7 @@ export class App {
       openTag: (tag) => this.searchFor(`tag:#${tag}`),
       notes: () => this.linkCandidates(),
       tags: () => [...this.index.tags().keys()].sort(),
+      subpaths: (target, kind) => this.subpathCandidates(target, kind),
       editorSuggests: () =>
         (this.compatibility?.services.getEditorSuggests() ??
           []) as EditorSuggestRegistration[],
@@ -1267,6 +1268,35 @@ export class App {
   searchFor(query: string): void {
     this.showPanel("search");
     this.search.setQuery(query);
+  }
+
+  /** Headings or block ids a `[[target#` link can point to. */
+  private subpathCandidates(
+    target: string,
+    kind: "heading" | "block",
+  ): Array<{ label: string; detail?: string }> {
+    const source = this.activePath;
+    if (!source) return [];
+    const path = target.trim() ? this.index.resolve(target, source) : source;
+    if (!path || !/\.md$/i.test(path)) return [];
+    const text =
+      this.store?.notes.get(path)?.text ?? this.index.content(path) ?? "";
+    if (kind === "heading") {
+      const seen = new Set<string>();
+      return documentOutline(text)
+        .filter((entry) => !seen.has(entry.text) && seen.add(entry.text))
+        .map((entry) => ({ label: entry.text, detail: `H${entry.depth}` }));
+    }
+    const blocks: Array<{ label: string; detail?: string }> = [];
+    for (const line of text.split("\n")) {
+      const id = /\s\^([A-Za-z0-9-]+)\s*$/.exec(line);
+      if (id)
+        blocks.push({
+          label: id[1],
+          detail: line.slice(0, id.index).trim().slice(0, 60),
+        });
+    }
+    return blocks;
   }
 
   private linkCandidates(): Array<{ link: string; detail: string }> {

@@ -10,6 +10,14 @@ export interface CompletionHost {
   /** Link text to insert plus the folder shown as detail. */
   notes(): Array<{ link: string; detail: string }>;
   tags(): string[];
+  /**
+   * Headings (`[[Note#`) or block ids (`[[Note#^`) of the note a link target
+   * names; an empty target is the note being edited.
+   */
+  subpaths?(
+    target: string,
+    kind: "heading" | "block",
+  ): Array<{ label: string; detail?: string }>;
 }
 
 function applyWikiLink(
@@ -56,5 +64,26 @@ export function completionSources(host: CompletionHost): CompletionSource[] {
       validFor: /^[\p{L}\p{N}_/-]*$/u,
     };
   };
-  return [wiki, tag];
+  const subpath = (context: CompletionContext): CompletionResult | null => {
+    if (!host.subpaths) return null;
+    const match = context.matchBefore(/\[\[[^\]\[|#\n]*#\^?[^\]\[|#\n]*/);
+    if (!match) return null;
+    const hash = match.text.indexOf("#");
+    const target = match.text.slice(2, hash);
+    const block = match.text[hash + 1] === "^";
+    const from = match.from + hash + (block ? 2 : 1);
+    const options = host.subpaths(target, block ? "block" : "heading");
+    if (!options.length) return null;
+    return {
+      from,
+      options: options.map((option) => ({
+        label: option.label,
+        detail: option.detail,
+        type: block ? "constant" : "keyword",
+        apply: applyWikiLink,
+      })),
+      validFor: /^[^\]\[|#^\n]*$/,
+    };
+  };
+  return [wiki, subpath, tag];
 }
