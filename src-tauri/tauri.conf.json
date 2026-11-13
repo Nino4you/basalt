@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Basalt",
+  "version": "0.2.0",
+  "identifier": "io.github.nino4you.basalt",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Basalt",
+        "width": 1280,
+        "height": 840,
+        "minWidth": 320,
+        "minHeight": 480,
+        "dragDropEnabled": false,
+        "backgroundColor": "#161b1e"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; connect-src 'self' data: ipc: http://ipc.localhost https: wss: basalt-resource: http://basalt-resource.localhost; worker-src 'self' blob:; media-src 'self' blob:; object-src 'none'; frame-src blob:; base-uri 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "appimage"],
+    "category": "Productivity",
+    "shortDescription": "A local-first Markdown workspace",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png"
+    ],
+    "android": { "minSdkVersion": 26 }
+  }
+}

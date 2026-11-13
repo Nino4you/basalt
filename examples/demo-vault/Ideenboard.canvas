@@ -1,0 +1,59 @@
+{
+	"nodes": [
+		{
+			"id": "5b8f1c2a9d3e4f60",
+			"type": "group",
+			"x": -460,
+			"y": -260,
+			"width": 960,
+			"height": 560,
+			"label": "Ideenboard"
+		},
+		{
+			"id": "a1c4e7f02b5d8e93",
+			"type": "text",
+			"x": -420,
+			"y": -220,
+			"width": 320,
+			"height": 180,
+			"color": "5",
+			"text": "## Willkommen auf der Canvas\n\nZiehe Karten, verbinde sie über die Punkte am Rand und zoome mit zwei Fingern oder **Strg + Mausrad**."
+		},
+		{
+			"id": "c3e6a9d12f4b7c80",
+			"type": "text",
+			"x": -420,
+			"y": 40,
+			"width": 320,
+			"height": 140,
+			"color": "4",
+			"text": "Doppelt tippen erstellt eine neue Karte. Doppelt tippen auf eine Karte bearbeitet sie."
+		},
+		{
+			"id": "e5a8c1f34d6b9e02",
+			"type": "file",
+			"x": 40,
+			"y": -220,
+			"width": 420,
+			"height": 400,
+			"file": "Willkommen.md"
+		}
+	],
+	"edges": [
+		{
+			"id": "f7b0d3a56e8c1f24",
+			"fromNode": "a1c4e7f02b5d8e93",
+			"fromSide": "right",
+			"toNode": "e5a8c1f34d6b9e02",
+			"toSide": "left",
+			"label": "führt zu"
+		},
+		{
+			"id": "0d2f5b8e1a4c7d36",
+			"fromNode": "a1c4e7f02b5d8e93",
+			"fromSide": "bottom",
+			"toNode": "c3e6a9d12f4b7c80",
+			"toSide": "top"
+		}
+	]
+}

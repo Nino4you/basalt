@@ -1,0 +1,369 @@
+/* ── canvas (JSON Canvas boards) ──────────────────────────────────────────── */
+
+:root {
+  --canvas-color-1: rgb(var(--color-red-rgb));
+  --canvas-color-2: rgb(var(--color-orange-rgb));
+  --canvas-color-3: rgb(var(--color-yellow-rgb));
+  --canvas-color-4: rgb(var(--color-green-rgb));
+  --canvas-color-5: rgb(var(--color-cyan-rgb));
+  --canvas-color-6: rgb(var(--color-purple-rgb));
+  --canvas-dot: var(--background-modifier-border);
+  --canvas-card-bg: var(--background-primary);
+  --canvas-edge: var(--text-faint);
+}
+
+.canvas-host {
+  position: relative;
+  overflow: hidden;
+}
+
+.canvas-wrapper {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--background-secondary);
+}
+
+.canvas-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+  outline: none;
+  background-image: radial-gradient(
+    circle,
+    var(--canvas-dot) 1px,
+    transparent 1.2px
+  );
+  background-size: 20px 20px;
+}
+.canvas-wrapper.is-panning .canvas-viewport {
+  cursor: grabbing;
+}
+
+.canvas-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+
+.canvas-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 999;
+}
+.canvas-overlay {
+  z-index: 100000;
+}
+.canvas-edge {
+  --canvas-color: var(--canvas-edge);
+  color: var(--canvas-color);
+}
+.canvas-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: calc(18px / var(--canvas-zoom, 1));
+  pointer-events: stroke;
+  cursor: pointer;
+}
+.canvas-edge-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: calc(2.5px / max(var(--canvas-zoom, 1), 0.5));
+  stroke-linecap: round;
+}
+.canvas-edge-preview {
+  color: var(--interactive-accent);
+  stroke-dasharray: 6 6;
+}
+.canvas-edge-arrow {
+  fill: currentColor;
+}
+.canvas-edge.is-selected {
+  color: var(--interactive-accent);
+}
+.canvas-edge.is-selected .canvas-edge-line {
+  stroke-width: calc(4px / max(var(--canvas-zoom, 1), 0.5));
+}
+.canvas-edge-label {
+  fill: var(--text-normal);
+  font-size: 14px;
+  paint-order: stroke;
+  stroke: var(--background-secondary);
+  stroke-width: 6px;
+  stroke-linejoin: round;
+}
+
+.canvas-node {
+  --canvas-color: var(--background-modifier-border);
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--canvas-color);
+  border-radius: var(--radius-m, 8px);
+  background: var(--canvas-card-bg);
+  box-shadow: var(--shadow-s, 0 1px 3px rgba(0, 0, 0, 0.12));
+  cursor: default;
+}
+.canvas-node.is-colored {
+  background: color-mix(
+    in srgb,
+    var(--canvas-color) 10%,
+    var(--canvas-card-bg)
+  );
+}
+.canvas-node.is-selected {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+.canvas-node.is-drop-target {
+  outline: 2px dashed var(--interactive-accent);
+  outline-offset: 4px;
+}
+.canvas-node.is-unresolved {
+  border-style: dashed;
+}
+.canvas-node-content {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  padding: 12px 16px;
+  color: var(--text-normal);
+  font-size: var(--font-text-size, 15px);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.canvas-node-content > :first-child,
+.canvas-file-preview > :first-child {
+  margin-top: 0;
+}
+.canvas-node-content > :last-child {
+  margin-bottom: 0;
+}
+.canvas-node-editor {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--text-normal);
+  font: inherit;
+  font-family: var(--font-text, inherit);
+  font-size: var(--font-text-size, 15px);
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+.canvas-placeholder {
+  color: var(--text-faint);
+  font-style: italic;
+}
+.canvas-file-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 0 8px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.canvas-file-header span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.canvas-file-preview {
+  font-size: 0.9em;
+}
+
+.canvas-node-group {
+  background: color-mix(in srgb, var(--canvas-color) 6%, transparent);
+  box-shadow: none;
+}
+.canvas-node-group.is-colored {
+  background: color-mix(in srgb, var(--canvas-color) 12%, transparent);
+}
+.canvas-group-label {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  max-width: 100%;
+  margin-bottom: 4px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: calc(var(--font-ui-medium, 15px) / min(var(--canvas-zoom, 1), 1));
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-resize-handle {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+.canvas-node.is-selected .canvas-resize-handle::after {
+  content: "";
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--interactive-accent);
+  border-bottom: 2px solid var(--interactive-accent);
+}
+
+.canvas-connect-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px;
+  border: 2px solid var(--interactive-accent);
+  border-radius: 50%;
+  background: var(--background-primary);
+  cursor: crosshair;
+  opacity: 0;
+  transition: opacity 120ms var(--ease, ease);
+  touch-action: none;
+}
+.canvas-connect-handle.mod-top {
+  top: 0;
+  left: 50%;
+}
+.canvas-connect-handle.mod-bottom {
+  top: 100%;
+  left: 50%;
+}
+.canvas-connect-handle.mod-left {
+  top: 50%;
+  left: 0;
+}
+.canvas-connect-handle.mod-right {
+  top: 50%;
+  left: 100%;
+}
+.canvas-node.is-selected .canvas-connect-handle,
+.canvas-node:hover .canvas-connect-handle {
+  opacity: 1;
+}
+.canvas-node.is-editing .canvas-connect-handle,
+.canvas-wrapper.is-readonly .canvas-connect-handle,
+.canvas-wrapper.is-readonly .canvas-resize-handle,
+.canvas-wrapper.is-dragging .canvas-connect-handle {
+  display: none;
+}
+
+.canvas-selection-box {
+  position: absolute;
+  border: 1px solid var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  pointer-events: none;
+}
+
+.canvas-toolbar,
+.canvas-controls {
+  position: absolute;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background: var(--background-primary);
+  box-shadow: var(--shadow-s, 0 1px 3px rgba(0, 0, 0, 0.12));
+  z-index: 2;
+}
+.canvas-toolbar {
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.canvas-toolbar-group {
+  display: flex;
+  gap: 2px;
+}
+.canvas-toolbar-group + .canvas-toolbar-group:not([hidden]) {
+  margin-left: 4px;
+  padding-left: 6px;
+  border-left: 1px solid var(--background-modifier-border);
+}
+.canvas-controls {
+  right: 12px;
+  bottom: 40px;
+  flex-direction: column;
+  align-items: center;
+}
+.canvas-zoom-level {
+  padding: 2px 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+}
+.canvas-wrapper.is-readonly .canvas-toolbar {
+  display: none;
+}
+.canvas-error {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  max-width: min(520px, calc(100% - 32px));
+  transform: translateX(-50%);
+  padding: 10px 14px;
+  border: 1px solid var(--background-modifier-error);
+  border-radius: var(--radius-m, 8px);
+  background: var(--background-primary);
+  color: var(--text-error);
+  z-index: 3;
+}
+
+/* Touch sizing applies to every finger-driven canvas, tablets included. */
+@media (max-width: 768px), (any-pointer: coarse), (hover: none) {
+  .canvas-toolbar {
+    top: 8px;
+    max-width: calc(100% - 16px);
+    overflow-x: auto;
+  }
+  .canvas-toolbar .clickable-icon,
+  .canvas-controls .clickable-icon {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .canvas-controls {
+    right: 8px;
+    bottom: 12px;
+  }
+  .canvas-connect-handle {
+    width: 22px;
+    height: 22px;
+    margin: -11px;
+  }
+  .canvas-resize-handle {
+    right: -12px;
+    bottom: -12px;
+    width: 28px;
+    height: 28px;
+  }
+  .canvas-node:hover:not(.is-selected) .canvas-connect-handle {
+    opacity: 0;
+  }
+}

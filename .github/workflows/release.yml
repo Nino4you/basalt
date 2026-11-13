@@ -1,0 +1,417 @@
+name: Signed release
+
+# Builds production-signed Linux and Android artifacts and attaches them to a
+# draft GitHub release. Signing keys come exclusively from the `release`
+# environment / repository secrets; see docs/release-signing.md.
+#
+# - Push a tag `v<version>` (e.g. v0.1.0 or v0.1.0-preview.2) to create a draft release.
+# - Run manually (workflow_dispatch) for a dry run: everything is built and
+#   signed, but only uploaded as Actions artifacts, no release is created.
+# - A manual run with `test_keys` signs with throwaway keys generated inside
+#   the run. It needs no secrets and checks the whole pipeline (including the
+#   ARMv7 build) before the real keys exist; its output must never be shipped.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      test_keys:
+        description: "Sign with throwaway test keys (no secrets needed, output is not distributable)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Check version and signing secrets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: release
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      publish: ${{ steps.version.outputs.publish }}
+      test_keys: ${{ steps.version.outputs.test_keys }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version consistency
+        id: version
+        env:
+          TEST_KEYS: ${{ github.event_name == 'workflow_dispatch' && inputs.test_keys }}
+        run: |
+          set -euo pipefail
+          conf=$(jq -r .version src-tauri/tauri.conf.json)
+          pkg=$(jq -r .version package.json)
+          cargo=$(sed -n 's/^version = "\(.*\)"$/\1/p' src-tauri/Cargo.toml | head -n1)
+          if [ "$conf" != "$pkg" ] || [ "$conf" != "$cargo" ]; then
+            echo "::error::Version mismatch: tauri.conf.json=$conf package.json=$pkg src-tauri/Cargo.toml=$cargo"
+            exit 1
+          fi
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            tag="$GITHUB_REF_NAME"
+            version="${tag#v}"
+            # The tag may carry a pre-release suffix (v0.1.0-preview.2), but its
+            # core must match the app version that Tauri/Android embed.
+            if [ "${version%%-*}" != "$conf" ]; then
+              echo "::error::Tag $tag does not match app version $conf"
+              exit 1
+            fi
+            publish=true
+          else
+            version="$conf"
+            publish=false
+            if [ "$TEST_KEYS" = "true" ]; then
+              tag="v$conf-testkeys"
+            else
+              tag="v$conf-dryrun"
+            fi
+          fi
+          # Test keys only ever come from a manual run, which never publishes.
+          if [ "$TEST_KEYS" = "true" ] && [ "$publish" = "true" ]; then
+            echo "::error::Test keys must not be used for a tagged release"
+            exit 1
+          fi
+          case "$version" in *-*) prerelease=true ;; *) prerelease=false ;; esac
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "prerelease=$prerelease"
+            echo "publish=$publish"
+            if [ "$TEST_KEYS" = "true" ]; then echo "test_keys=true"; else echo "test_keys=false"; fi
+          } >> "$GITHUB_OUTPUT"
+          echo "Release $tag (version $version, prerelease=$prerelease, publish=$publish)"
+      - name: Required secrets present
+        if: steps.version.outputs.test_keys != 'true'
+        env:
+          ANDROID_RELEASE_KEYSTORE: ${{ secrets.ANDROID_RELEASE_KEYSTORE }}
+          ANDROID_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+          RELEASE_GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
+          RELEASE_GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
+        run: |
+          missing=0
+          for name in ANDROID_RELEASE_KEYSTORE ANDROID_RELEASE_KEYSTORE_PASSWORD \
+                      ANDROID_RELEASE_KEY_ALIAS ANDROID_RELEASE_KEY_PASSWORD \
+                      RELEASE_GPG_PRIVATE_KEY RELEASE_GPG_PASSPHRASE; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Secret $name is not set (see docs/release-signing.md)"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+  linux:
+    name: Linux x86_64 (deb, AppImage)
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      # No build cache for release artifacts: they are built from a clean state.
+      - name: Native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2t64 xvfb
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm run tauri -- build --bundles deb,appimage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+      - name: Native Linux startup smoke test
+        run: |
+          set +e
+          xvfb-run -a timeout 12s src-tauri/target/release/basalt > /tmp/basalt-startup.log 2>&1
+          result=$?
+          cat /tmp/basalt-startup.log
+          test "$result" -eq 124
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          cp src-tauri/target/release/bundle/deb/*.deb out/
+          cp src-tauri/target/release/bundle/appimage/*.AppImage out/
+          ls -l out
+      # Packages travel to the publish job through the Actions cache: the
+      # artifact quota of a private repository (500 MB on the free plan) is
+      # too small for a release and is shared with CI. The cache entries are
+      # deleted again by the publish job.
+      - name: Hand packages to the publish job
+        uses: actions/cache/save@v4
+        with:
+          path: out
+          key: release-linux-${{ github.run_id }}
+
+  android:
+    name: Android (release APK, AAB)
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: release
+    env:
+      BUILD_TOOLS: "36.0.0"
+    steps:
+      # The NDK and three Rust targets do not fit beside the runner's
+      # preinstalled toolchains (same cleanup as the CI Android job).
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift \
+            /usr/local/share/boost /usr/local/share/powershell /usr/local/julia* \
+            /opt/hostedtoolcache/CodeQL /opt/hostedtoolcache/go /opt/hostedtoolcache/PyPy
+          df -h /
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - name: Android SDK and NDK
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;$BUILD_TOOLS" "ndk;27.2.12479018"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "$ANDROID_HOME/build-tools/$BUILD_TOOLS" >> "$GITHUB_PATH"
+      - run: npm ci
+      - run: npm run tauri -- android init --ci --skip-targets-install
+      - name: Apply Basalt's Android activity and manifest changes
+        run: node tools/patch_android.mjs
+      - run: npm run tauri -- icon public/basalt.svg
+      # Gradle produces unsigned release outputs; they are signed below with
+      # the production key so the key never enters the Gradle project files.
+      - name: Build unsigned release APK and AAB
+        run: npm run tauri -- android build --apk --aab --target aarch64 --target armv7 --target x86_64
+      - name: Restore release keystore
+        if: needs.prepare.outputs.test_keys != 'true'
+        env:
+          ANDROID_RELEASE_KEYSTORE: ${{ secrets.ANDROID_RELEASE_KEYSTORE }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$ANDROID_RELEASE_KEYSTORE" | base64 --decode > "$RUNNER_TEMP/release.jks"
+      - name: Generate throwaway test keystore
+        if: needs.prepare.outputs.test_keys == 'true'
+        run: |
+          set -euo pipefail
+          umask 077
+          pass=$(openssl rand -hex 24)
+          echo "::add-mask::$pass"
+          keytool -genkeypair -keystore "$RUNNER_TEMP/release.jks" -storetype PKCS12 \
+            -alias basalt-test -keyalg RSA -keysize 2048 -validity 2 \
+            -dname "CN=Basalt TEST KEY - NOT FOR DISTRIBUTION" \
+            -storepass "$pass" -keypass "$pass" -noprompt
+          {
+            echo "TEST_KS_PASS=$pass"
+            echo "TEST_KEY_ALIAS=basalt-test"
+          } >> "$GITHUB_ENV"
+      - name: Sign APK and AAB
+        env:
+          KS_PASS: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TEST_KEYS: ${{ needs.prepare.outputs.test_keys }}
+        run: |
+          set -euo pipefail
+          if [ "$TEST_KEYS" = "true" ]; then
+            KS_PASS="$TEST_KS_PASS" KEY_PASS="$TEST_KS_PASS" KEY_ALIAS="$TEST_KEY_ALIAS"
+            export KS_PASS KEY_PASS KEY_ALIAS
+          fi
+          outputs=src-tauri/gen/android/app/build/outputs
+          apk=$(find "$outputs/apk" -name '*-release-unsigned.apk' | head -n1)
+          aab=$(find "$outputs/bundle" -name '*-release.aab' | head -n1)
+          test -n "$apk" || { echo "::error::No unsigned release APK found"; find "$outputs" -type f; exit 1; }
+          test -n "$aab" || { echo "::error::No release AAB found"; find "$outputs" -type f; exit 1; }
+          mkdir -p out
+          signed_apk="out/Basalt_${VERSION}_android-universal.apk"
+          signed_aab="out/Basalt_${VERSION}_android-universal.aab"
+
+          # Align (16 KiB pages for native libraries), then sign with v1-v3 schemes.
+          zipalign -P 16 -f 4 "$apk" "$RUNNER_TEMP/aligned.apk"
+          apksigner sign \
+            --ks "$RUNNER_TEMP/release.jks" --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KS_PASS --key-pass env:KEY_PASS \
+            --out "$signed_apk" "$RUNNER_TEMP/aligned.apk"
+          apksigner verify --verbose --print-certs "$signed_apk" | tee "$RUNNER_TEMP/apk-certs.txt"
+
+          # App bundles use JAR signing; Google Play re-signs for delivery
+          # when Play App Signing is enabled (this key is then the upload key).
+          cp "$aab" "$signed_aab"
+          jarsigner -sigalg SHA256withRSA -digestalg SHA-256 \
+            -keystore "$RUNNER_TEMP/release.jks" \
+            -storepass:env KS_PASS -keypass:env KEY_PASS \
+            "$signed_aab" "$KEY_ALIAS"
+          # Android signing certificates are self-signed; trust only our release key.
+          jarsigner -verify -strict \
+            -keystore "$RUNNER_TEMP/release.jks" -storepass:env KS_PASS \
+            "$signed_aab" "$KEY_ALIAS"
+
+          grep -m1 'certificate SHA-256 digest' "$RUNNER_TEMP/apk-certs.txt" \
+            | sed 's/^.*digest: /Android signing certificate SHA-256: /' > out/android-certificate.txt
+          cat out/android-certificate.txt
+          ls -l out
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks" "$RUNNER_TEMP/aligned.apk"
+      - name: Hand packages to the publish job
+        uses: actions/cache/save@v4
+        with:
+          path: out
+          key: release-android-${{ github.run_id }}
+
+  publish:
+    name: Checksums, signatures and draft release
+    needs: [prepare, linux, android]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write
+      actions: write # delete the hand-over cache entries
+    env:
+      CACHE_SUFFIX: ${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore Linux packages
+        uses: actions/cache/restore@v4
+        with:
+          path: out
+          key: release-linux-${{ env.CACHE_SUFFIX }}
+          fail-on-cache-miss: true
+      - name: Restore Android packages
+        uses: actions/cache/restore@v4
+        with:
+          path: out
+          key: release-android-${{ env.CACHE_SUFFIX }}
+          fail-on-cache-miss: true
+      - name: Collect packages
+        run: |
+          mv out dist-release
+          ls -l dist-release
+      - name: Import release signing key
+        if: needs.prepare.outputs.test_keys != 'true'
+        env:
+          RELEASE_GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+          install -d -m 700 "$GNUPGHOME"
+          printf '%s\n' "$RELEASE_GPG_PRIVATE_KEY" | gpg --batch --import
+          fpr=$(gpg --batch --with-colons --list-secret-keys | awk -F: '/^fpr:/ {print $10; exit}')
+          test -n "$fpr"
+          echo "GPG_FPR=$fpr" >> "$GITHUB_ENV"
+          echo "Signing with OpenPGP key $fpr"
+      - name: Generate throwaway test OpenPGP key
+        if: needs.prepare.outputs.test_keys == 'true'
+        run: |
+          set -euo pipefail
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+          install -d -m 700 "$GNUPGHOME"
+          gpg --batch --passphrase '' --quick-gen-key \
+            "Basalt TEST KEY - NOT FOR DISTRIBUTION" ed25519 sign 1d
+          fpr=$(gpg --batch --with-colons --list-secret-keys | awk -F: '/^fpr:/ {print $10; exit}')
+          test -n "$fpr"
+          echo "GPG_FPR=$fpr" >> "$GITHUB_ENV"
+          echo "Signing with throwaway OpenPGP key $fpr"
+      - name: Checksums and detached signatures
+        env:
+          RELEASE_GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
+          TEST_KEYS: ${{ needs.prepare.outputs.test_keys }}
+        working-directory: dist-release
+        run: |
+          set -euo pipefail
+          sign() {
+            printf '%s' "$RELEASE_GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
+              --passphrase-fd 0 --local-user "$GPG_FPR" --armor --detach-sign --output "$1.asc" "$1"
+          }
+          shopt -s failglob
+          packages=(./*.deb ./*.AppImage ./*.apk ./*.aab)
+          sha256sum "${packages[@]#./}" > SHA256SUMS
+          for file in "${packages[@]#./}" SHA256SUMS; do
+            sign "$file"
+            gpg --batch --verify "$file.asc" "$file"
+          done
+          gpg --batch --armor --export "$GPG_FPR" > basalt-release-key.asc
+          {
+            if [ "$TEST_KEYS" = "true" ]; then
+              echo "WARNING: signed with throwaway TEST keys. Not for distribution."
+            fi
+            echo "OpenPGP release key fingerprint: $GPG_FPR"
+            cat android-certificate.txt
+          } > SIGNING.txt
+          rm android-certificate.txt
+          cat SIGNING.txt SHA256SUMS
+          ls -l
+      - name: Remove signing key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/gnupg"
+      # Download for dry runs. Everything above is already built, signed and
+      # verified, so a full artifact quota must not fail the run; tagged
+      # releases get their files from the draft release instead.
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: Basalt-${{ needs.prepare.outputs.tag }}-signed
+          retention-days: 3
+          path: dist-release/*
+          if-no-files-found: error
+      - name: Create draft GitHub release
+        if: needs.prepare.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          notes="docs/releases/$VERSION.md"
+          if [ -f "$notes" ]; then
+            cp "$notes" "$RUNNER_TEMP/notes.md"
+          else
+            echo "Basalt $VERSION" > "$RUNNER_TEMP/notes.md"
+          fi
+          {
+            echo
+            echo "## Signaturen"
+            echo
+            echo '```'
+            cat dist-release/SIGNING.txt
+            echo '```'
+            echo
+            echo "Prüfung: siehe docs/release-signing.md im Repository."
+          } >> "$RUNNER_TEMP/notes.md"
+          args=(--draft --verify-tag --title "Basalt $VERSION" --notes-file "$RUNNER_TEMP/notes.md")
+          if [ "$PRERELEASE" = "true" ]; then args+=(--prerelease); fi
+          gh release create "$TAG" "${args[@]}" dist-release/*
+      - name: Delete hand-over cache entries
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for job in linux android; do
+            gh cache delete "release-$job-$CACHE_SUFFIX" --repo "$GITHUB_REPOSITORY" || true
+          done

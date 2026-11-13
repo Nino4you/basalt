@@ -1,0 +1,245 @@
+name: Test and build
+
+# Documentation-only changes cannot break a build; skip the ten-minute run.
+# Root-level `*.md` only: example vaults and fixtures are Markdown, too.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+      - "screenshots/**"
+  pull_request:
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+      - "screenshots/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Core, frontend and browser tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: cargo fmt --all -- --check
+      - run: cargo test --workspace --locked
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: python3 -m py_compile tools/*.py
+      - name: Playwright browser cache
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      - run: npm run test:e2e
+      # Reports are for debugging; a full artifact quota must not fail the run.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: browser-test-results
+          retention-days: 1
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+
+  linux:
+    name: Linux x86_64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          cache-on-failure: true
+      - name: Native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2t64 xvfb
+      - run: npm ci
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+      - run: npm run tauri -- build --bundles deb,appimage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+      - name: Native vault IPC unit tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib --release --locked --features tauri/custom-protocol
+      - name: Native Linux startup smoke test
+        run: |
+          set +e
+          xvfb-run -a timeout 12s src-tauri/target/release/basalt > /tmp/basalt-startup.log 2>&1
+          result=$?
+          cat /tmp/basalt-startup.log
+          test "$result" -eq 124
+      # Each run's bundles are ~90 MB and the artifact quota is shared: keep
+      # them only for main and manual runs, and only for a day.
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        with:
+          name: Basalt-linux-x86_64
+          retention-days: 1
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+
+  android:
+    name: Android build and emulator tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      # NDK, two Rust targets, Gradle and the emulator image no longer fit
+      # beside the runner's preinstalled toolchains (the disk ran full).
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift             /usr/local/share/boost /usr/local/share/powershell /usr/local/julia*             /opt/hostedtoolcache/CodeQL /opt/hostedtoolcache/go /opt/hostedtoolcache/PyPy
+          df -h /
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      # Caches the Gradle distribution, dependencies and build cache, which
+      # otherwise cost ~80 s of downloads and ~85 s of Kotlin compilation.
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          cache-on-failure: true
+      - name: Android SDK and NDK
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npm run tauri -- android init --ci --skip-targets-install
+      - name: Apply Basalt's Android activity and manifest changes
+        run: node tools/patch_android.mjs
+      - name: Reuse Gradle task outputs across runs
+        run: echo "org.gradle.caching=true" >> src-tauri/gen/android/gradle.properties
+      - run: npm run tauri -- icon public/basalt.svg
+      - name: Stable development signing identity
+        if: github.event_name != 'pull_request'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE }}
+        run: |
+          test -n "$KEYSTORE_BASE64"
+          mkdir -p "$HOME/.android"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+          chmod 600 "$HOME/.android/debug.keystore"
+      - name: Build debug-signed APK for sideload testing
+        run: npm run tauri -- android build --apk --debug --target aarch64 --target x86_64
+      # The emulator test runs on this runner against the APK just built, so
+      # it needs no artifact round trip and no second job start-up. The
+      # upload is only for sideloading and may fail on a full quota.
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: Basalt-android-arm64-preview
+          retention-days: 1
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+      - name: Enable emulator hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      # The emulator, its system image and a booted AVD snapshot are reused:
+      # downloading them took ~50 s and a cold boot another ~45 s. Bump the
+      # key suffix to force a fresh snapshot.
+      - name: Emulator and AVD snapshot cache
+        id: avd-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+            ${{ env.ANDROID_HOME }}/emulator
+            ${{ env.ANDROID_HOME }}/system-images/android-34/default/x86_64
+          key: avd-34-default-x86_64-pixel_2-v1
+      - name: Create AVD snapshot for the cache
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: default
+          profile: pixel_2
+          ram-size: 4096M
+          cores: 4
+          force-avd-creation: false
+          emulator-boot-timeout: 300
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-metrics -camera-back none -camera-front none -feature -Vulkan
+          disable-animations: false
+          script: echo "AVD snapshot created."
+      - name: Native Android vault and editor smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: default
+          profile: pixel_2
+          ram-size: 4096M
+          cores: 4
+          force-avd-creation: false
+          emulator-boot-timeout: 300
+          # Boots from the clean cached snapshot and never writes it back, so
+          # every run starts without the previous run's app data.
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot-save -noaudio -no-boot-anim -no-metrics -camera-back none -camera-front none -feature -Vulkan
+          disable-animations: true
+          script: timeout 240s node tools/smoke_android.mjs
+      - name: Collect emulator boot diagnostics
+        if: failure()
+        run: |
+          mkdir -p test-results
+          timeout 10s adb devices -l > test-results/android-native-devices.txt 2>&1 || true
+          timeout 15s adb logcat -d -t 2000 > test-results/android-native-boot-logcat.txt 2>&1 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: android-native-test-results
+          retention-days: 1
+          path: test-results/android-native*
+          if-no-files-found: ignore

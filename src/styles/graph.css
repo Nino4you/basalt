@@ -1,0 +1,431 @@
+/* Graph view: global graph dialog and local graph in the right sidebar. */
+
+.graph-view {
+  --graph-node: var(--text-muted);
+  --graph-node-focused: var(--text-accent);
+  --graph-line: var(--color-base-40);
+  --graph-text: var(--text-muted);
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-m);
+  background: var(--background-primary);
+}
+.graph-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.graph-canvas:active {
+  cursor: grabbing;
+}
+.graph-canvas:focus-visible {
+  outline: 2px solid var(--background-modifier-border-focus);
+  outline-offset: -2px;
+}
+.graph-edge {
+  stroke: var(--graph-line);
+  stroke-width: 1;
+  stroke-opacity: 0.6;
+  vector-effect: non-scaling-stroke;
+  transition:
+    stroke-opacity 160ms var(--ease),
+    stroke 160ms var(--ease);
+}
+.graph-node {
+  cursor: pointer;
+  outline: none;
+  transition: opacity 160ms var(--ease);
+}
+.graph-hit-area {
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 14px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: all;
+}
+@media (pointer: coarse) {
+  .graph-hit-area {
+    stroke-width: 32px;
+  }
+}
+.graph-node circle {
+  fill: var(--graph-node-color, var(--graph-node));
+  stroke: var(--background-primary);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+  transition:
+    fill 160ms var(--ease),
+    stroke 160ms var(--ease);
+}
+/* Component colors are optional; unconfigured graphs stay neutral. */
+.graph-color-groups .graph-node[data-color="0"] {
+  --graph-node-color: var(--color-accent);
+}
+.graph-color-groups .graph-node[data-color="1"] {
+  --graph-node-color: rgb(var(--color-cyan-rgb));
+}
+.graph-color-groups .graph-node[data-color="2"] {
+  --graph-node-color: rgb(var(--color-orange-rgb));
+}
+.graph-color-groups .graph-node[data-color="3"] {
+  --graph-node-color: rgb(var(--color-green-rgb));
+}
+.graph-color-groups .graph-node[data-color="4"] {
+  --graph-node-color: rgb(var(--color-red-rgb));
+}
+.graph-color-groups .graph-node[data-color="5"] {
+  --graph-node-color: rgb(var(--color-yellow-rgb));
+}
+.graph-color-groups .graph-node[data-color="6"] {
+  --graph-node-color: rgb(var(--color-blue-rgb));
+}
+.graph-color-groups .graph-node[data-color="7"] {
+  --graph-node-color: rgb(var(--color-purple-rgb));
+}
+.graph-node.is-unresolved circle {
+  fill-opacity: 0.35;
+  stroke: var(--graph-node-color, var(--text-faint));
+  stroke-dasharray: 2 2;
+}
+.graph-node.is-tag circle {
+  fill-opacity: 0.55;
+}
+/* Current note and hovered hub use the user's accent, not a fixed palette. */
+.graph-node.is-active circle,
+.graph-node.is-focused circle {
+  fill: var(--graph-node-focused);
+  fill-opacity: 1;
+  stroke: var(--graph-node-focused);
+  stroke-width: 1px;
+  stroke-dasharray: none;
+}
+/* Labels sit centred below their node and fade in with zoom, hubs first. */
+.graph-label {
+  fill: var(--graph-text);
+  font-size: var(--graph-font-size, 12px);
+  text-anchor: middle;
+  dominant-baseline: hanging;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: var(--background-primary);
+  stroke-width: calc(var(--graph-font-size, 12px) * 0.28);
+  stroke-linejoin: round;
+  /* fill/stroke opacity, not opacity: no offscreen layer per label. */
+  fill-opacity: var(--graph-label-alpha);
+  stroke-opacity: var(--graph-label-alpha);
+}
+.graph-node {
+  --graph-label-base: var(--graph-label-0, 1);
+  --graph-label-alpha: var(--graph-label-base);
+}
+.graph-node[data-tier="1"] {
+  --graph-label-base: var(--graph-label-1, 1);
+}
+.graph-node[data-tier="2"] {
+  --graph-label-base: var(--graph-label-2, 1);
+}
+.graph-node[data-tier="3"] {
+  --graph-label-base: var(--graph-label-3, 1);
+}
+.graph-nodes.hide-labels-0 .graph-node[data-tier="0"] .graph-label,
+.graph-nodes.hide-labels-1 .graph-node[data-tier="1"] .graph-label,
+.graph-nodes.hide-labels-2 .graph-node[data-tier="2"] .graph-label,
+.graph-nodes.hide-labels-3 .graph-node[data-tier="3"] .graph-label {
+  display: none;
+}
+.graph-node.is-highlighted .graph-label,
+.graph-node.is-active .graph-label {
+  display: block;
+}
+/* Neighbours of a hovered node are named earlier than the rest. */
+.graph-node.is-highlighted {
+  --graph-label-alpha: max(var(--graph-label-near, 1), var(--graph-label-base));
+}
+.graph-node.is-highlighted .graph-label {
+  fill: var(--text-normal);
+}
+.graph-node.is-active,
+.graph-node.is-focused {
+  --graph-label-alpha: 1;
+}
+.graph-node.is-active .graph-label {
+  fill: var(--text-normal);
+}
+.graph-node.is-focused .graph-label {
+  fill: var(--text-accent);
+}
+.graph-canvas.has-focus .graph-node:not(.is-highlighted) {
+  opacity: 0.2;
+}
+.graph-canvas.has-focus .graph-edge:not(.is-highlighted) {
+  stroke-opacity: 0.08;
+}
+.graph-canvas.has-focus .graph-edge.is-highlighted {
+  stroke: var(--graph-node-focused);
+  stroke-width: 1.5;
+  stroke-opacity: 0.9;
+}
+.graph-node:focus-visible circle {
+  stroke: var(--text-accent);
+  stroke-width: 3px;
+  stroke-dasharray: none;
+}
+.graph-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.graph-empty[hidden] {
+  display: none;
+}
+.graph-controls {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  box-shadow: var(--shadow-s);
+  opacity: 0.75;
+  transition: opacity 150ms var(--ease);
+}
+.graph-view:hover .graph-controls,
+.graph-controls:focus-within {
+  opacity: 1;
+}
+
+.graph-settings {
+  position: absolute;
+  z-index: 1;
+  top: 12px;
+  right: 12px;
+  width: min(260px, calc(100% - 24px));
+  max-height: calc(100% - 72px);
+  overflow: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-primary);
+  font-size: var(--font-ui-small);
+}
+.graph-settings summary {
+  cursor: pointer;
+  color: var(--text-normal);
+  font-weight: var(--font-medium);
+}
+.graph-settings summary:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+.graph-settings-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  list-style: none;
+}
+.graph-settings-heading::-webkit-details-marker {
+  display: none;
+}
+.graph-settings-heading > :last-child {
+  margin-left: auto;
+  transition: transform 150ms var(--ease);
+}
+.graph-settings:not([open]) .graph-settings-heading > :last-child {
+  transform: rotate(-90deg);
+}
+.graph-settings-section {
+  padding: 0 12px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.graph-settings-section > summary {
+  padding: 12px 0;
+}
+.graph-settings-section[open] {
+  padding-bottom: 8px;
+}
+.graph-settings .graph-toggle {
+  display: flex;
+  justify-content: space-between;
+  min-height: 36px;
+  gap: 12px;
+}
+.graph-settings .graph-filter {
+  width: 100%;
+  margin-bottom: 8px;
+}
+/* Local graph: settings behind a gear in the top-right corner. */
+.graph-local-settings {
+  position: absolute;
+  z-index: 1;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  max-width: calc(100% - 12px);
+  max-height: calc(100% - 12px);
+  font-size: var(--font-ui-small);
+}
+.graph-local-settings > summary {
+  list-style: none;
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  opacity: 0.75;
+}
+.graph-local-settings > summary::-webkit-details-marker {
+  display: none;
+}
+.graph-view:hover .graph-local-settings > summary,
+.graph-local-settings[open] > summary,
+.graph-local-settings > summary:focus-visible {
+  opacity: 1;
+}
+.graph-local-settings[open] > summary {
+  color: var(--text-accent);
+}
+.graph-local-settings-body {
+  width: 240px;
+  max-width: 100%;
+  min-height: 0;
+  margin-top: 4px;
+  padding: 2px 12px;
+  overflow: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  box-shadow: var(--shadow-s);
+}
+.graph-local-settings .graph-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  color: var(--text-normal);
+}
+.graph-local-settings .graph-toggle > span:first-child {
+  flex: 1 1 auto;
+}
+.graph-local-settings .graph-toggle + .graph-toggle {
+  border-top: 1px solid var(--background-modifier-border);
+}
+.graph-local-settings .graph-toggle[hidden] {
+  display: none;
+}
+.graph-filter {
+  flex: 1 1 200px;
+  min-width: 0;
+  height: 30px;
+}
+.graph-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.graph-depth {
+  flex: 0 1 120px;
+  min-width: 60px;
+}
+.graph-depth-value {
+  min-width: 1.4em;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.graph-count {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.modal.mod-graph {
+  width: min(1100px, 100%);
+  height: min(800px, 90vh);
+  max-height: 90vh;
+}
+.mod-graph .modal-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* The graph takes whatever height the panel has, however small it is docked. */
+.workspace-leaf-content[data-pane="graph"] {
+  overflow: hidden;
+  padding: 8px;
+}
+.workspace-leaf-content[data-pane="graph"] .graph-view {
+  min-height: 0;
+}
+
+@media (max-width: 768px),
+  (any-pointer: coarse) and (max-height: 500px),
+  (hover: none) and (max-height: 500px) {
+  .modal.mod-graph {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    padding: calc(12px + var(--safe-top)) 12px calc(12px + var(--safe-bottom));
+    border: 0;
+    border-radius: 0;
+  }
+  .mod-graph .modal-close-button {
+    top: calc(8px + var(--safe-top));
+  }
+  .graph-count {
+    display: none;
+  }
+  .graph-settings {
+    position: static;
+    flex: none;
+    align-self: flex-end;
+    margin: 8px;
+    max-height: 42%;
+  }
+  .mod-graph .graph-view {
+    display: flex;
+    flex-direction: column;
+  }
+  .mod-graph .graph-canvas {
+    order: 1;
+    flex: 1 1 0;
+    min-height: 0;
+    height: 0;
+  }
+  .graph-settings-heading,
+  .graph-settings-section > summary {
+    min-height: 44px;
+  }
+  .graph-settings .graph-toggle {
+    min-height: 44px;
+  }
+  .graph-controls .clickable-icon {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+.graph-node.is-entering {
+  animation: graph-node-in 400ms var(--ease);
+}
+@keyframes graph-node-in {
+  from {
+    opacity: 0;
+  }
+}

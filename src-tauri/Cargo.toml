@@ -1,0 +1,32 @@
+[package]
+name = "basalt"
+version = "0.2.0"
+edition = "2024"
+publish = false
+license = "MPL-2.0"
+
+[lib]
+name = "basalt_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+sha2 = "0.10"
+# Unguessable resource-URL grant tokens.
+getrandom = "0.3"
+# requestUrl for plugins: rustls with ring and bundled webpki roots builds the same on Linux and Android.
+ureq = { version = "3", default-features = false, features = ["rustls", "gzip"] }
+vault-core = { path = "../crates/vault-core" }
+
+[target.'cfg(target_os = "android")'.dependencies]
+tauri-plugin-android-fs = "=30.2.0"
+
+[workspace]
