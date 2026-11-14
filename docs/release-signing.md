@@ -9,6 +9,8 @@ a **draft** GitHub release. Nothing is published until the draft is released man
 | `Basalt_<version>_android-universal.aab` | Android release key (JAR signature, upload key)              |
 | `.deb`, `.AppImage` (Linux x86_64)       | detached OpenPGP signature `<file>.asc`                      |
 | `_x64-setup.exe` (Windows x64)           | detached OpenPGP signature `<file>.asc` (no Authenticode)    |
+| `<desktop package>.sig`                  | updater signature (minisign) for the in-app updater          |
+| `latest.json`                            | update manifest for the desktop app, OpenPGP-signed          |
 | `SHA256SUMS`                             | checksums of all packages, OpenPGP-signed (`SHA256SUMS.asc`) |
 | `basalt-release-key.asc`, `SIGNING.txt`  | public OpenPGP key and both fingerprints                     |
 
@@ -45,7 +47,26 @@ tools/setup_release_signing.sh                 # keys end up in ~/basalt-release
 
 The script never overwrites existing keys and refuses a target folder inside the repository.
 Afterwards, back up the printed folder (it contains the keystore, the OpenPGP keyring with its
-revocation certificate and `FINGERPRINTS.txt`) and continue with step 4.
+revocation certificate and `FINGERPRINTS.txt`) and add the updater key (next section).
+
+### Updater key for the desktop app
+
+The desktop app (AppImage, `.deb`, Windows installer) installs updates itself, but only packages
+signed with its own updater key (minisign, separate from the OpenPGP key). The public half is
+built into the app as `plugins.updater.pubkey` in `src-tauri/tauri.conf.json`; tag releases and
+dry runs stop while it is empty. From a checkout with `npm ci` done:
+
+```sh
+tools/setup_release_signing.sh --updater       # creates ~/basalt-release-keys/basalt-updater.key
+```
+
+It asks for a password (twice), creates the key, checks the password by signing a test file,
+stores `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` in the environment
+`release` and prints the public key. Commit that public key into `tauri.conf.json`. Run the same
+command again later (for example for a new repository) to store the existing key; it never
+creates a second one. Back up `basalt-updater.key` and its password with the other keys: if they
+are lost, every installed desktop app has to be updated once by hand to a build with a new public
+key.
 
 ### Changing the name or email on the OpenPGP key
 
@@ -117,14 +138,16 @@ Under **Settings → Environments → New environment**, create an environment `
 with "Required reviewers" so every release run has to be approved) and add these secrets there.
 Repository secrets with the same names work too.
 
-| Secret                              | Content                                                      |
-| ----------------------------------- | ------------------------------------------------------------ |
-| `ANDROID_RELEASE_KEYSTORE`          | `base64 -w0 basalt-release.jks` (one line)                   |
-| `ANDROID_RELEASE_KEYSTORE_PASSWORD` | keystore password                                            |
-| `ANDROID_RELEASE_KEY_ALIAS`         | `basalt` (or the name chosen with `-alias`)                  |
-| `ANDROID_RELEASE_KEY_PASSWORD`      | key password (identical to the keystore password for PKCS12) |
-| `RELEASE_GPG_PRIVATE_KEY`           | full content of `basalt-release-private.asc`                 |
-| `RELEASE_GPG_PASSPHRASE`            | passphrase of the OpenPGP key                                |
+| Secret                               | Content                                                       |
+| ------------------------------------ | ------------------------------------------------------------- |
+| `ANDROID_RELEASE_KEYSTORE`           | `base64 -w0 basalt-release.jks` (one line)                    |
+| `ANDROID_RELEASE_KEYSTORE_PASSWORD`  | keystore password                                             |
+| `ANDROID_RELEASE_KEY_ALIAS`          | `basalt` (or the name chosen with `-alias`)                   |
+| `ANDROID_RELEASE_KEY_PASSWORD`       | key password (identical to the keystore password for PKCS12)  |
+| `RELEASE_GPG_PRIVATE_KEY`            | full content of `basalt-release-private.asc`                  |
+| `RELEASE_GPG_PASSPHRASE`             | passphrase of the OpenPGP key                                 |
+| `TAURI_SIGNING_PRIVATE_KEY`          | content of `basalt-updater.key` (`npx tauri signer generate`) |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | password of the updater key                                   |
 
 With the GitHub CLI, for example:
 
@@ -194,8 +217,12 @@ channel as the downloads.
   upload to Play.
 - **Linux packages:** `.deb` and AppImage carry no embedded signature, only detached `.asc`
   files. There is no signed APT repository yet.
-- **No auto-update:** The Tauri updater is not included. It would need the
-  `tauri-plugin-updater` plugin, a dedicated updater key and an update endpoint; that is a
-  separate step.
+- **Desktop updates:** The publish job writes `latest.json` with the download URL and updater
+  signature of the AppImage, `.deb` and Windows installer. The app reads it from
+  `releases/latest/download/latest.json`, so only the published latest release counts; drafts
+  and pre-releases are never offered. The app installs a download only when its signature
+  matches the built-in public key and names the announced version (`requireSignedVersion`).
+  A `.deb` update asks for the administrator password (`pkexec dpkg -i`). Android updates stay
+  manual (APK download or a store).
 - **Build provenance:** GitHub attestations (Sigstore) are only available for private
   repositories with GitHub Enterprise Cloud and are therefore not enabled.

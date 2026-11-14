@@ -61,8 +61,13 @@ will get a response once the report has been reviewed.
   against the bundled webpki roots. Plugins already had network access; only the browser's
   cross-origin restriction goes away.
 - The update check is off by default. Turned on (or with "Check now" in Settings → General) it
-  makes one request to `api.github.com/repos/Nino4you/basalt/releases/latest`, at most once a
-  day, and only links to the release page on `github.com`; nothing is downloaded or installed.
+  makes one request at most once a day: the desktop app reads `latest.json` from the latest
+  GitHub release, Android and the demo ask `api.github.com/repos/Nino4you/basalt/releases/latest`.
+  Nothing is downloaded or installed until the user presses "Install and restart" (desktop only).
+  The desktop app then accepts only a package whose minisign signature matches the public key in
+  `src-tauri/tauri.conf.json` and was made for the announced version, so a tampered manifest
+  cannot install foreign code or downgrade to an older release. The updater key exists only as a
+  GitHub secret and in the maintainer's offline backup.
 - The plugin catalog (Settings → Community plugins) downloads the community plugin list and
   download counts from `raw.githubusercontent.com/obsidianmd/obsidian-releases`, and plugin
   releases from `github.com/<owner>/<repo>/releases/latest/download/`, through the same

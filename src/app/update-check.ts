@@ -1,3 +1,4 @@
+import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
 import type { RequestUrl } from "../compat/request";
 import { compareVersions } from "../compat/plugin-catalog";
 
@@ -38,6 +39,68 @@ export async function latestRelease(request: RequestUrl): Promise<ReleaseInfo> {
     url,
     notes: typeof value?.body === "string" ? value.body : "",
   };
+}
+
+/** A newer release; `installable` when the app can install it itself. */
+export interface AvailableUpdate extends ReleaseInfo {
+  installable: boolean;
+}
+
+export interface UpdateProgress {
+  downloaded: number;
+  total: number | null;
+}
+
+/**
+ * The desktop app installs signed updates itself (AppImage, .deb, Windows
+ * installer). Android and the browser demo only announce new releases.
+ */
+export const selfUpdating =
+  isTauri() && !/Android/i.test(globalThis.navigator?.userAgent ?? "");
+
+/** Asks the native updater (signed `latest.json` of the latest release). */
+export async function checkSignedUpdate(): Promise<AvailableUpdate | null> {
+  const found = await invoke<{
+    version: string;
+    notes: string;
+    installable: boolean;
+  } | null>("app_update_check");
+  return found && { ...found, url: RELEASE_PAGE };
+}
+
+/**
+ * Downloads, verifies and installs the update from the last check; the app
+ * restarts on success. Save every open buffer before calling this.
+ */
+export async function installSignedUpdate(
+  onProgress: (progress: UpdateProgress) => void,
+): Promise<void> {
+  const channel = new Channel<UpdateProgress>();
+  channel.onmessage = onProgress;
+  await invoke("app_update_install", { onProgress: channel });
+}
+
+/**
+ * The newer release for this platform. The signed updater is asked first
+ * where it exists; when it fails (e.g. a release without `latest.json`), the
+ * GitHub release is still announced with a download link.
+ */
+export async function findUpdate(
+  request: RequestUrl,
+  current: string,
+  signed: (() => Promise<AvailableUpdate | null>) | null = selfUpdating
+    ? checkSignedUpdate
+    : null,
+): Promise<AvailableUpdate | null> {
+  if (signed) {
+    try {
+      return await signed();
+    } catch (error) {
+      console.warn("Signed update check failed:", error);
+    }
+  }
+  const release = await checkForUpdate(request, current);
+  return release && { ...release, installable: false };
 }
 
 /** The newer release, or null when `current` is up to date. */

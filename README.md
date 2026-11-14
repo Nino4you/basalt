@@ -112,8 +112,9 @@ data in the browser, not in real files.
 Basalt is a **preview (0.3)** and not yet a complete replacement for Obsidian. The core is
 stable and tested, but some things are still missing:
 
-- no built-in sync (use a folder sync tool, see [docs/sync.md](docs/sync.md)) and no automatic
-  installation of updates (Settings → General can check for new releases),
+- no built-in sync (use a folder sync tool, see [docs/sync.md](docs/sync.md)); the desktop app
+  installs signed updates from Settings → General, Android updates are still a manual APK
+  download,
 - plugin compatibility only for selected plugins (see below),
 - backups of attachments have to be restored by hand (old backups are kept until you set a
   retention period in Settings → Files and links → Backups),

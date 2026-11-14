@@ -1,8 +1,9 @@
-import { beforeEach, expect, it } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import type { RequestUrl } from "../../src/compat/request";
 import {
   CHECK_INTERVAL,
   checkForUpdate,
+  findUpdate,
   latestRelease,
   RELEASE_API,
   RELEASE_PAGE,
@@ -63,4 +64,52 @@ it("checks automatically at most once a day", () => {
   expect(updateCheckDue(now)).toBe(true);
   expect(updateCheckDue(now + 1000)).toBe(false);
   expect(updateCheckDue(now + CHECK_INTERVAL)).toBe(true);
+});
+
+it("prefers the signed updater and falls back to the release page", async () => {
+  const release = {
+    tag_name: "v9.0.0",
+    html_url: "https://github.com/Nino4you/basalt/releases/tag/v9.0.0",
+    body: "",
+  };
+  const signed = {
+    version: "9.0.0",
+    notes: "Neu",
+    url: RELEASE_PAGE,
+    installable: true,
+  };
+
+  const first = github(release);
+  expect(await findUpdate(first.request, "0.3.0", async () => signed)).toBe(
+    signed,
+  );
+  expect(first.urls).toEqual([]);
+
+  const upToDate = github(release);
+  expect(await findUpdate(upToDate.request, "0.3.0", async () => null)).toBe(
+    null,
+  );
+  expect(upToDate.urls).toEqual([]);
+
+  // A release without latest.json: still announce it, but only as a download.
+  const fallback = github(release);
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  expect(
+    await findUpdate(fallback.request, "0.3.0", async () => {
+      throw new Error("Could not fetch a valid release JSON from the remote");
+    }),
+  ).toEqual({
+    version: "9.0.0",
+    url: "https://github.com/Nino4you/basalt/releases/tag/v9.0.0",
+    notes: "",
+    installable: false,
+  });
+  expect(fallback.urls).toEqual([RELEASE_API]);
+  warn.mockRestore();
+
+  // Android and the browser demo have no signed updater.
+  const announce = github(release);
+  expect((await findUpdate(announce.request, "0.3.0", null))?.installable).toBe(
+    false,
+  );
 });
