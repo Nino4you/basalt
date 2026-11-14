@@ -1940,6 +1940,36 @@ export class App {
   }
 
   /**
+   * Rewrites notes one by one through the store, like a link update: each
+   * replaced text is backed up and saved version-checked, and a failed note
+   * stays unchanged. `rewrite` returns null to leave a note alone.
+   */
+  async rewriteNotes(
+    paths: string[],
+    rewrite: (text: string, path: string) => string | null,
+  ): Promise<{ updated: string[]; failed: string[] }> {
+    const store = this.store;
+    const updated: string[] = [];
+    const failed: string[] = [];
+    if (!store) return { updated, failed };
+    for (const path of paths) {
+      try {
+        const note = await store.load(path);
+        if (store !== this.store) break;
+        const next = rewrite(note.text, path);
+        if (next === null || next === note.text) continue;
+        await this.replaceText(note, next);
+        this.index.setContent(path, next);
+        updated.push(path);
+      } catch (error) {
+        failed.push(path);
+        console.warn(error);
+      }
+    }
+    return { updated, failed };
+  }
+
+  /**
    * Creates a deleted document again. It is never written over an existing
    * file: a taken name gets a "(restored)" copy instead. Returns the path.
    */

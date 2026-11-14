@@ -968,13 +968,43 @@ body.hide-ribbon .sidebar-toggle-button.mod-inline {
 /* ── search ───────────────────────────────────────────────────────────────── */
 
 .search-row {
+  display: flex;
   flex: none;
+  align-items: center;
+  gap: 4px;
   padding: 8px 12px 4px;
+}
+.search-row[hidden] {
+  display: none;
+}
+.search-replace-row {
+  padding-top: 0;
 }
 .search-input-container {
   position: relative;
   display: flex;
+  flex: 1;
+  min-width: 0;
   align-items: center;
+}
+.search-replace-toggle.is-active,
+.search-match-case.is-active {
+  background: var(--background-modifier-active-hover);
+  color: var(--text-accent);
+}
+.search-replace-all {
+  flex: none;
+  height: 30px;
+  font-size: var(--font-ui-small);
+}
+.search-result-replace {
+  display: none;
+  padding: 2px;
+}
+.is-replacing .search-result-file-title:hover .search-result-replace,
+.is-replacing .search-result-file-title:focus-within .search-result-replace,
+body.is-touch .is-replacing .search-result-replace {
+  display: inline-flex;
 }
 .search-input-container > .svg-icon {
   position: absolute;
