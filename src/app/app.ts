@@ -11,6 +11,7 @@ import { attachmentKind, attachmentLink } from "../attachments";
 import { importAttachments } from "./attachment-import";
 import { autoCleanBackups } from "./backup-cleanup";
 import { addProperty } from "../editor/properties";
+import { insertFootnote } from "../editor/footnotes";
 import { emptyCanvas } from "../canvas/model";
 import { CanvasView } from "../canvas/view";
 import { TFile, TFolder } from "../compat/files";
@@ -4202,6 +4203,16 @@ export class App {
       run: () => {
         this.editor.focus();
         addProperty(this.editor.view);
+      },
+    });
+    add({
+      id: "insert-footnote",
+      name: t("Fußnote einfügen"),
+      icon: "footprints",
+      when: () => hasNote() && !this.active.reading,
+      run: () => {
+        this.editor.focus();
+        insertFootnote(this.editor.view);
       },
     });
     add({

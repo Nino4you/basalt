@@ -684,4 +684,6 @@ export const en = {
   "{files} konnten nicht geändert werden und sind unverändert.": "{files} could not be changed and are unchanged.",
   "„{term}“ {occurrences}-mal in {files} Dateien durch „{replacement}“ ersetzen? Jede geänderte Datei wird vorher gesichert.": "Replace “{term}” {occurrences} times in {files} files with “{replacement}”? Every changed file is backed up first.",
   "In dieser Datei ersetzen": "Replace in this file",
+  "Zurück zum Text": "Back to text",
+  "Fußnote einfügen": "Insert footnote",
 } as const;

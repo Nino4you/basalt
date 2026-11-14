@@ -1246,3 +1246,44 @@ body.is-touch .metadata-property-remove {
 .metadata-add-button:hover {
   color: var(--text-normal);
 }
+
+/* Footnotes (reading view: src/markdown.ts, editor: src/editor/footnotes.ts). */
+.footnote-ref {
+  font-size: 0.75em;
+  line-height: 0;
+}
+.footnote-ref a,
+.footnote-backref {
+  color: var(--text-accent);
+  text-decoration: none;
+}
+.footnotes {
+  margin-top: 2em;
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+.footnotes hr {
+  margin: 1em 0;
+}
+.footnotes ol {
+  padding-left: 1.5em;
+}
+.footnotes li p {
+  margin: 0.25em 0;
+}
+.footnotes .is-flashing,
+.footnote-ref.is-flashing,
+a.is-flashing {
+  border-radius: var(--radius-s);
+  background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.2);
+  transition: background 0.4s;
+}
+.cm-footnote-ref {
+  color: var(--text-accent);
+  font-size: 0.8em;
+  vertical-align: super;
+  line-height: 0;
+}
+.cm-footnote-def {
+  color: var(--text-muted);
+}

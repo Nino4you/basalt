@@ -39,6 +39,7 @@ import { insertLink, toggleTask, toggleWrap } from "./editor/commands";
 import { type CompletionHost, completionSources } from "./editor/complete";
 import { richPreview, finishRichSource } from "./editor/rich-preview";
 import { propertiesEditor, propertiesFacet } from "./editor/properties";
+import { footnoteMarks } from "./editor/footnotes";
 import {
   EditorSuggestBridge,
   type EditorSuggestHost,
@@ -183,6 +184,7 @@ export class MarkdownEditor {
       livePreview,
       richPreview,
       propertiesEditor,
+      footnoteMarks,
       Prec.highest(keymap.of([{ key: "Escape", run: finishRichSource }])),
       this.pluginSurfaces.of(this.surfaceExtensions),
       linkClicks,
