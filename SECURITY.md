@@ -72,6 +72,11 @@ will get a response once the report has been reviewed.
   through the plugin config view, with the usual version checks and backups, and never enables
   the plugin. `basalt-source.json` there records the repository for update checks. Uninstalling
   deletes the plugin's files (backed up to `.basalt/trash/`); the empty folder stays.
+- Themes (`Basalt/Config/themes/<name>/theme.css`) and CSS snippets (`Basalt/Config/snippets/`)
+  load only when chosen in the settings (stored in `Basalt/Config/appearance.json`, like
+  Obsidian). They are plain `<style>` elements: CSS runs no code, and the CSP above still limits
+  what `url()` can load (no remote images or fonts). A theme can still make text unreadable;
+  choosing "Basalt (default)" removes it.
 - Plugin paths under `.obsidian/plugins/<id>` map to `Basalt/Plugins/<id>`. Like `.obsidian` in
   Obsidian, `Basalt/Plugins` is not vault content for plugins: it is missing from `getFiles()`
   and vault events and is reachable only through the adapter and the loader. This keeps sync

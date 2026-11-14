@@ -10,6 +10,12 @@ import {
 import { attachmentKind, attachmentLink } from "../attachments";
 import { importAttachments } from "./attachment-import";
 import { autoCleanBackups } from "./backup-cleanup";
+import {
+  readAppearance,
+  VaultStyles,
+  writeAppearance,
+  type Appearance,
+} from "./vault-styles";
 import { addProperty } from "../editor/properties";
 import { insertFootnote } from "../editor/footnotes";
 import { foldAll, toggleFold, unfoldAll } from "@codemirror/language";
@@ -197,6 +203,9 @@ export class App {
   vault: VaultInfo | null = null;
   store: NoteStore | null = null;
   compatibility: CompatibilitySession | null = null;
+  /** Theme and CSS snippets of the open vault (native only). */
+  readonly vaultStyles = new VaultStyles();
+  appearance: Appearance = { cssTheme: "", enabledCssSnippets: [] };
   /** Editor groups; the focused one hosts the live editor and views. */
   groups: Group[] = [];
   group!: Group;
@@ -469,6 +478,8 @@ export class App {
     const previous = this.compatibility;
     this.editor.releasePluginBlocks();
     this.compatibility = null;
+    this.vaultStyles.clear();
+    this.appearance = { cssTheme: "", enabledCssSnippets: [] };
     // The old session must have released the shared editor before a new one binds it.
     if (previous) await previous.dispose().catch((error) => this.report(error));
     if (epoch !== this.epoch) return;
@@ -615,6 +626,7 @@ export class App {
         );
       }
       this.bindPluginWorkspace(session);
+      void this.applyVaultStyles().catch((error) => this.report(error));
       this.syncVisibleFiles();
       this.editor.refreshPluginBlocks();
       // The note was rendered before the plugins existed; refresh that view
@@ -638,6 +650,31 @@ export class App {
     } catch (error) {
       this.report(error);
     }
+  }
+
+  /** Reads appearance.json and applies the vault's theme and snippets. */
+  async applyVaultStyles(): Promise<void> {
+    const session = this.compatibility;
+    if (!session) return;
+    const appearance = await readAppearance(session.configVault);
+    if (session !== this.compatibility) return;
+    this.appearance = appearance;
+    const failed = await this.vaultStyles.apply(session.configVault, appearance);
+    if (failed.length)
+      notify(
+        t("CSS konnte nicht geladen werden: {names}", { names: failed.join(", ") }),
+        true,
+      );
+  }
+
+  /** Saves a new theme/snippet choice to appearance.json and applies it. */
+  async setAppearance(next: Appearance): Promise<void> {
+    const session = this.compatibility;
+    if (!session) return;
+    await writeAppearance(session.configVault, next);
+    if (session !== this.compatibility) return;
+    this.appearance = next;
+    await this.vaultStyles.apply(session.configVault, next);
   }
 
   /** Plugin navigation and explorer navigation share the same real views/leaves. */

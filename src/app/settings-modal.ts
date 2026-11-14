@@ -12,6 +12,13 @@ import {
 } from "../ui/dom";
 import { confirmAction, Modal } from "../ui/modal";
 import {
+  listSnippets,
+  listThemes,
+  SNIPPET_FOLDER,
+  THEME_FOLDER,
+  type Appearance,
+} from "./vault-styles";
+import {
   cleanBackups,
   formatBytes,
   type CleanupResult,
@@ -334,6 +341,95 @@ function backupSettings(app: App, content: HTMLElement): void {
       },
     }),
   );
+}
+
+/** Themes and CSS snippets from Basalt/Config (Obsidian's .obsidian folder). */
+function vaultStyleSettings(app: App, content: HTMLElement): void {
+  const section = h("div", "vault-style-settings");
+  content.append(section);
+  const render = () => {
+    section.replaceChildren();
+    const session = app.compatibility;
+    heading(section, t("Themes und CSS-Snippets"));
+    if (!session) {
+      section.append(
+        h("p", {
+          class: "setting-item-description settings-paragraph",
+          text: t("Themes und CSS-Snippets aus dem Vault gibt es nur in der nativen App."),
+        }),
+      );
+      return;
+    }
+    const vault = session.configVault;
+    const appearance = app.appearance;
+    const save = (next: Appearance) =>
+      void app.setAppearance(next).then(render, (error) => {
+        app.report(error);
+        render();
+      });
+    const themes = listThemes(vault);
+    dropdown(
+      row(
+        section,
+        t("Theme"),
+        t("Ordner mit theme.css unter {folder}/.", { folder: THEME_FOLDER }),
+      ),
+      t("Theme"),
+      [
+        ["", t("Basalt (Standard)")],
+        ...themes.map((name) => [name, name] as [string, string]),
+        ...(appearance.cssTheme && !themes.includes(appearance.cssTheme)
+          ? [[appearance.cssTheme, t("{name} (fehlt)", { name: appearance.cssTheme })] as [string, string]]
+          : []),
+      ],
+      appearance.cssTheme,
+      (cssTheme) => save({ ...appearance, cssTheme }),
+    );
+    const snippets = listSnippets(vault);
+    const actions = row(
+      section,
+      t("CSS-Snippets"),
+      t("CSS-Dateien unter {folder}/ ändern das Aussehen. Sie werden nach dem Theme geladen.", {
+        folder: SNIPPET_FOLDER,
+      }),
+    );
+    actions.control.append(
+      h(
+        "button",
+        {
+          class: "clickable-icon",
+          label: t("Neu laden"),
+          attrs: { type: "button" },
+          on: {
+            click: () =>
+              void session.configVault
+                .refresh()
+                .then(() => app.applyVaultStyles())
+                .then(render, (error) => app.report(error)),
+          },
+        },
+        icon("refresh-cw", 16),
+      ),
+    );
+    if (!snippets.length)
+      section.append(
+        h("p", { class: "pane-empty", text: t("Keine Snippets gefunden.") }),
+      );
+    for (const name of snippets)
+      toggle(
+        row(section, name),
+        t("Snippet {name}", { name }),
+        appearance.enabledCssSnippets.includes(name),
+        (enabled) =>
+          save({
+            ...appearance,
+            enabledCssSnippets: enabled
+              ? [...appearance.enabledCssSnippets, name]
+              : appearance.enabledCssSnippets.filter((entry) => entry !== name),
+          }),
+      );
+  };
+  render();
 }
 
 type CoreTab =
@@ -815,6 +911,7 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         settings.set("fontSize", Number(slider.value));
       });
       size.control.append(value, slider);
+      vaultStyleSettings(app, content);
       heading(content, t("Oberfläche"));
       toggle(
         row(
