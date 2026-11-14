@@ -47,6 +47,22 @@ The script never overwrites existing keys and refuses a target folder inside the
 Afterwards, back up the printed folder (it contains the keystore, the OpenPGP keyring with its
 revocation certificate and `FINGERPRINTS.txt`) and continue with step 4.
 
+### Changing the name or email on the OpenPGP key
+
+The user ID of the OpenPGP key is public: it is part of `basalt-release-key.asc` in every
+release. To replace it, for example with a GitHub noreply address, run from a checkout:
+
+```sh
+tools/release_key_set_uid.sh 1234+name@users.noreply.github.com   # reads ~/basalt-release-keys
+```
+
+The key and its fingerprint stay the same, so earlier signatures and the README stay valid. The
+script rebuilds the keyring with only the new user ID (the old keyring is kept as
+`gnupg.old-<time>` until you delete it), writes a new `basalt-release-key.asc` and replaces the
+`RELEASE_GPG_PRIVATE_KEY` secret. Copies of the key that were already published keep the old
+user ID; replace the file in such a release with the `gh release upload … --clobber` command the
+script prints.
+
 ### Existing keys for a new repository
 
 When the repository moves or the secrets are lost, store the **existing** keys again instead of
