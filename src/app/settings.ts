@@ -42,6 +42,8 @@ export interface Settings {
   folding: boolean;
   /** Ask GitHub once a day whether a newer Basalt release exists. */
   updateCheck: boolean;
+  /** Vim keybindings in the editor. */
+  vimMode: boolean;
 }
 
 export const DEFAULT_ACCENT = "#8a5cf5";
@@ -71,6 +73,7 @@ export const defaults: Settings = {
   propertiesInDocument: true,
   folding: true,
   updateCheck: false,
+  vimMode: false,
 };
 
 const KEY = "basalt-settings";

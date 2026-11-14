@@ -122,6 +122,8 @@ export interface EditorOptions {
   properties: boolean;
   /** Headings, lists and blocks can be folded from a gutter arrow. */
   folding: boolean;
+  /** Vim keybindings (loaded on first use). */
+  vim: boolean;
 }
 
 /**
@@ -141,6 +143,10 @@ export class MarkdownEditor {
   private readonly gutter = new Compartment();
   private readonly attributes = new Compartment();
   private readonly pairing = new Compartment();
+  private readonly vimMode = new Compartment();
+  /** The Vim extension once its lazy chunk has loaded. */
+  private vimExtension: Extension | null = null;
+  private vimLoading: Promise<void> | null = null;
   private pluginList: Extension[] = [];
   private readonly suggestBridge: EditorSuggestBridge;
   private isEditable = false;
@@ -152,6 +158,7 @@ export class MarkdownEditor {
     autoPair: true,
     properties: true,
     folding: true,
+    vim: false,
   };
   private suppress = false;
   private readonly blockHost: CodeBlockHost;
@@ -330,6 +337,8 @@ export class MarkdownEditor {
     return EditorState.create({
       doc: text,
       extensions: [
+        // Vim must see keys before every other keymap.
+        this.vimMode.of(this.vimEnabled()),
         this.base,
         this.editable.of(EditorView.editable.of(this.isEditable)),
         this.pluginExtensions.of(this.pluginList),
@@ -352,6 +361,7 @@ export class MarkdownEditor {
         this.gutter.reconfigure(this.gutterExtension()),
         this.attributes.reconfigure(this.attributeExtension()),
         this.pairing.reconfigure(this.options.autoPair ? closeBrackets() : []),
+        this.vimMode.reconfigure(this.vimEnabled()),
         setInlineTitle.of(this.title),
         refreshPluginBlocks.of(null),
       ],
@@ -396,7 +406,35 @@ export class MarkdownEditor {
 
   configure(options: Partial<EditorOptions>): void {
     this.options = { ...this.options, ...options };
+    if (this.options.vim && !this.vimExtension) void this.loadVim();
     this.sync();
+  }
+
+  private vimEnabled(): Extension {
+    return this.options.vim && this.vimExtension
+      ? Prec.highest(this.vimExtension)
+      : [];
+  }
+
+  /** Loads the Vim keybindings in their own chunk, only for people who use them. */
+  private loadVim(): Promise<void> {
+    this.vimLoading ??= import("@replit/codemirror-vim")
+      .then(({ vim, Vim }) => {
+        // `:w` saves like Ctrl+S.
+        Vim.defineEx("write", "w", () => this.host.save());
+        this.vimExtension = vim({ status: true });
+        this.sync();
+      })
+      .catch((error) => {
+        this.vimLoading = null;
+        console.error(t("Vim-Modus konnte nicht geladen werden"), error);
+      });
+    return this.vimLoading;
+  }
+
+  /** Resolves once the Vim keybindings are active (tests and settings). */
+  async vimReady(): Promise<void> {
+    if (this.options.vim) await this.loadVim();
   }
 
   setTitle(title: string | null): void {

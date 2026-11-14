@@ -1328,3 +1328,27 @@ body.is-touch .cm-fold-marker {
 .cm-editor .cm-lineNumbers + .cm-foldGutter {
   margin-left: 0;
 }
+
+/* Vim mode (src/editor.ts): status line with the mode and the `:` command line. */
+.cm-editor .cm-vim-panel {
+  padding: 2px 12px;
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+}
+.cm-editor .cm-vim-panel input {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  font: inherit;
+}
+.cm-editor .cm-fat-cursor {
+  background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.6) !important;
+}
+.cm-editor:not(.cm-focused) .cm-fat-cursor {
+  outline: 1px solid hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.6);
+  background: transparent !important;
+}

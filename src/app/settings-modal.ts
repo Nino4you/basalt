@@ -745,6 +745,16 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
       toggle(
         row(
           content,
+          t("Vim-Tastenbelegung"),
+          t("Bearbeiten mit Vim-Befehlen; :w speichert."),
+        ),
+        t("Vim-Tastenbelegung"),
+        settings.get("vimMode"),
+        set("vimMode"),
+      );
+      toggle(
+        row(
+          content,
           t("Klammern automatisch schließen"),
           t("Ergänzt schließende Klammern und Anführungszeichen."),
         ),

@@ -2885,6 +2885,7 @@ export class App {
       autoPair: this.settings.get("autoPair"),
       properties: this.settings.get("propertiesInDocument"),
       folding: this.settings.get("folding"),
+      vim: this.settings.get("vimMode"),
     };
   }
 

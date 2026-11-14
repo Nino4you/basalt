@@ -734,4 +734,7 @@ export const en = {
   "Automatisch nach Updates suchen": "Check for updates automatically",
   "Fragt einmal am Tag bei GitHub nach einer neuen Version. Dabei wird nichts über dich oder deine Notizen gesendet. Installiert wird nie automatisch.": "Asks GitHub once a day for a new version. Nothing about you or your notes is sent. Nothing is ever installed automatically.",
   "Jetzt prüfen": "Check now",
+  "Vim-Modus konnte nicht geladen werden": "Vim mode could not be loaded",
+  "Vim-Tastenbelegung": "Vim key bindings",
+  "Bearbeiten mit Vim-Befehlen; :w speichert.": "Edit with Vim commands; :w saves.",
 } as const;
