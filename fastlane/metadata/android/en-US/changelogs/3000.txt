@@ -1,0 +1,1 @@
+Third preview: properties, footnotes, folding, search and replace, file recovery, attachments by paste and drop, sync conflict help, print and HTML export, themes and CSS snippets, a community plugin catalog and optional update checks.

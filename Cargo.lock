@@ -136,14 +136,14 @@ dependencies = [
 
 [[package]]
 name = "vault-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "vault-core",
 ]
 
 [[package]]
 name = "vault-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "cap-std",
 ]

@@ -1,0 +1,1 @@
+Dritte Vorschau: Eigenschaften, Fußnoten, Einklappen, Suchen und Ersetzen, Dateiwiederherstellung, Anhänge per Einfügen und Ziehen, Hilfe bei Sync-Konflikten, Druck und HTML-Export, Themes und CSS-Snippets, ein Katalog für Community-Plugins und optionale Update-Prüfung.
