@@ -68,7 +68,8 @@ export const defaults: Settings = {
   dailyTemplate: "",
   templateFolder: "",
   attachmentFolder: "/",
-  backupMaxAgeDays: 90,
+  // Off by default: deleting backups is an explicit choice.
+  backupMaxAgeDays: 0,
   backupMaxVersions: 0,
   propertiesInDocument: true,
   folding: true,

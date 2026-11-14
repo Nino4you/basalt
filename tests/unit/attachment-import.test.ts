@@ -17,6 +17,11 @@ import {
 import { FileManager } from "../../src/compat/file-manager";
 import { memoryVault } from "../helpers/vault-store";
 
+// jsdom has no layout. CodeMirror measures in animation frames, which can run
+// during any test of this file, and posAtCoords needs these for drops.
+Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList;
+Range.prototype.getBoundingClientRect ??= () => new DOMRect();
+
 afterEach(() => document.body.replaceChildren());
 
 it("resolves the attachment folder setting like Obsidian", () => {
@@ -175,9 +180,6 @@ it("pastes files as links but leaves pasted text alone", async () => {
 });
 
 it("drops explorer rows as wiki links", () => {
-  // jsdom has no layout; the drop lands wherever posAtCoords can measure.
-  Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList;
-  Range.prototype.getBoundingClientRect ??= () => new DOMRect();
   const view = editor({ linkTo: (path) => `[[${path.replace(/\.md$/, "")}]]` });
   const event = new Event("drop", { bubbles: true, cancelable: true });
   Object.defineProperty(event, "dataTransfer", {

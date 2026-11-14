@@ -114,8 +114,8 @@ stable and tested, but some things are still missing:
 - no built-in sync (use a folder sync tool, see [docs/sync.md](docs/sync.md)) and no automatic
   installation of updates (Settings → General can check for new releases),
 - plugin compatibility only for selected plugins (see below),
-- backups of attachments have to be restored by hand (old backups are removed after 90 days by
-  default; Settings → Files and links → Backups),
+- backups of attachments have to be restored by hand (old backups are kept until you set a
+  retention period in Settings → Files and links → Backups),
 - not in F-Droid or Google Play yet, only direct downloads (the store listing is prepared, see
   [docs/distribution.md](docs/distribution.md)).
 
