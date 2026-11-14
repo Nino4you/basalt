@@ -11,7 +11,7 @@ Obsidian vaults and selected Obsidian plugins.
 
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-blue.svg)](LICENSE)
 ![Platforms: Linux | Android](https://img.shields.io/badge/Platforms-Linux%20%7C%20Android-informational)
-![Status: preview](https://img.shields.io/badge/Status-Preview%200.3-orange)
+![Status: preview](https://img.shields.io/badge/Status-Preview%200.4-orange)
 
 [Website](https://nino4you.github.io/basalt/) · [Live demo](https://nino4you.github.io/basalt/demo/) ·
 [Features](#features) · [Installation](#installation) · [Plugins](#plugins) ·
@@ -113,7 +113,7 @@ data in the browser, not in real files.
 
 ## Status
 
-Basalt is a **preview (0.3)** and not yet a complete replacement for Obsidian. The core is
+Basalt is a **preview (0.4)** and not yet a complete replacement for Obsidian. The core is
 stable and tested, but some things are still missing:
 
 - no built-in sync (use a folder sync tool, see [docs/sync.md](docs/sync.md)); the desktop app
