@@ -763,4 +763,13 @@ export const en = {
   "Vim-Modus konnte nicht geladen werden": "Vim mode could not be loaded",
   "Vim-Tastenbelegung": "Vim key bindings",
   "Bearbeiten mit Vim-Befehlen; :w speichert.": "Edit with Vim commands; :w saves.",
+  "Block „{name}“ nicht gefunden.": "Block “{name}” not found.",
+  "Abschnitt „{name}“ nicht gefunden.": "Section “{name}” not found.",
+  "Einbettung bearbeiten": "Edit embed",
+  "Begriffe in derselben Zeile, z. B. line:(a b)": "terms on the same line, e.g. line:(a b)",
+  "Begriffe im selben Abschnitt": "terms in the same heading section",
+  "in Aufgaben suchen": "search in tasks",
+  "in offenen Aufgaben suchen": "search in open tasks",
+  "in erledigten Aufgaben suchen": "search in completed tasks",
+  "regulärer Ausdruck": "regular expression",
 } as const;
