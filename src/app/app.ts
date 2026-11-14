@@ -118,12 +118,6 @@ import { openCommandPalette, openQuickSwitcher } from "./switcher";
 import { openFileRecovery } from "./file-recovery";
 import { LinkUpdate } from "./link-update";
 import { VaultIndex } from "./vault-index";
-import {
-  namedWorkspace,
-  WorkspaceLibrary,
-  type WorkspaceTabs,
-} from "./workspaces";
-import { openWorkspaceLoader, openWorkspaces } from "./workspaces-dialog";
 import { openPopout, popoutPath, SaveBroadcast } from "./popout";
 
 export interface Tab {
@@ -239,8 +233,6 @@ export class App {
   split: SplitNode = { group: 0 };
   ws: SavedWorkspace = emptyWorkspace();
   layout: Layout;
-  /** Named workspaces of the open vault. */
-  workspaces: WorkspaceLibrary | null = null;
   /**
    * The note this window was popped out for, or null in the main window. A
    * pop-out shows one tab without sidebars, runs no plugins and never writes
@@ -534,7 +526,6 @@ export class App {
     this.ws = this.popout
       ? { ...emptyWorkspace(), tabs: [{ path: this.popout, reading: false }] }
       : loadWorkspace(next.id);
-    this.workspaces = this.popout ? null : new WorkspaceLibrary(next.id);
     this.shell.vaultName.textContent = next.name;
     this.shell.environment.textContent = native
       ? t("{platform} · lokal", { platform: next.platform === "android" ? "Android" : "Linux" })
@@ -3775,37 +3766,6 @@ export class App {
     }
   }
 
-  /** Saves the open tabs, splits and sidebars under `name` (replacing it). */
-  saveNamedWorkspace(name: string): void {
-    if (!this.workspaces) return;
-    this.workspaces.save(
-      namedWorkspace(name, this.captureTabs(), this.layout),
-    );
-  }
-
-  /**
-   * Replaces the open tabs and the sidebar layout with a saved workspace.
-   * Every open buffer is saved first; if that fails nothing changes.
-   */
-  async loadNamedWorkspace(name: string): Promise<void> {
-    const library = this.workspaces;
-    const saved = library?.get(name);
-    if (!library || !saved || !this.vault) return;
-    await saveBeforeLeaving(this);
-    if (library !== this.workspaces) return;
-    this.saveWorkspace.cancel();
-    this.unmountPluginView();
-    this.park();
-    this.applyTabs(saved.tabs);
-    if (saved.layout) {
-      this.layout = parseLayout(saved.layout);
-      this.applyLayout();
-    }
-    await this.restoreTabs(this.epoch);
-    library.setActive(saved.name);
-    this.writeWorkspace();
-  }
-
   /** Shows `tab` and opens it a second time in a new group on `side`. */
   private splitTab(tab: Tab, side: SplitSide): void {
     void this.activate(tab).then(() => {
@@ -4251,45 +4211,6 @@ export class App {
       run: () => void this.newTab(),
     });
     add({
-      id: "workspaces",
-      name: t("Workspaces verwalten"),
-      icon: "layout-template",
-      when: () => !!this.workspaces,
-      run: () => {
-        closeMenu();
-        openWorkspaces(this);
-      },
-    });
-    add({
-      id: "workspace-load",
-      name: t("Workspace laden"),
-      icon: "layout-template",
-      when: () => !!this.workspaces,
-      run: () => {
-        closeMenu();
-        openWorkspaceLoader(this);
-      },
-    });
-    add({
-      id: "workspace-save",
-      name: t("Aktuellen Workspace speichern"),
-      icon: "save",
-      when: () => !!this.workspaces,
-      run: () => {
-        const name = this.workspaces?.active;
-        if (!name) {
-          openWorkspaces(this);
-          return;
-        }
-        try {
-          this.saveNamedWorkspace(name);
-          notify(t("Workspace „{name}“ gespeichert.", { name }));
-        } catch (error) {
-          this.report(error);
-        }
-      },
-    });
-    add({
       id: "open-in-new-window",
       name: t("In neuem Fenster öffnen"),
       icon: "app-window",
@@ -4691,37 +4612,26 @@ export class App {
 
   // ── persistence ───────────────────────────────────────────────────────────
 
-  /** The open tabs and splits, in the shape `restoreTabs` reads. */
-  private captureTabs(): WorkspaceTabs {
+  private writeWorkspace(): void {
+    if (!this.vault || this.popout) return;
     const groups = this.groups.map((group) => ({
       tabs: group.tabs.map((tab) => ({ path: tab.path, reading: tab.reading })),
       active: group.tabs.indexOf(group.active),
     }));
     const focused = this.groups.indexOf(this.group);
-    const result: WorkspaceTabs = {
-      tabs: groups[focused].tabs,
-      active: groups[focused].active,
-    };
+    this.ws.tabs = groups[focused].tabs;
+    this.ws.active = groups[focused].active;
     if (groups.length > 1) {
-      result.groups = groups;
-      result.split = mapGroups(this.split, (id) =>
+      this.ws.groups = groups;
+      this.ws.split = mapGroups(this.split, (id) =>
         this.groups.findIndex((group) => group.id === id),
       );
-      result.group = focused;
+      this.ws.group = focused;
+    } else {
+      delete this.ws.groups;
+      delete this.ws.split;
+      delete this.ws.group;
     }
-    return result;
-  }
-
-  private applyTabs(tabs: WorkspaceTabs): void {
-    delete this.ws.groups;
-    delete this.ws.split;
-    delete this.ws.group;
-    Object.assign(this.ws, tabs);
-  }
-
-  private writeWorkspace(): void {
-    if (!this.vault || this.popout) return;
-    this.applyTabs(this.captureTabs());
     try {
       localStorage.setItem(
         workspaceKey(this.vault.id),
@@ -4807,15 +4717,6 @@ function popoutLayout(): Layout {
 }
 
 function loadLayout(): Layout {
-  try {
-    return parseLayout(JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? "null"));
-  } catch {
-    return parseLayout(null);
-  }
-}
-
-/** Validates a stored layout; anything missing or invalid takes the default. */
-function parseLayout(raw: unknown): Layout {
   const layout: Layout = {
     leftWidth: 280,
     rightWidth: 300,
@@ -4828,6 +4729,7 @@ function parseLayout(raw: unknown): Layout {
     closedPanels: [],
   };
   try {
+    const raw: unknown = JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? "null");
     if (raw && typeof raw === "object") {
       const value = raw as Partial<Layout> & {
         leftTab?: unknown;

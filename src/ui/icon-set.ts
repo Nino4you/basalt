@@ -128,7 +128,6 @@ import {
   ZoomIn,
   ZoomOut,
   AppWindow,
-  LayoutTemplate,
 } from "lucide";
 
 /**
@@ -141,7 +140,6 @@ import {
  */
 export const hostIcons: Record<string, IconNode> = {
   AppWindow,
-  LayoutTemplate,
   ArrowLeft,
   ArrowLeftRight,
   ArrowRight,
