@@ -12,6 +12,7 @@ import { importAttachments } from "./attachment-import";
 import { autoCleanBackups } from "./backup-cleanup";
 import { addProperty } from "../editor/properties";
 import { insertFootnote } from "../editor/footnotes";
+import { foldAll, toggleFold, unfoldAll } from "@codemirror/language";
 import { emptyCanvas } from "../canvas/model";
 import { CanvasView } from "../canvas/view";
 import { TFile, TFolder } from "../compat/files";
@@ -2751,6 +2752,7 @@ export class App {
       spellcheck: this.settings.get("spellcheck"),
       autoPair: this.settings.get("autoPair"),
       properties: this.settings.get("propertiesInDocument"),
+      folding: this.settings.get("folding"),
     };
   }
 
@@ -4204,6 +4206,31 @@ export class App {
         this.editor.focus();
         addProperty(this.editor.view);
       },
+    });
+    const fold = (command: (view: EditorView) => boolean) => () => {
+      this.editor.focus();
+      command(this.editor.view);
+    };
+    add({
+      id: "toggle-fold",
+      name: t("Einklappen umschalten"),
+      icon: "chevrons-down-up",
+      when: () => hasNote() && !this.active.reading,
+      run: fold(toggleFold),
+    });
+    add({
+      id: "fold-all",
+      name: t("Alle Überschriften und Listen einklappen"),
+      icon: "chevrons-down-up",
+      when: () => hasNote() && !this.active.reading,
+      run: fold(foldAll),
+    });
+    add({
+      id: "unfold-all",
+      name: t("Alle Überschriften und Listen ausklappen"),
+      icon: "chevrons-up-down",
+      when: () => hasNote() && !this.active.reading,
+      run: fold(unfoldAll),
     });
     add({
       id: "insert-footnote",

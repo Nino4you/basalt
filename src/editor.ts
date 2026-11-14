@@ -12,7 +12,13 @@ import {
   indentWithTab,
 } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { indentOnInput, syntaxHighlighting } from "@codemirror/language";
+import {
+  codeFolding,
+  foldGutter,
+  foldKeymap,
+  indentOnInput,
+  syntaxHighlighting,
+} from "@codemirror/language";
 import {
   highlightSelectionMatches,
   search,
@@ -27,6 +33,7 @@ import {
   lineNumbers,
 } from "@codemirror/view";
 import { Editor } from "./compat/editor-adapter";
+import { icon } from "./ui/dom";
 import { EditorExtensionRegistry } from "./compat/editor-extensions";
 import type { PluginEmbed } from "./compat/embeds";
 import { embedHost, pluginEmbeds } from "./editor/plugin-embeds";
@@ -113,6 +120,8 @@ export interface EditorOptions {
   autoPair: boolean;
   /** Live preview shows frontmatter as editable properties. */
   properties: boolean;
+  /** Headings, lists and blocks can be folded from a gutter arrow. */
+  folding: boolean;
 }
 
 /**
@@ -142,6 +151,7 @@ export class MarkdownEditor {
     spellcheck: true,
     autoPair: true,
     properties: true,
+    folding: true,
   };
   private suppress = false;
   private readonly blockHost: CodeBlockHost;
@@ -175,6 +185,17 @@ export class MarkdownEditor {
       indentOnInput(),
       highlightSelectionMatches({ minSelectionLength: 2 }),
       search({ top: true }),
+      codeFolding({
+        placeholderDOM: (_view, onclick) => {
+          const marker = document.createElement("span");
+          marker.className = "cm-foldPlaceholder";
+          marker.textContent = "…";
+          marker.title = t("Ausklappen");
+          marker.setAttribute("role", "button");
+          marker.addEventListener("click", onclick);
+          return marker;
+        },
+      }),
       EditorView.lineWrapping,
       EditorState.tabSize.of(4),
       EditorState.phrases.of(PHRASES),
@@ -213,6 +234,7 @@ export class MarkdownEditor {
         ...defaultKeymap,
         ...historyKeymap,
         ...searchKeymap,
+        ...foldKeymap,
         indentWithTab,
       ]),
       EditorView.updateListener.of((update) => {
@@ -271,6 +293,23 @@ export class MarkdownEditor {
       document.documentElement.style.setProperty("--list-ch", `${width}px`);
   }
 
+  private gutterExtension(): Extension {
+    return [
+      this.options.lineNumbers ? lineNumbers() : [],
+      this.options.folding
+        ? foldGutter({
+            markerDOM: (open) => {
+              const marker = document.createElement("span");
+              marker.className = `cm-fold-marker${open ? "" : " is-folded"}`;
+              marker.title = open ? t("Einklappen") : t("Ausklappen");
+              marker.append(icon("chevron-down", 14));
+              return marker;
+            },
+          })
+        : [],
+    ];
+  }
+
   private modeExtension(): Extension {
     return [
       renderedFacet.of(this.options.livePreview),
@@ -295,7 +334,7 @@ export class MarkdownEditor {
         this.editable.of(EditorView.editable.of(this.isEditable)),
         this.pluginExtensions.of(this.pluginList),
         this.mode.of(this.modeExtension()),
-        this.gutter.of(this.options.lineNumbers ? lineNumbers() : []),
+        this.gutter.of(this.gutterExtension()),
         this.attributes.of(this.attributeExtension()),
         this.pairing.of(this.options.autoPair ? closeBrackets() : []),
       ],
@@ -310,7 +349,7 @@ export class MarkdownEditor {
         this.pluginExtensions.reconfigure(this.pluginList),
         this.pluginSurfaces.reconfigure(this.surfaceExtensions),
         this.mode.reconfigure(this.modeExtension()),
-        this.gutter.reconfigure(this.options.lineNumbers ? lineNumbers() : []),
+        this.gutter.reconfigure(this.gutterExtension()),
         this.attributes.reconfigure(this.attributeExtension()),
         this.pairing.reconfigure(this.options.autoPair ? closeBrackets() : []),
         setInlineTitle.of(this.title),

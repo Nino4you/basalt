@@ -580,6 +580,16 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         settings.get("propertiesInDocument"),
         set("propertiesInDocument"),
       );
+      toggle(
+        row(
+          content,
+          t("Einklappen"),
+          t("Pfeile am Rand klappen Abschnitte unter Überschriften, Listen und Blöcke ein."),
+        ),
+        t("Einklappen"),
+        settings.get("folding"),
+        set("folding"),
+      );
       heading(content, t("Verhalten"));
       toggle(
         row(content, t("Rechtschreibprüfung"), t("Nutzt die Prüfung des Systems.")),

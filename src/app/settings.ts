@@ -38,6 +38,8 @@ export interface Settings {
   backupMaxVersions: number;
   /** Live preview shows frontmatter as editable properties instead of YAML. */
   propertiesInDocument: boolean;
+  /** Fold arrows for headings, lists and blocks. */
+  folding: boolean;
 }
 
 export const DEFAULT_ACCENT = "#8a5cf5";
@@ -65,6 +67,7 @@ export const defaults: Settings = {
   backupMaxAgeDays: 90,
   backupMaxVersions: 0,
   propertiesInDocument: true,
+  folding: true,
 };
 
 const KEY = "basalt-settings";

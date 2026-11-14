@@ -1287,3 +1287,44 @@ a.is-flashing {
 .cm-footnote-def {
   color: var(--text-muted);
 }
+
+/* Folding (src/editor.ts): arrows sit in the margin and do not move the text. */
+.cm-editor .cm-foldGutter {
+  width: 20px;
+  margin-left: -20px;
+}
+.cm-editor .cm-foldGutter .cm-gutterElement {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cm-fold-marker {
+  display: inline-flex;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.cm-fold-marker.is-folded {
+  opacity: 1;
+  transform: rotate(-90deg);
+}
+.cm-editor:hover .cm-fold-marker,
+body.is-touch .cm-fold-marker {
+  opacity: 1;
+}
+.cm-fold-marker:hover {
+  color: var(--text-normal);
+}
+.cm-editor .cm-foldPlaceholder {
+  margin: 0 4px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.cm-editor .cm-lineNumbers + .cm-foldGutter {
+  margin-left: 0;
+}

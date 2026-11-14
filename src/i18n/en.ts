@@ -686,4 +686,10 @@ export const en = {
   "In dieser Datei ersetzen": "Replace in this file",
   "Zurück zum Text": "Back to text",
   "Fußnote einfügen": "Insert footnote",
+  "Ausklappen": "Unfold",
+  "Einklappen": "Fold",
+  "Einklappen umschalten": "Toggle fold",
+  "Alle Überschriften und Listen einklappen": "Fold all headings and lists",
+  "Alle Überschriften und Listen ausklappen": "Unfold all headings and lists",
+  "Pfeile am Rand klappen Abschnitte unter Überschriften, Listen und Blöcke ein.": "Arrows in the margin fold sections under headings, lists and blocks.",
 } as const;
