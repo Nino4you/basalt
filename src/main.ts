@@ -4,6 +4,7 @@ import "./styles/components.css";
 import "./styles/canvas.css";
 import "./styles/graph.css";
 import "./styles/recovery.css";
+import "./styles/plugin-catalog.css";
 import { App } from "./app/app";
 import { installAndroidInsets } from "./ui/android-insets";
 
