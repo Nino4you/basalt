@@ -1121,3 +1121,128 @@ body.is-readable-line-width .markdown-preview-sizer {
 .pdf-page { position: relative; margin: 0 auto; background: white; color: black; }
 .pdf-page canvas { display: block; }
 .pdf-embed .pdf-frame { display: flex; flex-direction: column; }
+
+/* Properties editor in live preview (src/editor/properties.ts). */
+.cm-properties {
+  margin: 0 0 1em;
+  font-family: var(--font-interface);
+  white-space: normal;
+}
+.cm-properties .metadata-property {
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0;
+  border-radius: var(--radius-s);
+}
+.cm-properties .metadata-property:hover,
+.cm-properties .metadata-property:focus-within {
+  background: var(--background-modifier-hover);
+}
+.cm-properties .metadata-property-key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 34%;
+  max-width: 180px;
+  padding-left: 4px;
+}
+.metadata-property-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-faint);
+}
+.cm-properties input.metadata-property-key-input,
+.cm-properties input.metadata-input,
+.cm-properties input.multi-select-input {
+  width: 100%;
+  min-width: 0;
+  height: 26px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+}
+.cm-properties input.metadata-property-key-input {
+  color: var(--text-muted);
+}
+.cm-properties input:focus {
+  outline: 1px solid var(--interactive-accent);
+  outline-offset: -1px;
+  border-radius: var(--radius-s);
+}
+.cm-properties .metadata-property-value {
+  align-items: center;
+}
+.cm-properties .metadata-input-checkbox {
+  margin: 0 4px;
+}
+.multi-select-container {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.multi-select-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 4px 1px 8px;
+  border-radius: 999px;
+  background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.15);
+  color: var(--text-accent);
+}
+.multi-select-pill-remove-button,
+.metadata-property-remove {
+  display: inline-flex;
+  height: auto;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.cm-properties .multi-select-input {
+  flex: 1 0 80px;
+  width: auto;
+}
+.metadata-property-remove {
+  opacity: 0;
+}
+.metadata-property:hover .metadata-property-remove,
+.metadata-property:focus-within .metadata-property-remove,
+body.is-touch .metadata-property-remove {
+  opacity: 1;
+}
+.metadata-property-complex {
+  height: auto;
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  text-align: left;
+  white-space: pre-wrap;
+}
+.metadata-add-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: auto;
+  margin-top: 4px;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  font-size: var(--font-ui-small);
+}
+.metadata-add-button:hover {
+  color: var(--text-normal);
+}

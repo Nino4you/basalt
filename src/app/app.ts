@@ -10,6 +10,7 @@ import {
 import { attachmentKind, attachmentLink } from "../attachments";
 import { importAttachments } from "./attachment-import";
 import { autoCleanBackups } from "./backup-cleanup";
+import { addProperty } from "../editor/properties";
 import { emptyCanvas } from "../canvas/model";
 import { CanvasView } from "../canvas/view";
 import { TFile, TFolder } from "../compat/files";
@@ -2718,6 +2719,7 @@ export class App {
       lineNumbers: this.settings.get("lineNumbers"),
       spellcheck: this.settings.get("spellcheck"),
       autoPair: this.settings.get("autoPair"),
+      properties: this.settings.get("propertiesInDocument"),
     };
   }
 
@@ -4160,6 +4162,17 @@ export class App {
       name: t("Nächste Tagesnotiz öffnen"),
       icon: "chevron-right",
       run: () => void this.adjacentDailyNote(1),
+    });
+    add({
+      id: "add-property",
+      name: t("Eigenschaft hinzufügen"),
+      hotkey: "Mod+;",
+      icon: "list-plus",
+      when: () => hasNote() && !this.active.reading,
+      run: () => {
+        this.editor.focus();
+        addProperty(this.editor.view);
+      },
     });
     add({
       id: "insert-template",

@@ -570,6 +570,16 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         settings.get("lineNumbers"),
         set("lineNumbers"),
       );
+      toggle(
+        row(
+          content,
+          t("Eigenschaften im Dokument"),
+          t("Zeigt das Frontmatter in der Live-Vorschau als bearbeitbare Felder statt als YAML."),
+        ),
+        t("Eigenschaften im Dokument"),
+        settings.get("propertiesInDocument"),
+        set("propertiesInDocument"),
+      );
       heading(content, t("Verhalten"));
       toggle(
         row(content, t("Rechtschreibprüfung"), t("Nutzt die Prüfung des Systems.")),

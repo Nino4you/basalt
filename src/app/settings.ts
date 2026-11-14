@@ -36,6 +36,8 @@ export interface Settings {
   backupMaxAgeDays: number;
   /** Versions kept per file; 0 keeps all. */
   backupMaxVersions: number;
+  /** Live preview shows frontmatter as editable properties instead of YAML. */
+  propertiesInDocument: boolean;
 }
 
 export const DEFAULT_ACCENT = "#8a5cf5";
@@ -62,6 +64,7 @@ export const defaults: Settings = {
   attachmentFolder: "/",
   backupMaxAgeDays: 90,
   backupMaxVersions: 0,
+  propertiesInDocument: true,
 };
 
 const KEY = "basalt-settings";

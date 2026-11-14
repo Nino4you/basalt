@@ -38,6 +38,7 @@ import {
 import { insertLink, toggleTask, toggleWrap } from "./editor/commands";
 import { type CompletionHost, completionSources } from "./editor/complete";
 import { richPreview, finishRichSource } from "./editor/rich-preview";
+import { propertiesEditor, propertiesFacet } from "./editor/properties";
 import {
   EditorSuggestBridge,
   type EditorSuggestHost,
@@ -109,6 +110,8 @@ export interface EditorOptions {
   lineNumbers: boolean;
   spellcheck: boolean;
   autoPair: boolean;
+  /** Live preview shows frontmatter as editable properties. */
+  properties: boolean;
 }
 
 /**
@@ -137,6 +140,7 @@ export class MarkdownEditor {
     lineNumbers: false,
     spellcheck: true,
     autoPair: true,
+    properties: true,
   };
   private suppress = false;
   private readonly blockHost: CodeBlockHost;
@@ -178,6 +182,7 @@ export class MarkdownEditor {
       attachmentHandlers,
       livePreview,
       richPreview,
+      propertiesEditor,
       Prec.highest(keymap.of([{ key: "Escape", run: finishRichSource }])),
       this.pluginSurfaces.of(this.surfaceExtensions),
       linkClicks,
@@ -264,6 +269,13 @@ export class MarkdownEditor {
       document.documentElement.style.setProperty("--list-ch", `${width}px`);
   }
 
+  private modeExtension(): Extension {
+    return [
+      renderedFacet.of(this.options.livePreview),
+      propertiesFacet.of(this.options.properties),
+    ];
+  }
+
   private attributeExtension(): Extension {
     return EditorView.contentAttributes.of({
       "aria-label": t("Markdown-Editor"),
@@ -280,7 +292,7 @@ export class MarkdownEditor {
         this.base,
         this.editable.of(EditorView.editable.of(this.isEditable)),
         this.pluginExtensions.of(this.pluginList),
-        this.mode.of(renderedFacet.of(this.options.livePreview)),
+        this.mode.of(this.modeExtension()),
         this.gutter.of(this.options.lineNumbers ? lineNumbers() : []),
         this.attributes.of(this.attributeExtension()),
         this.pairing.of(this.options.autoPair ? closeBrackets() : []),
@@ -295,7 +307,7 @@ export class MarkdownEditor {
         this.editable.reconfigure(EditorView.editable.of(this.isEditable)),
         this.pluginExtensions.reconfigure(this.pluginList),
         this.pluginSurfaces.reconfigure(this.surfaceExtensions),
-        this.mode.reconfigure(renderedFacet.of(this.options.livePreview)),
+        this.mode.reconfigure(this.modeExtension()),
         this.gutter.reconfigure(this.options.lineNumbers ? lineNumbers() : []),
         this.attributes.reconfigure(this.attributeExtension()),
         this.pairing.reconfigure(this.options.autoPair ? closeBrackets() : []),
