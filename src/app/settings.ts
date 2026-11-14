@@ -28,6 +28,8 @@ export interface Settings {
   dailyFormat: string;
   /** Template for new daily notes; "" for none. */
   dailyTemplate: string;
+  /** Folder with templates; "" means any folder called `_templates`. */
+  templateFolder: string;
 }
 
 export const DEFAULT_ACCENT = "#8a5cf5";
@@ -50,6 +52,7 @@ export const defaults: Settings = {
   dailyFolder: "",
   dailyFormat: "YYYY-MM-DD",
   dailyTemplate: "",
+  templateFolder: "",
 };
 
 const KEY = "basalt-settings";

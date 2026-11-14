@@ -178,6 +178,8 @@ const LAYOUT_KEY = "basalt-layout";
 export class App {
   readonly settings = new SettingsStore();
   readonly index = new VaultIndex();
+  /** Text selected in the editor, for the status bar counts. */
+  private selected = "";
   readonly commands = new CommandRegistry();
   readonly shell: Shell;
   readonly editor: MarkdownEditor;
@@ -252,6 +254,11 @@ export class App {
     });
     this.editor = new MarkdownEditor(this.shell.editorEl, {
       onChange: (text) => this.onEditorChange(text),
+      onSelection: (selected) => {
+        if (selected === this.selected) return;
+        this.selected = selected;
+        this.updateStatus();
+      },
       save: () => void this.save().catch((error) => this.report(error)),
       resolves: (target) =>
         !!this.activePath &&
@@ -1649,15 +1656,20 @@ export class App {
       );
     else this.setSaveStatus("saved", t("Alle Änderungen gespeichert"));
     if (!markdown) return;
-    const words = wordCount(note.text);
-    shell.wordCount.textContent = plural(words, {
+    // With a selection, the counts are about the selected text, as in Obsidian.
+    const counted = this.selected && !tab.reading ? this.selected : note.text;
+    const words = wordCount(counted);
+    const wordText = plural(words, {
       one: "{count} Wort",
       other: "{count} Wörter",
     });
-    shell.charCount.textContent = plural(note.text.length, {
+    const charText = plural(counted.length, {
       one: "{count} Schriftzeichen",
       other: "{count} Zeichen",
     });
+    shell.wordCount.textContent =
+      counted === note.text ? wordText : t("{count} ausgewählt", { count: wordText });
+    shell.charCount.textContent = charText;
     this.updateBacklinkCount();
   }
 
@@ -2399,7 +2411,10 @@ export class App {
       notify(t("Vorlagen lassen sich nur in Markdown-Notizen einfügen."));
       return;
     }
-    const paths = templatePaths(this.index.files);
+    const paths = templatePaths(
+      this.index.files,
+      this.settings.get("templateFolder"),
+    );
     if (!paths.length) {
       notify(t("Keine Markdown-Vorlagen unter _templates gefunden."));
       return;

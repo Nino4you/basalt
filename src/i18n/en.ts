@@ -577,6 +577,10 @@ export const en = {
   "Moment.js-Format, Text in [eckigen Klammern] bleibt wörtlich.": "Moment.js format; text in [square brackets] stays as written.",
   "Beispiel: {name}": "Example: {name}",
   "Vorlage": "Template",
-  "Vorlagen liegen in einem Ordner „_templates“. {date} und {title} werden ersetzt.": "Templates live in a “_templates” folder. {date} and {title} are filled in.",
   "Keine Vorlage": "No template",
+  "{count} ausgewählt": "{count} selected",
+  "Vorlagen": "Templates",
+  "Vorlagenordner": "Template folder location",
+  "Notizen in diesem Ordner stehen unter „Vorlage einfügen“ zur Wahl. Leer: jeder Ordner namens „_templates“.": "Notes in this folder are offered by “Insert template”. Empty: any folder called “_templates”.",
+  "Eine Notiz aus dem Vorlagenordner. {date} und {title} werden ersetzt.": "A note from the template folder. {date} and {title} are filled in.",
 } as const;

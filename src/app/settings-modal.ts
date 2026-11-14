@@ -483,6 +483,18 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         settings.get("updateLinks"),
         set("updateLinks"),
       );
+      heading(content, t("Vorlagen"));
+      textField(
+        row(
+          content,
+          t("Vorlagenordner"),
+          t("Notizen in diesem Ordner stehen unter „Vorlage einfügen“ zur Wahl. Leer: jeder Ordner namens „_templates“."),
+        ),
+        t("Vorlagenordner"),
+        settings.get("templateFolder"),
+        set("templateFolder"),
+        "_templates",
+      );
       heading(content, t("Tagesnotizen"));
       textField(
         row(
@@ -520,7 +532,7 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         row(
           content,
           t("Vorlage"),
-          t("Vorlagen liegen in einem Ordner „_templates“. {date} und {title} werden ersetzt.", {
+          t("Eine Notiz aus dem Vorlagenordner. {date} und {title} werden ersetzt.", {
             date: "{{date}}",
             title: "{{title}}",
           }),
@@ -528,7 +540,7 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         t("Vorlage"),
         [
           ["", t("Keine Vorlage")],
-          ...templatePaths(app.index.files).map(
+          ...templatePaths(app.index.files, settings.get("templateFolder")).map(
             (path) => [path, path] as [string, string],
           ),
         ],

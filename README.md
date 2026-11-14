@@ -40,8 +40,8 @@ Obsidian vaults and selected Obsidian plugins.
   clickable, and KaTeX math, Mermaid diagrams and tables render right in the editor. Tables
   are edited cell by cell while the Markdown stays the source of truth.
 - Completion for `[[wiki links]]` (including `#headings`, `#^blocks` and note aliases) and
-  `#tags`, page previews when hovering links, templates
-  with title and date placeholders, and a source mode.
+  `#tags`, page previews when hovering links, templates from a folder you choose (with title
+  and Moment.js date placeholders), and a source mode.
 - Reading view with callouts, properties, note embeds and syntax highlighting.
 - PDFs, images, audio and video open in their own tabs; PDFs are rendered locally.
 
