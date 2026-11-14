@@ -136,4 +136,17 @@ describe("requestUrl compatibility", () => {
       },
     });
   });
+
+  it("rejects with an Error when the native command fails", async () => {
+    const run = vi.fn(async () => {
+      throw "requestUrl only supports http and https URLs";
+    });
+    const failure = await api(nativeRequestUrl(run))("/api/x").catch(
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toBe(
+      "requestUrl only supports http and https URLs",
+    );
+  });
 });
