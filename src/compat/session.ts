@@ -113,6 +113,7 @@ export class CompatibilitySession {
   };
   private readonly editorInfoCleanup: () => void;
   private disposePromise: Promise<void> | null = null;
+  private readonly pluginData: VaultPluginDataStore;
 
   private constructor(options: CompatibilityOptions) {
     this.id = options.vaultId;
@@ -183,9 +184,13 @@ export class CompatibilitySession {
     };
     this.workspace.connect(this, this.services);
     document.addEventListener("keydown", this.keydown);
+    this.pluginData = new VaultPluginDataStore(
+      this.configVault,
+      options.vaultId,
+    );
     this.plugins = new PluginRegistry(
       this,
-      new VaultPluginDataStore(this.configVault, options.vaultId),
+      this.pluginData,
       options.mobile,
       options.extensions,
       this.services,
@@ -338,12 +343,25 @@ export class CompatibilitySession {
     cm.dispatch({ effects: editorInfoEffect.of({ file, app: this }) });
   }
 
+  /** Writes plugin settings that are still waiting for the typing pause. */
+  flushPluginData(): Promise<void> {
+    return this.pluginData.flush();
+  }
+
+  hasPendingPluginData(): boolean {
+    return this.pluginData.hasPendingWrites();
+  }
+
   dispose(): Promise<void> {
     this.disposePromise ??= (async () => {
       try {
+        // Settings saved during `onunload` go straight to disk from here on.
+        const pending = this.pluginData.close();
         // The host owns cancellation, plugin shutdown and style removal, so one
         // failing plugin cannot prevent the remaining cleanup.
         await this.bundleHost.dispose();
+        await pending;
+        await this.pluginData.flush();
       } finally {
         document.removeEventListener("keydown", this.keydown);
         try {
