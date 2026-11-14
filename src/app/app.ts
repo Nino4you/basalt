@@ -699,8 +699,10 @@ export class App {
   }
 
   private checkSyncConflicts(): void {
-    const conflicts = findConflicts(this.index.files, (path) =>
-      this.index.content(path),
+    const conflicts = findConflicts(
+      this.index.files,
+      (path) => this.index.content(path),
+      this.conflictWatcher.markers,
     );
     const fresh = this.conflictWatcher.update(conflicts);
     const button = document.getElementById("sync-conflicts");

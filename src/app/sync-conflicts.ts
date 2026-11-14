@@ -42,6 +42,8 @@ export function conflictCopyOf(
 
 /** Whether a note still holds an unresolved Git merge conflict. */
 export function hasConflictMarkers(text: string): boolean {
+  // A plain substring search first: most notes never contain the marker.
+  if (!text.includes("<<<<<<<")) return false;
   const start = text.search(/^<{7}(?: |$)/m);
   if (start < 0) return false;
   const middle = text.slice(start).search(/^={7}\s*$/m);
@@ -52,6 +54,8 @@ export function hasConflictMarkers(text: string): boolean {
 export function findConflicts(
   files: readonly string[],
   contentOf: (path: string) => string | undefined,
+  markers: (path: string, text: string) => boolean = (_path, text) =>
+    hasConflictMarkers(text),
 ): Conflict[] {
   const conflicts: Conflict[] = [];
   for (const path of files) {
@@ -62,7 +66,7 @@ export function findConflicts(
       continue;
     }
     const text = /\.md$/i.test(path) ? contentOf(path) : undefined;
-    if (text !== undefined && hasConflictMarkers(text))
+    if (text !== undefined && markers(path, text))
       conflicts.push({ kind: "markers", path });
   }
   return conflicts.sort((a, b) => a.path.localeCompare(b.path));
@@ -71,7 +75,25 @@ export function findConflicts(
 /** Tells about conflicts once each per session, so sync problems do not go unnoticed. */
 export class ConflictWatcher {
   private readonly reported = new Set<string>();
+  /** Marker results per note, reused while the note's text is unchanged. */
+  private readonly scanned = new Map<
+    string,
+    { text: string; found: boolean }
+  >();
   conflicts: Conflict[] = [];
+
+  /**
+   * Like `hasConflictMarkers`, but scans a note only when its text changed:
+   * the index hands out the same string until then, so the check is cheap
+   * even when it runs after every edit.
+   */
+  readonly markers = (path: string, text: string): boolean => {
+    const cached = this.scanned.get(path);
+    if (cached && cached.text === text) return cached.found;
+    const found = hasConflictMarkers(text);
+    this.scanned.set(path, { text, found });
+    return found;
+  };
 
   update(conflicts: Conflict[]): Conflict[] {
     this.conflicts = conflicts;
@@ -84,6 +106,7 @@ export class ConflictWatcher {
 
   reset(): void {
     this.reported.clear();
+    this.scanned.clear();
     this.conflicts = [];
   }
 }

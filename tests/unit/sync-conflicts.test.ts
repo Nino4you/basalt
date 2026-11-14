@@ -63,3 +63,11 @@ it("lists conflicts and reports each one once", () => {
   expect(watcher.update(conflicts)).toHaveLength(0);
   expect(watcher.conflicts).toHaveLength(2);
 });
+
+it("scans a note for markers again only after its text changed", () => {
+  const watcher = new ConflictWatcher();
+  const text = "<<<<<<< a\nx\n=======\ny\n>>>>>>> b\n";
+  expect(watcher.markers("A.md", text)).toBe(true);
+  expect(watcher.markers("A.md", text)).toBe(true);
+  expect(watcher.markers("A.md", "aufgelöst")).toBe(false);
+});

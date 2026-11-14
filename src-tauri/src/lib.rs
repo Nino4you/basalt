@@ -579,10 +579,16 @@ async fn backup_remove(
         .iter()
         .map(|location| VaultPath::parse(location).map_err(error))
         .collect::<Result<Vec<_>>>()?;
+    let mut removed = 0;
     for location in &locations {
-        vault_core::remove_backup(&*session.storage, location).map_err(error)?;
+        match vault_core::remove_backup(&*session.storage, location) {
+            Ok(()) => removed += 1,
+            // Already gone (another device or a second cleanup): nothing to do.
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(other) => return Err(error(other)),
+        }
     }
-    Ok(locations.len())
+    Ok(removed)
 }
 
 #[tauri::command]
