@@ -583,4 +583,11 @@ export const en = {
   "Vorlagenordner": "Template folder location",
   "Notizen in diesem Ordner stehen unter „Vorlage einfügen“ zur Wahl. Leer: jeder Ordner namens „_templates“.": "Notes in this folder are offered by “Insert template”. Empty: any folder called “_templates”.",
   "Eine Notiz aus dem Vorlagenordner. {date} und {title} werden ersetzt.": "A note from the template folder. {date} and {title} are filled in.",
+  "Ordner suchen …": "Find a folder …",
+  "Datei verschieben nach": "Move file to",
+  verschieben: "move",
+  "Kein passender Ordner.": "No matching folder.",
+  "Aktuelle Datei verschieben nach …": "Move current file to …",
+  "Aktuelle Datei löschen": "Delete current file",
+  navigieren: "navigate",
 } as const;

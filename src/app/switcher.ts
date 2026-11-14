@@ -184,7 +184,7 @@ export function openQuickSwitcher(app: App): void {
         return results;
       },
       [
-        ["↑↓", "navigieren"],
+        ["↑↓", t("navigieren")],
         ["↵", t("öffnen")],
         [`${formatHotkey("Mod")} ↵`, t("in neuem Tab öffnen")],
         ["esc", t("schließen")],
@@ -277,7 +277,7 @@ export function openCommandPalette(app: App): void {
         }));
       },
       [
-        ["↑↓", "navigieren"],
+        ["↑↓", t("navigieren")],
         ["↵", t("ausführen")],
         ["esc", t("schließen")],
       ],

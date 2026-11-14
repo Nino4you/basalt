@@ -34,7 +34,7 @@ import {
   icon,
 } from "../ui/dom";
 import { closeMenu, showMenu, type MenuEntry } from "../ui/menu";
-import { Modal, topModal } from "../ui/modal";
+import { Modal, SuggestModal, topModal } from "../ui/modal";
 import { notify } from "../ui/notice";
 import { installTooltips } from "../ui/tooltip";
 import { CommandRegistry } from "./commands";
@@ -2069,6 +2069,49 @@ export class App {
     }
   }
 
+  /** Asks for a folder and moves the file there, links and all. */
+  promptMoveFile(path: string): void {
+    if (!this.index.has(path)) return;
+    const current = dirname(path);
+    const folders = ["", ...this.explorer.folderPaths()].filter(
+      (folder) => folder !== current,
+    );
+    const modal = new SuggestModal(
+      t("Ordner suchen …"),
+      t("Datei verschieben nach"),
+      (raw) => {
+        const query = raw.trim().toLowerCase();
+        return folders
+          .filter((folder) => (folder || "/").toLowerCase().includes(query))
+          .map((folder) => ({
+            render(parent: HTMLElement) {
+              parent.append(
+                h(
+                  "div",
+                  "suggestion-content",
+                  h("div", {
+                    class: "suggestion-title",
+                    text: folder || t("Oberste Ebene"),
+                  }),
+                ),
+              );
+            },
+            run: () =>
+              void this.moveFile(path, folder).catch((error) =>
+                this.report(error),
+              ),
+          }));
+      },
+      [
+        ["↑↓", t("navigieren")],
+        ["↵", t("verschieben")],
+        ["esc", t("schließen")],
+      ],
+      t("Kein passender Ordner."),
+    );
+    modal.open();
+  }
+
   /** Moves a file into `folder` ("" is the vault root), keeping its name. */
   async moveFile(path: string, folder: string): Promise<void> {
     if (!this.store || !this.vault || !this.index.has(path)) return;
@@ -3855,6 +3898,20 @@ export class App {
       hotkey: "Mod+W",
       icon: "x",
       run: () => this.closeTab(),
+    });
+    add({
+      id: "move-file",
+      name: t("Aktuelle Datei verschieben nach …"),
+      icon: "folder-closed",
+      when: () => !!this.activePath,
+      run: () => this.promptMoveFile(this.activePath!),
+    });
+    add({
+      id: "delete-file",
+      name: t("Aktuelle Datei löschen"),
+      icon: "trash-2",
+      when: () => !!this.activePath,
+      run: () => this.promptDeleteFile(this.activePath!),
     });
     add({
       id: "rename-file",
