@@ -215,6 +215,11 @@ plugins (see `docs/plugin-compatibility.md`), not at arbitrary community plugins
   host** (passed from `session.ts`); duplicated CodeMirror modules produce incompatible
   extensions. The app's own `MarkdownEditor` wraps the compat `Editor` adapter so plugin editor
   commands act on the shared instance.
+- `plugin-catalog.ts` (logic) and `src/app/plugin-install.ts` (UI in Settings → Community
+  plugins) browse the Obsidian community catalog and install, update and uninstall plugins from
+  GitHub releases or local files into `Basalt/Plugins/<id>/` through `configVault`. Every
+  install asks first and never enables; `VERIFIED_PLUGINS` must match
+  `docs/plugin-compatibility.md`.
 - Plugin paths under `.obsidian/plugins/<id>` are remapped to `Basalt/Plugins/<id>`, every other
   `.obsidian/...` path to `Basalt/Config/...`; both are hidden from vault content. Other hidden
   paths stay rejected.
