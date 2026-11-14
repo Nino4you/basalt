@@ -1,56 +1,11 @@
 import { isMap, isScalar, isSeq, parseDocument, type Document } from "yaml";
-import { formatDate } from "../dates";
 import { frontmatterRange } from "../editor/properties-model";
 import { LinkResolver } from "./vault-index";
 
 /**
- * Logic behind the small core plugins: random note, unique (Zettelkasten)
- * notes and the note composer (merge notes, extract a selection). The App
+ * Logic behind the note composer (merge notes, extract a selection). The App
  * wires these into commands; everything here is pure and tested on its own.
  */
-
-/** A random Markdown note other than `current`, or null when there is none. */
-export function pickRandomNote(
-  files: readonly string[],
-  current: string | null,
-  random: () => number = Math.random,
-): string | null {
-  const notes = files.filter((path) => /\.md$/i.test(path) && path !== current);
-  if (!notes.length) return null;
-  return notes[Math.min(notes.length - 1, Math.floor(random() * notes.length))];
-}
-
-/**
- * Path for a new unique note named after `date` in `format`. A taken name
- * moves on minute by minute, like a Zettelkasten ID; formats without minutes
- * fall back to a counter.
- */
-export function uniqueNotePath(
-  folder: string,
-  format: string,
-  date: Date,
-  exists: (path: string) => boolean,
-  locale = "en",
-): string {
-  const prefix = folder.replace(/^\/+|\/+$/g, "");
-  const path = (name: string) =>
-    `${prefix ? `${prefix}/` : ""}${name.replace(/[\\/:*?"<>|]/g, "-").trim()}.md`;
-  const pattern = format.trim() || "YYYYMMDDHHmm";
-  const first = formatDate(date, pattern, locale);
-  for (let minute = 0; minute < 60; minute++) {
-    const name = formatDate(
-      new Date(date.getTime() + minute * 60_000),
-      pattern,
-      locale,
-    );
-    if (minute > 0 && name === first) break;
-    if (!exists(path(name))) return path(name);
-  }
-  for (let n = 1; ; n++) {
-    const candidate = path(`${first} ${n}`);
-    if (!exists(candidate)) return candidate;
-  }
-}
 
 /** Splits a note into its frontmatter YAML (null without one) and its body. */
 function splitNote(text: string): { yaml: string | null; body: string } {

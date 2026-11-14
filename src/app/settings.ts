@@ -28,12 +28,6 @@ export interface Settings {
   dailyFormat: string;
   /** Template for new daily notes; "" for none. */
   dailyTemplate: string;
-  /** Folder for unique (Zettelkasten) notes ("" is the vault root). */
-  uniqueFolder: string;
-  /** Moment-style name of a unique note, such as `YYYYMMDDHHmm`. */
-  uniqueFormat: string;
-  /** Template for new unique notes; "" for none. */
-  uniqueTemplate: string;
   /** Folder with templates; "" means any folder called `_templates`. */
   templateFolder: string;
   /** Where pasted and dropped files go, see `attachmentFolder`. */
@@ -73,9 +67,6 @@ export const defaults: Settings = {
   dailyFormat: "YYYY-MM-DD",
   dailyTemplate: "",
   templateFolder: "",
-  uniqueFolder: "",
-  uniqueFormat: "YYYYMMDDHHmm",
-  uniqueTemplate: "",
   attachmentFolder: "/",
   // Off by default: deleting backups is an explicit choice.
   backupMaxAgeDays: 0,

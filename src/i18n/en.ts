@@ -743,9 +743,6 @@ export const en = {
   "Vim-Modus konnte nicht geladen werden": "Vim mode could not be loaded",
   "Vim-Tastenbelegung": "Vim key bindings",
   "Bearbeiten mit Vim-Befehlen; :w speichert.": "Edit with Vim commands; :w saves.",
-  "Zufällige Notiz öffnen": "Open random note",
-  "Keine weitere Notiz im Vault.": "No other note in the vault.",
-  "Neue eindeutige Notiz erstellen": "Create new unique note",
   "Aktuelle Notiz mit einer anderen zusammenführen": "Merge current note with another note",
   "Auswahl in neue Notiz extrahieren": "Extract selection to new note",
   "Zielnotiz suchen …": "Find target note …",
@@ -765,12 +762,4 @@ export const en = {
   "„{name}“ gibt es bereits.": "“{name}” already exists.",
   "Die Auswahl hat sich geändert. Bitte erneut auswählen.": "The selection has changed. Please select again.",
   "„{name}“ angelegt und verlinkt.": "Created and linked “{name}”.",
-  "Eindeutige Notizen": "Unique notes",
-  "Ordner für eindeutige Notizen": "Folder for unique notes",
-  "Für „Neue eindeutige Notiz erstellen“ (Zettelkasten). Leer lassen für den Vault-Stammordner.":
-    "For “Create new unique note” (Zettelkasten). Leave empty for the vault root.",
-  "Format der Kennung": "ID format",
-  "Moment.js-Format aus Datum und Uhrzeit. Ist der Name vergeben, rückt er minutenweise weiter.":
-    "Moment.js format of date and time. If the name is taken, it moves on by a minute.",
-  "Vorlage für eindeutige Notizen": "Template for unique notes",
 } as const;

@@ -27,11 +27,7 @@ test.beforeEach(async ({ page }) => {
     if (localStorage.getItem("basalt-demo-v1")) return;
     localStorage.setItem(
       "basalt-settings",
-      JSON.stringify({
-        language: "de",
-        uniqueFolder: "Zettel",
-        uniqueFormat: "YYYYMMDDHHmm",
-      }),
+      JSON.stringify({ language: "de" }),
     );
     localStorage.setItem(
       "basalt-demo-v1",
@@ -48,26 +44,6 @@ test.beforeEach(async ({ page }) => {
   });
   await page.goto("/");
   await expect(page.locator("#tab-name")).toHaveText("Start");
-});
-
-test("opens a random note other than the current one", async ({ page }) => {
-  await palette(page, "Zufällige Notiz öffnen");
-  await expect(page.locator("#tab-name")).toHaveText(/^(Entwurf|Ziel)$/);
-});
-
-test("creates unique notes named after the time in their folder", async ({
-  page,
-}) => {
-  await palette(page, "Neue eindeutige Notiz erstellen");
-  await expect(page.locator("#tab-name")).toHaveText(/^\d{12}$/);
-  await palette(page, "Neue eindeutige Notiz erstellen");
-  await expect
-    .poll(async () =>
-      Object.keys(await demo(page))
-        .filter((path) => /^Zettel\/\d{12}\.md$/.test(path))
-        .length,
-    )
-    .toBe(2);
 });
 
 test("merges a note into another and points links at the target", async ({

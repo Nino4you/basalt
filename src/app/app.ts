@@ -77,13 +77,7 @@ import { ReadingView } from "./reading";
 import { LinkPreview } from "./link-preview";
 import { SearchView } from "./search";
 import { expandTemplate, templatePaths } from "./templates";
-import {
-  mergeNoteText,
-  pickRandomNote,
-  suggestNoteName,
-  uniqueNotePath,
-  wikiLinkTo,
-} from "./note-tools";
+import { mergeNoteText, suggestNoteName, wikiLinkTo } from "./note-tools";
 import { formatDate, parseDate } from "../dates";
 import { SettingsStore } from "./settings";
 import { openSettings } from "./settings-modal";
@@ -2797,42 +2791,7 @@ export class App {
       );
   }
 
-  // ── core plugins: random note, unique note, note composer ───────────────
-
-  /** Opens a random Markdown note other than the active one. */
-  async openRandomNote(): Promise<void> {
-    const path = pickRandomNote(this.index.files, this.activePath);
-    if (path) await this.openPath(path);
-    else notify(t("Keine weitere Notiz im Vault."));
-  }
-
-  /** Creates a note named after the current time (Zettelkasten ID). */
-  async uniqueNote(date = new Date()): Promise<void> {
-    const vault = this.vault;
-    if (!vault) return;
-    try {
-      const path = uniqueNotePath(
-        this.settings.get("uniqueFolder"),
-        this.settings.get("uniqueFormat"),
-        date,
-        (candidate) => this.index.has(candidate),
-        getLocale(),
-      );
-      const template = this.settings.get("uniqueTemplate");
-      const text =
-        template && this.index.has(template)
-          ? expandTemplate(
-              await backend.read(template, vault.id),
-              basename(path).replace(/\.md$/i, ""),
-              date,
-            )
-          : undefined;
-      await this.ensureFolder(dirname(path));
-      await this.createNote(path, { text, throwOnError: true });
-    } catch (error) {
-      this.report(error);
-    }
-  }
+  // ── note composer ─────────────────────────────────────────────────────────
 
   /** Asks for another note and merges `path` into it. */
   promptMergeFile(path = this.activePath): void {
@@ -4634,18 +4593,6 @@ export class App {
       name: t("Nächste Tagesnotiz öffnen"),
       icon: "chevron-right",
       run: () => void this.adjacentDailyNote(1),
-    });
-    add({
-      id: "random-note",
-      name: t("Zufällige Notiz öffnen"),
-      icon: "dices",
-      run: () => void this.openRandomNote(),
-    });
-    add({
-      id: "unique-note",
-      name: t("Neue eindeutige Notiz erstellen"),
-      icon: "file-clock",
-      run: () => void this.uniqueNote(),
     });
     add({
       id: "merge-file",

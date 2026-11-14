@@ -167,13 +167,6 @@ export function buildShell(root: HTMLElement) {
         "right",
       ),
       commandButton(
-        "random-note",
-        "dices",
-        t("Zufällige Notiz öffnen"),
-        "",
-        "right",
-      ),
-      commandButton(
         "command-palette",
         "terminal",
         t("Befehlspalette öffnen"),
