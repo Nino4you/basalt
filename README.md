@@ -136,7 +136,8 @@ you enable each one in the settings.
 Settings → Community plugins installs them for you:
 
 - **Browse** the Obsidian community catalog. Plugins Basalt has checked are marked; all others
-  are untested and may work, partly work or fail visibly.
+  are untested and may work, partly work or fail visibly. Each plugin installs its latest release
+  or any earlier version you pick; releases that need a newer Obsidian API are marked.
 - **From GitHub** installs the latest release of any repository, such as your own plugin or a
   beta that is not in the catalog.
 - **From files** installs a plugin you built yourself from its `manifest.json`, `main.js` and

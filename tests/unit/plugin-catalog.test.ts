@@ -7,7 +7,12 @@ import {
   installedSource,
   installPlugin,
   latestManifest,
+  listReleases,
   loadCatalog,
+  parseReleases,
+  releasesUrl,
+  supportsMinAppVersion,
+  versionsUrl,
   parseCatalog,
   parseRepo,
   searchCatalog,
@@ -200,6 +205,27 @@ describe("plugin files", () => {
     );
   });
 
+  it("downloads a picked release by its tag", async () => {
+    const repo = "owner/demo";
+    const tagged = (file: string) =>
+      `https://github.com/${repo}/releases/download/1.4.0/${file}`;
+    const { request, asked } = network({
+      [tagged("manifest.json")]: manifest("demo", "1.4.0"),
+      [tagged("main.js")]: "module.exports = class {}",
+      [tagged("styles.css")]: ".x {}",
+    });
+    const files = await downloadRelease(repo, request, "demo", "1.4.0");
+    expect(files.manifest.version).toBe("1.4.0");
+    expect(files.styles).toBe(".x {}");
+    expect(asked.every((url) => url.includes("/download/1.4.0/"))).toBe(true);
+    await expect(
+      downloadRelease(repo, request, "demo", "2.0.0"),
+    ).rejects.toThrow("no release 2.0.0");
+    await expect(
+      downloadRelease(repo, request, "demo", "../latest"),
+    ).rejects.toThrow("Invalid release tag");
+  });
+
   it("compares versions", () => {
     expect(compareVersions("1.10.0", "1.9.9")).toBe(1);
     expect(compareVersions("v2.0", "2.0.0")).toBe(0);
@@ -299,5 +325,75 @@ describe("verifiedVersion", () => {
     expect(
       verifiedVersion({ ...entry, verified: null }, entry.repo),
     ).toBeNull();
+  });
+});
+
+describe("releases", () => {
+  const asset = (name: string) => ({ name });
+  const full = [asset("main.js"), asset("manifest.json")];
+
+  it("lists installable releases, newest version first", () => {
+    const releases = parseReleases(
+      [
+        { tag_name: "1.9.0", assets: full, published_at: "2026-01-02" },
+        { tag_name: "2.0.0-beta.1", prerelease: true, assets: full },
+        { tag_name: "2.1.0", draft: true, assets: full },
+        { tag_name: "1.10.0", assets: full },
+        { tag_name: "1.8.0", assets: [asset("main.js")] },
+        { tag_name: "v1.7.0", assets: full },
+        { tag_name: "../evil", assets: full },
+        { tag_name: "1.9.0", assets: full },
+        "junk",
+      ],
+      { "1.10.0": "1.20.0", "1.9.0": "0.15.0", "1.7.0": " 1.0.0 " },
+    );
+    expect(releases.map((release) => release.tag)).toEqual([
+      "2.0.0-beta.1",
+      "1.10.0",
+      "1.9.0",
+      "v1.7.0",
+    ]);
+    expect(releases[0].prerelease).toBe(true);
+    expect(releases[1].minAppVersion).toBe("1.20.0");
+    expect(releases[2]).toMatchObject({
+      version: "1.9.0",
+      publishedAt: "2026-01-02",
+      minAppVersion: "0.15.0",
+    });
+    expect(releases[3]).toMatchObject({
+      version: "1.7.0",
+      minAppVersion: "1.0.0",
+    });
+    expect(parseReleases([{ tag_name: "1.0.0" }])[0].minAppVersion).toBeNull();
+    expect(() => parseReleases({})).toThrow("not a list");
+  });
+
+  it("loads releases with versions.json, which is optional", async () => {
+    const repo = "owner/demo";
+    const releases = [{ tag_name: "1.0.0", assets: full }];
+    const withVersions = network({
+      [releasesUrl(repo)]: releases,
+      [versionsUrl(repo)]: { "1.0.0": "9.0.0" },
+    });
+    expect(
+      (await listReleases(repo, withVersions.request))[0].minAppVersion,
+    ).toBe("9.0.0");
+    const without = network({ [releasesUrl(repo)]: releases });
+    expect((await listReleases(repo, without.request))[0].minAppVersion).toBe(
+      null,
+    );
+    await expect(listReleases("owner/none", without.request)).rejects.toThrow(
+      "HTTP 404",
+    );
+    await expect(listReleases("not a repo", without.request)).rejects.toThrow(
+      "Invalid repository",
+    );
+  });
+
+  it("checks minAppVersion against Basalt's API version", () => {
+    expect(supportsMinAppVersion(undefined, "1.15.0")).toBe(true);
+    expect(supportsMinAppVersion("1.15.0", "1.15.0")).toBe(true);
+    expect(supportsMinAppVersion("0.15.9", "1.15.0")).toBe(true);
+    expect(supportsMinAppVersion("1.16.0", "1.15.0")).toBe(false);
   });
 });

@@ -144,3 +144,105 @@ it("needs a manifest and main.js", async () => {
   expect(document.querySelector(".mod-plugin-confirm")).toBeNull();
   expect(document.body.textContent).toContain("manifest.json und main.js");
 });
+
+it("installs a picked older release from the catalog", async () => {
+  const { app, configVault } = await fakeApp();
+  await configVault.createFolder("Basalt");
+  await configVault.createFolder("Basalt/Plugins");
+  await configVault.createFolder("Basalt/Plugins/mine");
+  await configVault.create(
+    "Basalt/Plugins/mine/manifest.json",
+    manifest("1.1.0"),
+  );
+  await configVault.create("Basalt/Plugins/mine/main.js", "new");
+  const assets = [{ name: "manifest.json" }, { name: "main.js" }];
+  const pages: Record<string, string> = {
+    "https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/community-plugins.json":
+      JSON.stringify([
+        {
+          id: "mine",
+          name: "My plugin",
+          author: "Me",
+          description: "Mine",
+          repo: "owner/mine",
+        },
+      ]),
+    "https://api.github.com/repos/owner/mine/releases?per_page=30":
+      JSON.stringify([
+        { tag_name: "1.1.0", assets },
+        { tag_name: "1.0.0", assets },
+      ]),
+    "https://raw.githubusercontent.com/owner/mine/HEAD/versions.json":
+      JSON.stringify({ "1.1.0": "99.0.0", "1.0.0": "0.15.0" }),
+    "https://github.com/owner/mine/releases/download/1.0.0/manifest.json":
+      manifest("1.0.0"),
+    "https://github.com/owner/mine/releases/download/1.0.0/main.js": "old",
+  };
+  const fetched: string[] = [];
+  vi.stubGlobal("fetch", async (url: string) => {
+    fetched.push(url);
+    const body = pages[url];
+    return new Response(body ?? "", { status: body === undefined ? 404 : 200 });
+  });
+  try {
+    const { openPluginCatalog } = await import("../../src/app/plugin-install");
+    const changed = vi.fn();
+    openPluginCatalog(app, changed);
+    const row = await vi.waitFor(() => {
+      const found = document.querySelector<HTMLButtonElement>(
+        ".plugin-catalog-row",
+      );
+      if (!found) throw new Error("no catalog yet");
+      return found;
+    });
+    row.click();
+    const picker = await vi.waitFor(() => {
+      const found = document.querySelector<HTMLSelectElement>(
+        ".plugin-catalog-version",
+      );
+      if (!found || found.disabled) throw new Error("no releases yet");
+      return found;
+    });
+    const options = [...picker.options].map((option) => option.textContent);
+    expect(options[0]).toBe("Neueste Version (1.1.0)");
+    expect(options[1]).toContain("installiert");
+    expect(options[1]).toContain("braucht Obsidian 99.0.0");
+    const action = document.querySelector<HTMLButtonElement>(
+      ".plugin-catalog-details .mod-cta",
+    )!;
+    picker.value = "1.1.0";
+    picker.dispatchEvent(new Event("change"));
+    expect(action.textContent).toBe("Installiert");
+    expect(action.disabled).toBe(true);
+    picker.value = "1.0.0";
+    picker.dispatchEvent(new Event("change"));
+    expect(action.textContent).toBe("Version wechseln");
+    action.click();
+    await vi.waitFor(() => {
+      if (document.querySelector(".mod-plugin-confirm")) return;
+      expect(app.report).not.toHaveBeenCalled();
+      throw new Error("no confirmation yet");
+    });
+    expect(
+      document.querySelector(".mod-plugin-confirm")?.textContent,
+    ).toContain("ältere Version");
+    const confirm = [
+      ...document.querySelectorAll<HTMLButtonElement>(
+        ".mod-plugin-confirm button",
+      ),
+    ].find((element) => element.textContent === "Version wechseln")!;
+    confirm.click();
+    await vi.waitFor(() => expect(changed).toHaveBeenCalled());
+    expect(
+      await configVault.read(
+        configVault.getFileByPath("Basalt/Plugins/mine/main.js")!,
+      ),
+    ).toBe("old");
+    expect(fetched).not.toContain(
+      "https://github.com/owner/mine/releases/latest/download/main.js",
+    );
+    expect(app.report).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

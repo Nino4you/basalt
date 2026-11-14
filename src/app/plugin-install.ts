@@ -6,15 +6,19 @@ import {
   installedSource,
   installPlugin,
   latestManifest,
+  listReleases,
   loadCatalog,
   parseRepo,
   searchCatalog,
+  supportsMinAppVersion,
   uninstallPlugin,
   validatePluginFiles,
   verifiedVersion,
   type CatalogEntry,
   type PluginFiles,
+  type PluginRelease,
 } from "../compat/plugin-catalog";
+import { API_VERSION } from "../compat/api-version";
 import {
   fetchRequestUrl,
   nativeRequestUrl,
@@ -44,6 +48,25 @@ export function pluginCatalog(): Promise<CatalogEntry[]> {
     throw error;
   });
   return catalog;
+}
+
+const releases = new Map<string, Promise<PluginRelease[]>>();
+
+/**
+ * A repository's releases, listed once per app start (GitHub limits
+ * anonymous API calls); a failed listing is tried again next time.
+ */
+export function pluginReleases(repo: string): Promise<PluginRelease[]> {
+  const key = repo.toLowerCase();
+  let listed = releases.get(key);
+  if (!listed) {
+    listed = listReleases(repo, request).catch((error) => {
+      releases.delete(key);
+      throw error;
+    });
+    releases.set(key, listed);
+  }
+  return listed;
 }
 
 const formatCount = (value: number) =>
@@ -86,6 +109,35 @@ function trustBadge(
       });
 }
 
+const formatDate = (iso: string) => {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : new Intl.DateTimeFormat(getLocale(), { dateStyle: "medium" }).format(
+        date,
+      );
+};
+
+/** "1.2.0 · 3 Mar 2026 · pre-release · installed" for the version picker. */
+function releaseLabel(
+  release: PluginRelease,
+  installedVersion: string | undefined,
+  verified: string | null,
+): string {
+  return [
+    release.version,
+    formatDate(release.publishedAt),
+    release.prerelease ? t("Vorabversion") : "",
+    release.version === installedVersion ? t("installiert") : "",
+    release.version === verified ? t("geprüft") : "",
+    supportsMinAppVersion(release.minAppVersion)
+      ? ""
+      : t("braucht Obsidian {min}", { min: release.minAppVersion ?? "" }),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 /**
  * Asks before any plugin code lands in the vault, and says plainly that
  * plugins are not sandboxed. Resolves to `true` when the user agrees.
@@ -99,8 +151,16 @@ function confirmInstall(
   return new Promise((resolve) => {
     const modal = new Modal("mod-plugin-confirm");
     const manifest = files.manifest;
+    const downgrade =
+      installed !== null &&
+      installed !== "?" &&
+      compareVersions(manifest.version, installed) < 0;
     modal.setTitle(
-      installed ? t("Plugin aktualisieren") : t("Plugin installieren"),
+      downgrade
+        ? t("Plugin-Version wechseln")
+        : installed
+          ? t("Plugin aktualisieren")
+          : t("Plugin installieren"),
     );
     let answer = false;
     modal.onClose = () => resolve(answer);
@@ -111,7 +171,11 @@ function confirmInstall(
     });
     const submit = h("button", {
       class: "mod-cta",
-      text: installed ? t("Aktualisieren") : t("Installieren"),
+      text: downgrade
+        ? t("Version wechseln")
+        : installed
+          ? t("Aktualisieren")
+          : t("Installieren"),
       attrs: { type: "button" },
       on: {
         click: () => {
@@ -151,6 +215,23 @@ function confirmInstall(
           "Plugins laufen nicht abgeschottet: Ihr Code hat dieselben Rechte wie Basalt und kann alle Notizen lesen und ändern. Installiere nur Plugins, denen du vertraust.",
         ),
       }),
+      supportsMinAppVersion(manifest.minAppVersion)
+        ? ""
+        : h("p", {
+            class: "plugin-warning",
+            text: t(
+              "Diese Version verlangt Obsidian {min}; Basalt bietet die Plugin-Schnittstelle von Obsidian {api}. Sie startet womöglich nicht oder nur teilweise.",
+              { min: manifest.minAppVersion ?? "", api: API_VERSION },
+            ),
+          }),
+      downgrade
+        ? h("p", {
+            class: "plugin-warning",
+            text: t(
+              "Eine ältere Version kann mit Einstellungen, die eine neuere gespeichert hat, nicht immer umgehen.",
+            ),
+          })
+        : "",
       manifest.isDesktopOnly && android
         ? h("p", {
             class: "plugin-warning",
@@ -273,6 +354,8 @@ export function openPluginCatalog(app: App, changed: () => void): void {
   let selected: CatalogEntry | null = null;
   let limit = PAGE;
   const installed = new Map<string, string>();
+  /** The release tag picked per plugin; missing or "" means the latest. */
+  const chosen = new Map<string, string>();
 
   const renderList = () => {
     list.replaceChildren(
@@ -361,20 +444,104 @@ export function openPluginCatalog(app: App, changed: () => void): void {
       return;
     }
     const version = installed.get(entry.id);
+    const tag = chosen.get(entry.id) ?? "";
+    let listed: PluginRelease[] = [];
     const action = h("button", {
       class: "mod-cta",
-      text: version ? t("Aktualisieren") : t("Installieren"),
-      attrs: { type: "button", disabled: !app.compatibility },
+      attrs: { type: "button" },
     });
+    const latestOption = h("option", {
+      text: t("Neueste Version"),
+      attrs: { value: "" },
+    });
+    const picker = h(
+      "select",
+      {
+        class: "plugin-catalog-version",
+        attrs: { "aria-label": t("Version"), disabled: true },
+      },
+      latestOption,
+    );
+    const versionNote = h("p", { class: "plugin-catalog-note" });
+    const pickedRelease = () =>
+      picker.value
+        ? listed.find((release) => release.tag === picker.value)
+        : listed.find((release) => !release.prerelease);
+    /** Button text and notes for the release currently picked. */
+    const syncChoice = () => {
+      const release = pickedRelease();
+      const order =
+        version && release && picker.value
+          ? compareVersions(release.version, version)
+          : 1;
+      action.textContent = !version
+        ? t("Installieren")
+        : order < 0
+          ? t("Version wechseln")
+          : order === 0
+            ? t("Installiert")
+            : t("Aktualisieren");
+      action.disabled = !app.compatibility || order === 0;
+      versionNote.textContent =
+        release && !supportsMinAppVersion(release.minAppVersion)
+          ? t(
+              "Version {version} verlangt Obsidian {min}; Basalt bietet die Plugin-Schnittstelle von Obsidian {api}.",
+              {
+                version: release.version,
+                min: release.minAppVersion ?? "",
+                api: API_VERSION,
+              },
+            )
+          : "";
+      versionNote.hidden = !versionNote.textContent;
+    };
+    picker.addEventListener("change", () => {
+      chosen.set(entry.id, picker.value);
+      syncChoice();
+    });
+    syncChoice();
+    void pluginReleases(entry.repo).then(
+      (list) => {
+        if (selected !== entry || !modal.isOpen) return;
+        listed = list;
+        const latest = list.find((release) => !release.prerelease);
+        if (latest)
+          latestOption.textContent = t("Neueste Version ({version})", {
+            version: latest.version,
+          });
+        picker.append(
+          ...list.map((release) =>
+            h("option", {
+              text: releaseLabel(release, version, entry.verified),
+              attrs: { value: release.tag },
+            }),
+          ),
+        );
+        picker.value = list.some((release) => release.tag === tag) ? tag : "";
+        picker.disabled = list.length === 0;
+        syncChoice();
+      },
+      (error) => {
+        if (selected !== entry || !modal.isOpen) return;
+        versionNote.textContent = t(
+          "Ältere Versionen konnten nicht geladen werden: {error}",
+          { error: errorMessage(error) },
+        );
+        versionNote.hidden = false;
+      },
+    );
     action.addEventListener("click", () => {
+      const pick = picker.value;
       action.disabled = true;
       action.textContent = t("Wird geladen …");
-      void downloadRelease(entry.repo, request, entry.id)
+      void downloadRelease(entry.repo, request, entry.id, pick || undefined)
         .then(async (files) => {
-          if (
-            version &&
-            compareVersions(files.manifest.version, version) <= 0
-          ) {
+          const order = version
+            ? compareVersions(files.manifest.version, version)
+            : 1;
+          // "Latest" only ever updates; an explicitly picked release may
+          // also go back to an older version.
+          if (version && (pick ? order === 0 : order <= 0)) {
             notify(
               t("„{name}“ ist bereits aktuell ({version}).", {
                 name: entry.name,
@@ -448,6 +615,13 @@ export function openPluginCatalog(app: App, changed: () => void): void {
             class: "plugin-catalog-note",
             text: t("Plugins lassen sich nur in der nativen App installieren."),
           }),
+      h(
+        "label",
+        "plugin-catalog-version-row",
+        h("span", { text: t("Version") }),
+        picker,
+      ),
+      versionNote,
       h(
         "div",
         "modal-button-container",
