@@ -74,6 +74,9 @@ Obsidian vaults and selected Obsidian plugins.
 
 - Tabs with their own history, split editors and freely dockable side views like in VS Code;
   the layout is saved per vault.
+- Named workspaces: save tabs, splits and sidebars under a name and switch between them
+  (command palette → "Manage workspaces"). On the desktop a note or canvas can be opened in a
+  window of its own; saves in one window show up in the other.
 - Quick switcher (Ctrl+O), command palette (Ctrl+P), full keyboard navigation and hotkeys you
   can change in the settings.
 - Light and dark theme with an accent color, plus Obsidian-style themes and CSS snippets from

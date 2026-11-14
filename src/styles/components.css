@@ -344,7 +344,7 @@ kbd {
 }
 .link-preview-title {
   margin-bottom: 6px;
-  font-weight: var(--font-semibold);
+  font-weight: 600;
   font-size: var(--font-ui-medium);
 }
 .link-preview-body {
@@ -595,6 +595,70 @@ kbd {
   margin: 8px 0 0;
   color: var(--text-error);
   font-size: var(--font-ui-small);
+}
+
+/* ── workspaces ───────────────────────────────────────────────────────────── */
+
+.mod-workspaces {
+  width: 520px;
+  max-width: calc(100vw - 32px);
+}
+.workspace-save-row {
+  display: flex;
+  gap: 8px;
+}
+.workspace-save-row input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  font-size: var(--font-ui-medium);
+}
+.workspace-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.workspace-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-s);
+}
+.workspace-item:hover {
+  background: var(--background-modifier-hover);
+}
+.workspace-item.is-active .workspace-item-name {
+  color: var(--text-accent);
+}
+.workspace-item-info {
+  flex: 1;
+  min-width: 0;
+}
+.workspace-item-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-item-meta,
+.workspace-empty {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+.workspace-empty {
+  margin: 4px 0;
+}
+
+/* A pop-out window is just the editor: no ribbon, no sidebars. */
+body.is-popout .workspace-ribbon,
+body.is-popout .sidebar-toggle-button {
+  display: none;
 }
 
 /* ── prompt: quick switcher and command palette ───────────────────────────── */

@@ -74,7 +74,8 @@ const de = {
   "f4.title": "Ein Arbeitsbereich, der sich dir anpasst",
   "f4.text":
     "Teile den Editor, docke Seitenansichten an, wo du sie brauchst, und halte eine zweite Notiz neben der ersten offen. Das Layout wird pro Vault gemerkt.",
-  "f4.a": "Tabs mit eigenem Verlauf, geteilte Editoren, andockbare Ansichten",
+  "f4.a":
+    "Tabs mit eigenem Verlauf, geteilte Editoren, andockbare Ansichten, gespeicherte Workspaces und Pop-out-Fenster",
   "f4.b":
     "Schnellauswahl <kbd>Strg</kbd> <kbd>O</kbd>, Befehlspalette <kbd>Strg</kbd> <kbd>P</kbd>",
   "f4.c": "Helles und dunkles Design mit einer Akzentfarbe deiner Wahl",
