@@ -491,6 +491,17 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         settings.get("updateLinks"),
         set("updateLinks"),
       );
+      textField(
+        row(
+          content,
+          t("Speicherort für neue Anhänge"),
+          t("Für eingefügte und hineingezogene Dateien. „/“ ist der Vault-Stammordner, „./“ der Ordner der Notiz, „./Anhänge“ ein Unterordner daneben, sonst ein Ordner im Vault."),
+        ),
+        t("Speicherort für neue Anhänge"),
+        settings.get("attachmentFolder"),
+        (value) => settings.set("attachmentFolder", value || "/"),
+        "/",
+      );
       heading(content, t("Vorlagen"));
       textField(
         row(

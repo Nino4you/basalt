@@ -30,6 +30,8 @@ export interface Settings {
   dailyTemplate: string;
   /** Folder with templates; "" means any folder called `_templates`. */
   templateFolder: string;
+  /** Where pasted and dropped files go, see `attachmentFolder`. */
+  attachmentFolder: string;
 }
 
 export const DEFAULT_ACCENT = "#8a5cf5";
@@ -53,6 +55,7 @@ export const defaults: Settings = {
   dailyFormat: "YYYY-MM-DD",
   dailyTemplate: "",
   templateFolder: "",
+  attachmentFolder: "/",
 };
 
 const KEY = "basalt-settings";

@@ -5,8 +5,7 @@ import type { App } from "./app";
 import { Component } from "../compat/component";
 import type { TAbstractFile } from "../compat/files";
 import { setDragLabel } from "./dock-drag";
-
-const FILE_MIME = "application/x-basalt-file";
+import { FILE_MIME } from "../editor/attachments";
 
 /** Row children Basalt builds itself; anything else in a row belongs to a plugin. */
 const HOST_ROW_PARTS = [

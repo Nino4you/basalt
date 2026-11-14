@@ -30,6 +30,11 @@ import { Editor } from "./compat/editor-adapter";
 import { EditorExtensionRegistry } from "./compat/editor-extensions";
 import type { PluginEmbed } from "./compat/embeds";
 import { embedHost, pluginEmbeds } from "./editor/plugin-embeds";
+import {
+  attachmentHandlers,
+  attachmentHost,
+  type AttachmentHost,
+} from "./editor/attachments";
 import { insertLink, toggleTask, toggleWrap } from "./editor/commands";
 import { type CompletionHost, completionSources } from "./editor/complete";
 import { richPreview, finishRichSource } from "./editor/rich-preview";
@@ -83,7 +88,11 @@ const PHRASES: Record<string, string> = {
   Completions: t("Vorschläge"),
 };
 
-export interface EditorHost extends LinkHost, CompletionHost, EditorSuggestHost {
+export interface EditorHost
+  extends LinkHost,
+    CompletionHost,
+    EditorSuggestHost,
+    AttachmentHost {
   onChange(text: string): void;
   /** The selected text changed (empty when nothing is selected). */
   onSelection?(selected: string): void;
@@ -165,6 +174,8 @@ export class MarkdownEditor {
       EditorState.tabSize.of(4),
       EditorState.phrases.of(PHRASES),
       linkHost.of(host),
+      attachmentHost.of(host),
+      attachmentHandlers,
       livePreview,
       richPreview,
       Prec.highest(keymap.of([{ key: "Escape", run: finishRichSource }])),

@@ -7,7 +7,8 @@ import {
   validateNotePath,
   type VaultInfo,
 } from "../backend";
-import { attachmentKind } from "../attachments";
+import { attachmentKind, attachmentLink } from "../attachments";
+import { importAttachments } from "./attachment-import";
 import { emptyCanvas } from "../canvas/model";
 import { CanvasView } from "../canvas/view";
 import { TFile, TFolder } from "../compat/files";
@@ -298,6 +299,16 @@ export class App {
         this.compatibility
           ? { sourcePath: this.activePath ?? "", app: this.compatibility }
           : null,
+      attachFiles: (files, pasted) =>
+        importAttachments(this.compatibility?.vault ?? null, files, {
+          sourcePath: this.activePath ?? "",
+          folderSetting: this.settings.get("attachmentFolder"),
+          pasted,
+        }),
+      linkTo: (path) =>
+        this.vault?.files.includes(path)
+          ? attachmentLink(path, this.vault.files)
+          : null,
     });
     this.applyEditorSettings();
     this.wireTouchEditing();
@@ -577,6 +588,7 @@ export class App {
         statusBarEl: this.shell.pluginStatus,
         requestUrl: nativeRequestUrl(),
         updateLinks: () => this.settings.get("updateLinks"),
+        attachmentFolder: () => this.settings.get("attachmentFolder"),
       });
       if (this.vault !== next) {
         await session.dispose().catch((error) => this.report(error));

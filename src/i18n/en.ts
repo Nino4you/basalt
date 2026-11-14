@@ -639,4 +639,10 @@ export const en = {
   "„{name}“ ist jetzt auf Version {version}.": "“{name}” is now on version {version}.",
   "„{name}“ mit seinen Einstellungen entfernen? Die Dateien landen im Papierkorb des Vaults (.basalt/trash/).": "Remove “{name}” and its settings? The files go to the vault trash (.basalt/trash/).",
   "„{name}“ wurde deinstalliert.": "“{name}” was uninstalled.",
+  "Speicherort für neue Anhänge": "Default location for new attachments",
+  "Für eingefügte und hineingezogene Dateien. „/“ ist der Vault-Stammordner, „./“ der Ordner der Notiz, „./Anhänge“ ein Unterordner daneben, sonst ein Ordner im Vault.": "For pasted and dropped files. “/” is the vault root, “./” the note’s folder, “./attachments” a subfolder next to it, anything else a folder in the vault.",
+  "Anhänge können nur in der nativen App eingefügt werden.": "Attachments can only be added in the native app.",
+  "{name} ist größer als 64 MiB und wurde nicht eingefügt.": "{name} is larger than 64 MiB and was not added.",
+  "Datei": "File",
+  "{name} konnte nicht eingefügt werden: {error}": "{name} could not be added: {error}",
 } as const;
