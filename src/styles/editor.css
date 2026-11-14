@@ -724,6 +724,64 @@ body.is-readable-line-width .markdown-preview-sizer {
   padding-block: 8px;
   overflow-x: auto;
 }
+.cm-embed-preview {
+  white-space: normal;
+  cursor: default;
+}
+.cm-embed-preview.is-inline {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: bottom;
+}
+.cm-embed-preview.is-block {
+  position: relative;
+  padding-block: 4px;
+}
+.cm-embed-preview.cm-embed-image {
+  cursor: pointer;
+}
+.cm-embed-preview .internal-embed.markdown-embed {
+  margin: 0;
+}
+.cm-embed-preview .internal-embed.media-embed {
+  margin: 0;
+}
+.cm-embed-preview .markdown-embed-link {
+  right: 28px;
+}
+.cm-embed-edit {
+  position: absolute;
+  top: 4px;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--text-faint);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 120ms var(--ease);
+}
+.cm-embed-preview:hover .cm-embed-edit,
+.cm-embed-edit:focus-visible {
+  opacity: 1;
+}
+.cm-embed-edit:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.cm-embed-preview.cm-embed-image .cm-embed-edit {
+  background: var(--background-primary);
+}
+.markdown-embed-missing {
+  color: var(--text-faint);
+  font-style: italic;
+}
+body.is-android .cm-embed-edit {
+  opacity: 1;
+}
 .cm-table-preview {
   max-width: 100%;
   overflow-x: auto;

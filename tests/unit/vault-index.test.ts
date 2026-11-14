@@ -121,7 +121,7 @@ describe("vault search", () => {
   it("parses terms, phrases and operators", () => {
     expect(
       parseQuery('rust "der plan" tag:#a path:Projekte file:plan #b'),
-    ).toEqual({
+    ).toMatchObject({
       terms: ["rust", "der plan"],
       tags: ["a", "b"],
       path: ["projekte"],
@@ -136,7 +136,7 @@ describe("vault search", () => {
   it("parses exclusions only at the start of a term", () => {
     expect(
       parseQuery('android -rust -tag:#projekt -path:Archiv -file:alt -"alter plan"'),
-    ).toEqual({
+    ).toMatchObject({
       terms: ["android"],
       tags: [],
       path: [],
@@ -219,5 +219,95 @@ describe("link resolution cache", () => {
     const index = vault({ "Notes/A.md": "", "Notes/B.md": "" });
     expect(index.resolve("#Intro", "Notes/A.md")).toBe("Notes/A.md");
     expect(index.resolve("#Intro", "Notes/B.md")).toBe("Notes/B.md");
+  });
+});
+
+describe("attachment resolution", () => {
+  it("finds attachments in subfolders by their file name", () => {
+    const index = vault({
+      "Notes/A.md": "",
+      "Bilder/Foto.png": "",
+      "Foto.md": "",
+    });
+    expect(index.resolve("Foto.png", "Notes/A.md")).toBe("Bilder/Foto.png");
+    // A note of the same name still wins over a name without extension.
+    expect(index.resolve("Foto", "Notes/A.md")).toBe("Foto.md");
+    expect(index.resolve("Fehlt.png", "Notes/A.md")).toBeNull();
+  });
+});
+
+describe("search operators", () => {
+  const index = vault({
+    "Rezepte/Kuchen.md": [
+      "# Kuchen",
+      "Mehl und Zucker verrühren.",
+      "Eier extra.",
+      "## Einkauf",
+      "- [ ] Mehl kaufen",
+      "- [x] Zucker kaufen",
+      "Rechnung 2026-11-03",
+    ].join("\n"),
+    "Rezepte/Brot.md": "# Brot\nMehl\nund Wasser, kein Zucker.\n- [x] Mehl kaufen",
+  });
+  const find = (query: string) =>
+    index.files
+      .map((path) => searchNote(index, path, parseQuery(query)))
+      .filter((result) => result !== null);
+  const paths = (query: string) => find(query).map((result) => result.path);
+  const hits = (query: string) =>
+    find(query).flatMap((result) =>
+      result.matches.map((m) => m.text.slice(m.start, m.start + m.length)),
+    );
+
+  it("parses scoped groups and regular expressions", () => {
+    const query = parseQuery('line:(mehl "zucker ver") -section:eier /\\d{4}-\\d\\d/ task-todo:""');
+    expect(query.scoped).toEqual([
+      { scope: "line", matchers: [{ text: "mehl" }, { text: "zucker ver" }] },
+      { scope: "task-todo", matchers: [] },
+    ]);
+    expect(query.excludedScoped).toEqual([
+      { scope: "section", matchers: [{ text: "eier" }] },
+    ]);
+    expect(query.regexes.map((regex) => regex.source)).toEqual(["\\d{4}-\\d\\d"]);
+    expect(query.terms).toEqual([]);
+  });
+
+  it("keeps slashes in paths and invalid patterns as text", () => {
+    expect(parseQuery("a/b/c /notes").terms).toEqual(["a/b/c", "/notes"]);
+    expect(parseQuery("/foo(/").terms).toEqual(["/foo(/"]);
+    expect(parseQuery("path:/Archiv/").path).toEqual(["/archiv/"]);
+  });
+
+  it("requires line: terms on one line", () => {
+    expect(paths("line:(mehl zucker)")).toEqual(["Rezepte/Kuchen.md"]);
+    expect(hits("line:(mehl zucker)")).toEqual(["Mehl", "Zucker"]);
+    expect(paths("mehl zucker")).toEqual(["Rezepte/Brot.md", "Rezepte/Kuchen.md"]);
+    expect(paths("-line:(mehl zucker)")).toEqual(["Rezepte/Brot.md"]);
+  });
+
+  it("requires section: terms under one heading", () => {
+    expect(paths("section:(eier zucker)")).toEqual(["Rezepte/Kuchen.md"]);
+    expect(paths("section:(eier rechnung)")).toEqual([]);
+    expect(paths("section:(wasser zucker)")).toEqual(["Rezepte/Brot.md"]);
+  });
+
+  it("finds open, done and any tasks", () => {
+    expect(paths("task-todo:mehl")).toEqual(["Rezepte/Kuchen.md"]);
+    expect(paths("task-done:mehl")).toEqual(["Rezepte/Brot.md"]);
+    expect(paths("task:zucker")).toEqual(["Rezepte/Kuchen.md"]);
+    // A task's checkbox and bullet are not part of its text.
+    expect(paths("task:x")).toEqual([]);
+    expect(hits('task-todo:""')).toEqual(["Mehl kaufen"]);
+    expect(paths("task-done:()")).toEqual(["Rezepte/Brot.md", "Rezepte/Kuchen.md"]);
+  });
+
+  it("matches regular expressions case-insensitively", () => {
+    expect(paths("/\\d{4}-\\d{2}-\\d{2}/")).toEqual(["Rezepte/Kuchen.md"]);
+    expect(hits("/\\d{4}-\\d{2}-\\d{2}/")).toEqual(["2026-11-03"]);
+    expect(paths("/^mehl$/m")).toEqual([]);
+    expect(paths("/^MEHL$/")).toEqual(["Rezepte/Brot.md"]);
+    expect(paths("line:/^mehl$/")).toEqual(["Rezepte/Brot.md"]);
+    expect(paths("-/wasser/")).toEqual(["Rezepte/Kuchen.md"]);
+    expect(paths("line:(/z.cker/ mehl)")).toEqual(["Rezepte/Kuchen.md"]);
   });
 });

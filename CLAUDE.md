@@ -148,10 +148,11 @@ No UI framework: DOM is built with the `h()` / `icon()` helpers in `src/ui/dom.t
   views (explorer, search, side panels, reading view, switcher/command palette, settings).
 - `src/store.ts` — `NoteStore` serializes saves and keeps localStorage drafts that remember the
   original conflict base, so recovery cannot silently overwrite external changes.
-- `src/app/vault-index.ts` — in-memory link/tag/heading index and the search query parser
-  (`tag:`, `path:`, `file:`) behind backlinks, unlinked mentions, outgoing links, tags and
-  search. Frontmatter `aliases` are indexed for completion (`[[Note|Alias]]`), the quick
-  switcher and unlinked mentions; like in Obsidian, `[[Alias]]` alone does not resolve.
+- `src/app/vault-index.ts` — in-memory link/tag/heading index and search (query syntax in
+  `search-query.ts`: `tag:`, `path:`, `file:`, `line:`, `section:`, `task*:`, `/regex/`)
+  behind backlinks, unlinked mentions, outgoing links, tags and search. Frontmatter
+  `aliases` are indexed for completion (`[[Note|Alias]]`), the quick switcher and unlinked
+  mentions; like in Obsidian, `[[Alias]]` alone does not resolve.
   `LinkResolver`
   resolves links for any file list; `src/app/link-update.ts` compares resolution before and
   after a rename/move and rewrites only links whose target would change (wiki links, embeds,
@@ -170,6 +171,10 @@ No UI framework: DOM is built with the `h()` / `icon()` helpers in `src/ui/dom.t
   - Registered plugin code-block processors (`plugin-blocks.ts`) take precedence over the
     built-in Mermaid renderer; `MarkdownEditor.refreshPluginBlocks()` re-renders after plugin
     changes.
+  - Image, media and note embeds (`embeds.ts`) render through the reading view's
+    `RenderScope` (`src/app/embed-render.ts`, via `editor-embeds.ts`); plugin embeds win.
+    Sections/blocks are cut by `src/subpath.ts`; image object URLs are shared through
+    `image-cache.ts`, cleared on vault switch.
 - `src/app/rich-content.ts` — KaTeX/Mermaid are dynamically imported only when a note uses them,
   to keep vault opening fast; keep heavy renderers (also `pdf-runtime.ts`) out of the initial
   bundle.
