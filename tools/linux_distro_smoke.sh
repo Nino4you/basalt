@@ -7,7 +7,9 @@
 #
 # The .deb is installed with the distribution's package manager, so missing
 # or too new dependencies fail here. The AppImage gets only Xvfb plus the
-# GTK/WebKit base libraries a desktop has anyway. Needs docker.
+# libraries every desktop has and AppImages deliberately leave to the host
+# (GTK, Mesa/EGL, X11/Wayland clients, fontconfig, libgpg-error, gmp ...);
+# minimal container images lack them. Needs docker.
 set -euo pipefail
 
 image="$1"
@@ -35,7 +37,7 @@ case "$ID" in
     fi
     ;;
   fedora)
-    dnf install -y -q xorg-x11-server-Xvfb xorg-x11-xauth gtk3 mesa-libEGL mesa-libGLES which > /tmp/install.log 2>&1 || { tail -20 /tmp/install.log; exit 1; }
+    dnf install -y -q xorg-x11-server-Xvfb xorg-x11-xauth which gtk3 mesa-libEGL mesa-libGLES mesa-libGL mesa-libgbm libdrm libgpg-error gmp libcom_err fribidi harfbuzz libX11-xcb libwayland-client > /tmp/install.log 2>&1 || { tail -20 /tmp/install.log; exit 1; }
     ;;
   arch)
     pacman -Syu --noconfirm --quiet xorg-server-xvfb xorg-xauth gtk3 mesa > /tmp/install.log 2>&1 || { tail -20 /tmp/install.log; exit 1; }
