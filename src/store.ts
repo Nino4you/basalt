@@ -15,9 +15,17 @@ export interface Recovery {
   savedAt: string;
 }
 
+/**
+ * How often the app backs up its own autosaved content while someone keeps
+ * typing. Content the app did not write itself is always backed up.
+ */
+export const OWN_BACKUP_INTERVAL = 5 * 60_000;
+
 /** Serializes saves and retains edits made while an earlier snapshot is being saved. */
 export class NoteStore {
   readonly notes = new Map<string, Note>();
+  /** What this store last wrote per path, and when that path was last backed up. */
+  private readonly written = new Map<string, { text: string; backedUp: number }>();
   private pending: Promise<void> = Promise.resolve();
   private readonly deleting = new Set<string>();
   private readonly deleted = new WeakSet<Note>();
@@ -79,20 +87,35 @@ export class NoteStore {
       );
   }
 
-  save(note: Note): Promise<void> {
+  /** `backup: true` backs up the replaced content even if it was a recent own write. */
+  save(note: Note, options: { backup?: boolean } = {}): Promise<void> {
     const operation = this.pending
       .catch(() => {})
       .then(async () => {
-        if (!this.deleted.has(note)) await this.saveSnapshot(note);
+        if (!this.deleted.has(note))
+          await this.saveSnapshot(note, options.backup === true);
       });
     this.pending = operation;
     return operation;
   }
 
-  private async saveSnapshot(note: Note): Promise<void> {
+  private async saveSnapshot(note: Note, force: boolean): Promise<void> {
     const snapshot = note.text;
     if (snapshot === note.saved) return;
-    await this.api.save(note.path, snapshot, note.saved, this.vaultId);
+    // The replaced content needs a backup unless this store wrote it itself
+    // and backed this file up a short while ago.
+    const own = this.written.get(note.path);
+    const now = Date.now();
+    const backup =
+      force ||
+      !own ||
+      own.text !== note.saved ||
+      now - own.backedUp >= OWN_BACKUP_INTERVAL;
+    await this.api.save(note.path, snapshot, note.saved, this.vaultId, backup);
+    this.written.set(note.path, {
+      text: snapshot,
+      backedUp: backup ? now : own!.backedUp,
+    });
     note.saved = snapshot;
     note.recovered = false;
     if (note.text === snapshot)
@@ -119,8 +142,9 @@ export class NoteStore {
         let note = this.notes.get(path);
         if (!note && localStorage.getItem(this.draftKey(path)) !== null)
           note = await this.loadSnapshot(path);
-        if (note) await this.saveSnapshot(note);
+        if (note) await this.saveSnapshot(note, false);
         await this.api.remove(path, note?.saved, this.vaultId);
+        this.written.delete(path);
         if (note) this.deleted.add(note);
         this.notes.delete(path);
         localStorage.removeItem(this.draftKey(path));
@@ -152,8 +176,11 @@ export class NoteStore {
         let note = this.notes.get(from);
         if (!note && localStorage.getItem(this.draftKey(from)) !== null)
           note = await this.loadSnapshot(from);
-        if (note) await this.saveSnapshot(note);
+        if (note) await this.saveSnapshot(note, false);
         await this.api.move(from, to, note?.saved, this.vaultId);
+        const own = this.written.get(from);
+        this.written.delete(from);
+        if (own) this.written.set(to, own);
         localStorage.removeItem(this.draftKey(from));
         if (!note) return;
         this.notes.delete(from);

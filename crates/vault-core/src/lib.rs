@@ -68,6 +68,14 @@ pub trait VaultStorage {
     /// Must fail rather than overwrite an existing file. Parent folders must exist.
     fn create_text(&self, path: &VaultPath, text: &str) -> io::Result<()>;
     fn save_text(&self, path: &VaultPath, text: &str, expected: &str) -> io::Result<()>;
+    /// Like [`save_text`](Self::save_text), but the replaced content gets no history backup.
+    ///
+    /// Only for callers that know the replaced content is their own recent write that is
+    /// already backed up (autosave while typing). Storages may keep backing up; the default
+    /// does.
+    fn save_text_unbacked(&self, path: &VaultPath, text: &str, expected: &str) -> io::Result<()> {
+        self.save_text(path, text, expected)
+    }
 }
 
 /// Optional attachment storage. Native IPC and Android SAF adapters must opt in explicitly.
@@ -292,7 +300,7 @@ impl DirectoryVault {
     /// Atomic replacement with a previous-version backup and optimistic conflict check.
     /// Callers must serialize writes. Uncooperative external writers can still race the final rename.
     pub fn save_text(&self, path: &VaultPath, text: &str, expected: &str) -> io::Result<()> {
-        self.save_bytes(path, text.as_bytes(), expected.as_bytes(), true)
+        self.save_bytes(path, text.as_bytes(), expected.as_bytes(), true, true)
     }
 
     fn create_bytes(&self, path: &VaultPath, data: &[u8]) -> io::Result<()> {
@@ -309,6 +317,7 @@ impl DirectoryVault {
         data: &[u8],
         expected: &[u8],
         text: bool,
+        backup: bool,
     ) -> io::Result<()> {
         if self
             .directory
@@ -344,13 +353,15 @@ impl DirectoryVault {
             std::process::id(),
             NEXT_WRITE.fetch_add(1, Ordering::Relaxed)
         );
-        let history = format!(".basalt/history/{}", path.as_str());
-        self.directory.create_dir_all(&history)?;
-        let extension = if text { "md" } else { "bin" };
-        self.create_bytes(
-            &VaultPath::parse(&format!("{history}/{id}.{extension}"))?,
-            &current,
-        )?;
+        if backup {
+            let history = format!(".basalt/history/{}", path.as_str());
+            self.directory.create_dir_all(&history)?;
+            let extension = if text { "md" } else { "bin" };
+            self.create_bytes(
+                &VaultPath::parse(&format!("{history}/{id}.{extension}"))?,
+                &current,
+            )?;
+        }
         let parent = Path::new(path.as_str()).parent().unwrap_or(Path::new(""));
         let temp = parent.join(format!(".basalt-{id}.tmp"));
         let mut options = OpenOptions::new();
@@ -382,6 +393,10 @@ impl VaultStorage for DirectoryVault {
         DirectoryVault::save_text(self, path, text, expected)
     }
 
+    fn save_text_unbacked(&self, path: &VaultPath, text: &str, expected: &str) -> io::Result<()> {
+        self.save_bytes(path, text.as_bytes(), expected.as_bytes(), true, false)
+    }
+
     fn document_files(&self) -> io::Result<Vec<VaultPath>> {
         let mut files = Vec::new();
         collect_documents(&self.directory, "", &mut files, 0)?;
@@ -411,7 +426,7 @@ impl BinaryVaultStorage for DirectoryVault {
 
     fn save_binary(&self, path: &VaultPath, data: &[u8], expected: &[u8]) -> io::Result<()> {
         self.check_path(path, false)?;
-        self.save_bytes(path, data, expected, false)
+        self.save_bytes(path, data, expected, false, true)
     }
 }
 

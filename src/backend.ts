@@ -36,11 +36,17 @@ export interface Backend {
     expected?: string,
     vaultId?: string,
   ): Promise<void>;
+  /**
+   * Version-checked replacement. `backup: false` skips the history backup of
+   * the replaced content; only for the app's own recent, already backed-up
+   * writes. Storages may back up anyway (Android SAF always does).
+   */
   save(
     path: string,
     text: string,
     expected: string,
     vaultId?: string,
+    backup?: boolean,
   ): Promise<void>;
   choose(): Promise<VaultInfo | null>;
   export(path: string, text: string): Promise<boolean>;
@@ -185,13 +191,24 @@ export class BrowserBackend implements Backend {
     localStorage.setItem(this.key, JSON.stringify(files));
   }
 
-  async save(path: string, text: string, expected: string): Promise<void> {
+  async save(
+    path: string,
+    text: string,
+    expected: string,
+    _vaultId?: string,
+    backup = true,
+  ): Promise<void> {
     const files = this.files();
     if (!Object.hasOwn(files, path) || files[path] !== expected)
       throw new Error(
         t("Die Notiz wurde außerhalb des Editors geändert. Bitte zuerst neu laden."),
       );
     if (files[path] === text) return;
+    if (!backup) {
+      files[path] = text;
+      localStorage.setItem(this.key, JSON.stringify(files));
+      return;
+    }
     // Like the native vault, keep the previous content. Browser storage is
     // small, so the demo keeps only the newest versions of each note.
     const history = `${HISTORY_DIR}/${path}/`;
@@ -343,8 +360,9 @@ class NativeBackend implements Backend {
     text: string,
     expected: string,
     vaultId = this.vaultId,
+    backup = true,
   ): Promise<void> {
-    return invoke("save_note", { path, text, expected, vaultId });
+    return invoke("save_note", { path, text, expected, vaultId, backup });
   }
   async choose(): Promise<VaultInfo | null> {
     const info = await invoke<VaultInfo | null>("choose_vault", {

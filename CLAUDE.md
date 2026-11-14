@@ -102,7 +102,8 @@ src/ (WebView UI)  ──invoke──▶  src-tauri/src/lib.rs (IPC commands)  �
   (entry snapshots, mkdir, delete). `DirectoryVault` implements them on a `cap-std` directory
   handle so nothing can escape the vault root; `crates/vault-core/tests/vault.rs` covers path and
   symlink escapes. Saves are compare-and-swap against the previously loaded content and first
-  write a backup to `.basalt/history/`.
+  write a backup to `.basalt/history/`; `save_text_unbacked` skips that backup for the app's
+  own recent autosaves only (Android keeps backing up).
 - **`src-tauri`** holds one `Mutex<Session>` with a boxed storage backend. Commands that read or
   write vault files take a `vaultId` and are rejected (`lock_session`) if it does not match the
   current session, so stale frontend state
@@ -229,7 +230,9 @@ These are deliberate and documented in `SECURITY.md` / `docs/`:
 - Plugin code is trusted, not sandboxed. `'unsafe-eval'` in the CSP (`src-tauri/tauri.conf.json`)
   exists solely for the CommonJS loader; do not widen the CSP further without need.
 - Writes never overwrite blindly: creation is exclusive, replacement and deletion are
-  version-checked and backed up first. Folder deletion is rejected.
+  version-checked and backed up first. The only exception: `NoteStore` backs up its *own*
+  autosaved content at most every five minutes per note; anything it did not write itself, and
+  whatever a restore or link update replaces, is always backed up. Folder deletion is rejected.
 - Basalt implements the public `obsidian.d.ts` API surface. Never commit
   Obsidian application code, unpacked app packages or decompiler output.
 - Storage changes usually need both paths (note `Backend` and plugin `NativeVaultPort`) and both

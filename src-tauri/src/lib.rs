@@ -501,22 +501,28 @@ async fn create_note(
         .map_err(error)
 }
 
+/// `backup: false` skips the history backup; the frontend asks for that only when the
+/// replaced content is its own recent, already backed-up write. Missing means `true`.
 #[tauri::command]
 async fn save_note(
     path: String,
     text: String,
     expected: String,
     vault_id: String,
+    backup: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<()> {
     let path = VaultPath::parse(&path).map_err(error)?;
     if !path.is_document() {
         return Err("Only Markdown notes and canvases can be edited".into());
     }
-    lock_session(&state, &vault_id)?
-        .storage
-        .save_text(&path, &text, &expected)
-        .map_err(error)
+    let session = lock_session(&state, &vault_id)?;
+    if backup == Some(false) {
+        session.storage.save_text_unbacked(&path, &text, &expected)
+    } else {
+        session.storage.save_text(&path, &text, &expected)
+    }
+    .map_err(error)
 }
 
 #[derive(Serialize)]

@@ -14,7 +14,12 @@ will get a response once the report has been reviewed.
 - The Rust core uses `cap-std` instead of joined absolute file paths. Only an explicit vault
   selection opens a new file system root.
 - Existing notes are never overwritten when creating a note. Saving checks the previously
-  loaded version and first writes a copy to `.basalt/history/`.
+  loaded version and first writes a copy to `.basalt/history/`. One exception keeps the history
+  readable: while someone keeps typing, the app's own autosaved content is backed up at most
+  every five minutes per note (`NoteStore`, `save_note` with `backup: false`). Content the app
+  did not write itself in this session, such as the version loaded from disk or an external
+  change, is always backed up before it is replaced, and so is everything a restore or a link
+  update replaces. Android (SAF) still backs up every save.
 - On Linux, a save first writes a separate file and replaces the target by rename.
   Uncoordinated external writers can still write between the check and the rename: there is no
   compare-and-swap that is guaranteed across file systems.

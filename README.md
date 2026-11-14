@@ -29,8 +29,9 @@ Obsidian vaults and selected Obsidian plugins.
   behave as you expect; existing Obsidian vaults open directly.
 - **Built for Linux and Android.** One shared Rust core, one native Tauri app for both
   platforms, and an interface that adapts to mouse, keyboard, touch and pen.
-- **Careful with your data.** Every change is backed up before it is saved, external edits are
-  detected instead of overwritten, and file access is confined to the vault.
+- **Careful with your data.** Content is backed up before it is overwritten (while you type,
+  every few minutes), external edits are detected instead of overwritten, and file access is
+  confined to the vault.
 
 ## Features
 

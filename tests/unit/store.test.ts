@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { BrowserBackend, type Backend } from "../../src/backend";
-import { NoteStore } from "../../src/store";
+import { NoteStore, OWN_BACKUP_INTERVAL } from "../../src/store";
 
 beforeEach(() => localStorage.clear());
 
@@ -255,4 +255,56 @@ it("never overwrites a file or loses changes when moving", async () => {
   await expect(api.read("Neu/Test.md")).rejects.toThrow();
   expect(note).toMatchObject({ path: "Test.md", text: "mine" });
   expect(store.isDeleting("Test.md")).toBe(false);
+});
+
+it("backs up foreign content always and its own autosaves every few minutes", async () => {
+  const real = new BrowserBackend();
+  await real.create("Test.md", "from disk");
+  const calls: boolean[] = [];
+  const api: Backend = {
+    info: () => real.info(),
+    read: (path) => real.read(path),
+    create: (p, t) => real.create(p, t),
+    remove: (p, e) => real.remove(p, e),
+    move: (f, t, e) => real.move(f, t, e),
+    choose: () => real.choose(),
+    export: (p, t) => real.export(p, t),
+    backups: () => real.backups(),
+    readBackup: (location) => real.readBackup(location),
+    save: (path, text, expected, vaultId, backup = true) => {
+      calls.push(backup);
+      return real.save(path, text, expected, vaultId, backup);
+    },
+  };
+  vi.useFakeTimers({ now: 0 });
+  try {
+    const store = new NoteStore(api, "test");
+    const note = await store.load("Test.md");
+    for (const text of ["a", "ab", "abc"]) {
+      store.edit(note, text);
+      await store.save(note);
+    }
+    // The content from disk is kept; the own intermediate states are not.
+    expect(calls).toEqual([true, false, false]);
+    vi.setSystemTime(OWN_BACKUP_INTERVAL);
+    store.edit(note, "abcd");
+    await store.save(note);
+    store.edit(note, "abcde");
+    await store.save(note, { backup: true });
+    expect(calls).toEqual([true, false, false, true, true]);
+    const versions = (await real.backups()).map((b) =>
+      real.readBackup(b.location),
+    );
+    expect(await Promise.all(versions)).toEqual(["abcd", "abc", "from disk"]);
+
+    // Someone else wrote the file: its content is backed up before it is replaced.
+    await real.save("Test.md", "external", "abcde");
+    const fresh = await new NoteStore(api, "test").load("Test.md");
+    store.edit(fresh, "mine");
+    calls.length = 0;
+    await new NoteStore(api, "test").save(fresh);
+    expect(calls).toEqual([true]);
+  } finally {
+    vi.useRealTimers();
+  }
 });

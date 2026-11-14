@@ -1729,7 +1729,11 @@ export class App {
     );
   }
 
-  async save(note: Note | null = this.activeNote): Promise<void> {
+  /** `backup: true` always backs up the replaced content (see `NoteStore.save`). */
+  async save(
+    note: Note | null = this.activeNote,
+    options: { backup?: boolean } = {},
+  ): Promise<void> {
     const store = this.store;
     if (!note || !store) return;
     clearTimeout(this.saveTimers.get(note));
@@ -1737,7 +1741,7 @@ export class App {
     if (note === this.activeDocument && note.text !== note.saved)
       this.setSaveStatus("saving", t("Wird gespeichert …"));
     try {
-      await store.save(note);
+      await store.save(note, options);
       this.failed.delete(note.path);
       this.savedPaths.add(note.path);
       this.refreshCompatLater();
@@ -1841,7 +1845,8 @@ export class App {
     const store = this.store;
     if (!store) throw new Error(t("Kein Vault geöffnet."));
     store.edit(note, text);
-    await this.save(note);
+    // Restores and link updates are not typing: always keep what they replace.
+    await this.save(note, { backup: true });
     for (const tab of this.allTabs) if (tab.note === note) tab.state = null;
     if (this.activeDocument === note) {
       if (this.active.kind === "canvas") this.canvasView?.setText(text);

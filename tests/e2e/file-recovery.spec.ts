@@ -21,7 +21,10 @@ async function fileMenu(page: Page, item: string) {
 
 /** Autosave runs 800 ms after the last edit; the status turns to "saved". */
 async function typeAndSave(page: Page, text: string) {
-  await editorOf(page).fill(text);
+  // fill() can append right after a reload; select everything and replace it.
+  await editorOf(page).click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.insertText(text);
   await expect
     .poll(() =>
       page.evaluate(
@@ -39,7 +42,17 @@ test("restores an earlier version without losing the current one", async ({
   await page.goto("/");
   await createNote(page, "Verlauf");
   await typeAndSave(page, "Erste Fassung");
+  // A quick correction of the app's own autosave gets no version of its own.
+  await typeAndSave(page, "Erste Fassung, korrigiert");
+  // A new session backs up what it finds on disk before replacing it.
+  const reopen = async (loaded: string) => {
+    await page.reload();
+    await expect(page.locator("#tab-name")).toHaveText("Verlauf");
+    await expect(editorOf(page)).toContainText(loaded);
+  };
+  await reopen("Erste Fassung, korrigiert");
   await typeAndSave(page, "Zweite Fassung");
+  await reopen("Zweite Fassung");
   await typeAndSave(page, "Dritte Fassung");
 
   await fileMenu(page, "Versionsverlauf");
@@ -59,14 +72,16 @@ test("restores an earlier version without losing the current one", async ({
   await expect(rows).toHaveCount(3);
   await rows.nth(1).click();
   await dialog.getByRole("button", { name: "Inhalt", exact: true }).click();
-  await expect(dialog.locator(".recovery-text")).toHaveText("Erste Fassung");
+  await expect(dialog.locator(".recovery-text")).toHaveText(
+    "Erste Fassung, korrigiert",
+  );
   await dialog
     .getByRole("button", { name: "Wiederherstellen", exact: true })
     .click();
 
   await expect(dialog).toBeHidden();
   // The editor also shows the inline title.
-  await expect(editorOf(page)).toContainText("Erste Fassung");
+  await expect(editorOf(page)).toContainText("Erste Fassung, korrigiert");
   await expect(editorOf(page)).not.toContainText("Dritte Fassung");
   await expect
     .poll(() =>
@@ -74,7 +89,7 @@ test("restores an earlier version without losing the current one", async ({
         () => JSON.parse(localStorage.getItem("basalt-demo-v1")!)["Verlauf.md"],
       ),
     )
-    .toBe("Erste Fassung");
+    .toBe("Erste Fassung, korrigiert");
 
   // The replaced content is a version itself now.
   await fileMenu(page, "Versionsverlauf");

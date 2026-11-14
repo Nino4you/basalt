@@ -35,7 +35,7 @@ const de = {
     "Ein gemeinsamer Rust-Kern, eine native App und eine Oberfläche für Maus, Tastatur, Touch und Stift.",
   "p4.title": "Sorgsam mit deinen Daten",
   "p4.text":
-    "Jede Änderung wird vor dem Speichern gesichert, und frühere Fassungen lassen sich zurückholen. Änderungen von außen werden erkannt statt überschrieben.",
+    "Frühere Fassungen werden vor dem Überschreiben gesichert und lassen sich zurückholen. Änderungen von außen werden erkannt statt überschrieben.",
   "f1.title": "Markdown, das dir nicht im Weg steht",
   "f1.text":
     "In der Live-Vorschau tritt die Syntax beim Schreiben zurück. Links und Checkboxen sind anklickbar, Formeln, Diagramme und Tabellen erscheinen direkt im Editor. Maßgeblich bleibt das Markdown darunter.",

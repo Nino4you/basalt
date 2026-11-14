@@ -587,3 +587,19 @@ fn backup_listing_ignores_symlinks() {
     let error = read_backup(&fixture.vault(), &path(".basalt/history/b.md/2-0.md")).unwrap_err();
     assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
 }
+
+#[test]
+fn unbacked_saves_keep_the_conflict_check_but_skip_the_history() {
+    let fixture = Fixture::new();
+    let vault = fixture.vault();
+    let note = path("note.md");
+    vault.create_text(&note, "one").unwrap();
+    vault.save_text_unbacked(&note, "two", "one").unwrap();
+    assert_eq!(vault.read_text(&note).unwrap(), "two");
+    assert!(!fixture.0.join(".basalt").exists());
+    let error = vault.save_text_unbacked(&note, "three", "one").unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::AlreadyExists);
+    assert_eq!(vault.read_text(&note).unwrap(), "two");
+    vault.save_text(&note, "three", "two").unwrap();
+    assert_eq!(list_backups(&vault).unwrap().len(), 1);
+}
