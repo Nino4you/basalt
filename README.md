@@ -94,6 +94,10 @@ Packages are published under [Releases](https://github.com/Nino4you/basalt/relea
 | Windows x64             | `Basalt_<version>_x64-setup.exe`         |
 | Android (ARM64, x86_64) | `Basalt_<version>_android-universal.apk` |
 
+The Linux packages need glibc 2.35 or newer and WebKitGTK 4.1, for example Ubuntu 22.04,
+Debian 12, Fedora or Arch Linux. Every build is started on Debian 12, Ubuntu 24.04 (`.deb`),
+Fedora and Arch Linux (AppImage) before it is released.
+
 All downloads are signed. Please verify them against these fingerprints as described in
 [docs/release-signing.md](docs/release-signing.md#verifying-downloads):
 
