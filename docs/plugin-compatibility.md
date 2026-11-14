@@ -152,6 +152,12 @@ promise shortcuts `.json`, `.text` and `.arrayBuffer`. In the native app it runs
 outside the WebView, so it is not subject to CORS (see `SECURITY.md`); the browser demo keeps
 using `fetch`. API contract: https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts.
 
+Settings → Community plugins can browse the Obsidian community catalog, install the latest
+GitHub release of a catalog plugin or any repository, install from local files, check for updates
+and uninstall (`src/compat/plugin-catalog.ts`, `src/app/plugin-install.ts`). Only the plugins
+listed in `VERIFIED_PLUGINS` there are marked as checked, with the version above; keep that list
+in sync with this document. Being installable says nothing about compatibility.
+
 `FileManager.renameFile` moves the file and, when "Automatically update internal links" is on,
 rewrites links to it in notes and canvases exactly like a rename in the app: only links whose
 target would change, each file through a version-checked `Vault.process`. Files that fail keep

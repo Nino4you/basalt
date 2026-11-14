@@ -15,6 +15,14 @@ import { notify } from "../ui/notice";
 import { eventHotkey, isAssignable, type Command } from "./commands";
 import { formatDate } from "../dates";
 import { templatePaths } from "./templates";
+import {
+  confirmUninstall,
+  findUpdates,
+  installFromFiles,
+  openPluginCatalog,
+  promptGithubInstall,
+  updatePlugin,
+} from "./plugin-install";
 import type { App } from "./app";
 import { DEFAULT_ACCENT, type Settings } from "./settings";
 
@@ -738,12 +746,10 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
           text: app.compatStatus,
         }),
       );
-      heading(content, t("Installierte Plugins"));
       const bundles = h("div", { id: "plugin-bundles" });
-      content.append(bundles);
       const firstTab = (id: string) =>
         plugins.find((entry) => entry.id.startsWith(`plugin:${id}:`));
-      void renderBundles(app, bundles, {
+      const hooks: BundleHooks = {
         hasSettings: (id) => Boolean(firstTab(id)),
         openSettings: (id) => {
           const entry = firstTab(id);
@@ -753,7 +759,89 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
           plugins = pluginTabs(app);
           renderNav();
         },
+        updates: new Map(),
+      };
+      const rerender = () => {
+        hooks.changed();
+        void renderBundles(app, bundles, hooks);
+      };
+      const filePicker = h("input", {
+        attrs: {
+          type: "file",
+          multiple: true,
+          accept: ".json,.js,.css",
+          hidden: true,
+          "aria-label": t("Plugin-Dateien auswählen"),
+        },
       });
+      filePicker.addEventListener("change", () => {
+        const files = [...(filePicker.files ?? [])];
+        filePicker.value = "";
+        if (files.length) void installFromFiles(app, files, rerender);
+      });
+      const nativeOnly = !app.compatibility;
+      const checkUpdates = h("button", {
+        text: t("Nach Updates suchen"),
+        attrs: { type: "button", disabled: nativeOnly },
+      });
+      checkUpdates.addEventListener("click", () => {
+        checkUpdates.disabled = true;
+        checkUpdates.textContent = t("Wird geprüft …");
+        void findUpdates(app)
+          .then((updates) => {
+            hooks.updates = updates;
+            const status = document.getElementById("compat-status");
+            if (status)
+              status.textContent = updates.size
+                ? t("Updates verfügbar: {count}", { count: updates.size })
+                : t("Alle Plugins sind aktuell.");
+            void renderBundles(app, bundles, hooks);
+          })
+          .catch((error) => app.report(error))
+          .finally(() => {
+            checkUpdates.disabled = false;
+            checkUpdates.textContent = t("Nach Updates suchen");
+          });
+      });
+      content.append(
+        h(
+          "div",
+          "plugin-actions",
+          h(
+            "button",
+            {
+              class: "mod-cta",
+              attrs: { type: "button" },
+              on: { click: () => openPluginCatalog(app, rerender) },
+            },
+            icon("search", 16),
+            t("Durchsuchen"),
+          ),
+          h(
+            "button",
+            {
+              attrs: { type: "button", disabled: nativeOnly },
+              on: { click: () => promptGithubInstall(app, rerender) },
+            },
+            icon("download", 16),
+            t("Von GitHub"),
+          ),
+          h(
+            "button",
+            {
+              attrs: { type: "button", disabled: nativeOnly },
+              on: { click: () => filePicker.click() },
+            },
+            icon("file-plus", 16),
+            t("Aus Dateien"),
+          ),
+          checkUpdates,
+          filePicker,
+        ),
+      );
+      heading(content, t("Installierte Plugins"));
+      content.append(bundles);
+      void renderBundles(app, bundles, hooks);
     },
   };
 
@@ -904,6 +992,8 @@ interface BundleHooks {
   hasSettings: (id: string) => boolean;
   openSettings: (id: string) => void;
   changed: () => void;
+  /** Newer releases found by "Check for updates", by plugin id. */
+  updates: Map<string, { repo: string; version: string }>;
 }
 
 async function renderBundles(
@@ -1005,6 +1095,46 @@ async function renderBundles(
         })();
       });
       const control = h("div", "setting-item-control");
+      const update = hooks.updates.get(listing.id);
+      if (update)
+        control.append(
+          h("button", {
+            class: "mod-cta",
+            text: t("Auf {version} aktualisieren", { version: update.version }),
+            attrs: { type: "button" },
+            on: {
+              click: (event) => {
+                const button = event.currentTarget as HTMLButtonElement;
+                button.disabled = true;
+                void updatePlugin(app, listing.id, update.repo, () => {
+                  hooks.updates.delete(listing.id);
+                  hooks.changed();
+                })
+                  .catch((error) => app.report(error))
+                  .finally(() => void renderBundles(app, container, hooks));
+              },
+            },
+          }),
+        );
+      control.append(
+        h(
+          "button",
+          {
+            class: "clickable-icon",
+            label: t("{name} deinstallieren", { name }),
+            attrs: { type: "button" },
+            on: {
+              click: () =>
+                confirmUninstall(app, listing.id, name, () => {
+                  hooks.updates.delete(listing.id);
+                  hooks.changed();
+                  void renderBundles(app, container, hooks);
+                }),
+            },
+          },
+          icon("trash-2", 18),
+        ),
+      );
       if (enabled && hooks.hasSettings(listing.id))
         control.append(
           h(

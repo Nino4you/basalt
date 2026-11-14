@@ -91,9 +91,9 @@ const de = {
   "pl.title": "Bring deine Plugins mit. Vorerst die ausgewählten.",
   "pl.text":
     "Basalt bringt eine eigene Umsetzung der Obsidian-Plugin-API mit. Das Ziel ist verlässliche Unterstützung für ausgewählte Plugins statt eines vagen Versprechens für alle.",
-  "pl.a.title": "Einzeln freischalten",
+  "pl.a.title": "Ein Katalog, und deine eigenen",
   "pl.a.text":
-    "Plugins liegen im Vault unter <code>Basalt/Plugins/</code> und laufen erst, wenn du jedes einzeln in den Einstellungen aktivierst.",
+    "Durchsuche den Community-Katalog, installiere von GitHub oder aus eigenen Dateien. Nichts läuft, bevor du es aktivierst.",
   "pl.b.title": "Ehrlich bei Lücken",
   "pl.b.text":
     "Eine fehlende API schlägt sichtbar fehl, statt Erfolg vorzutäuschen. Plugins, die Node.js oder Electron brauchen, laufen nicht.",

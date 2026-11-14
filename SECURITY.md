@@ -56,6 +56,18 @@ will get a response once the report has been reviewed.
   allowed, request and response bodies are capped at 64 MiB, and TLS certificates are verified
   against the bundled webpki roots. Plugins already had network access; only the browser's
   cross-origin restriction goes away.
+- The plugin catalog (Settings → Community plugins) downloads the community plugin list and
+  download counts from `raw.githubusercontent.com/obsidianmd/obsidian-releases`, and plugin
+  releases from `github.com/<owner>/<repo>/releases/latest/download/`, through the same
+  `requestUrl` path (Rust in the app, `fetch` in the browser demo). Nothing is downloaded until
+  the settings page is used, and nothing updates automatically. Basalt does not verify release
+  signatures or review plugin code: the catalog marks the few plugins checked with Basalt and
+  calls the rest untested. Before writing anything, the app validates the manifest (and its id
+  against the catalog entry) and the loader's size limits, and asks for confirmation with a
+  warning that plugins are not sandboxed. Installing writes only into `Basalt/Plugins/<id>/`
+  through the plugin config view, with the usual version checks and backups, and never enables
+  the plugin. `basalt-source.json` there records the repository for update checks. Uninstalling
+  deletes the plugin's files (backed up to `.basalt/trash/`); the empty folder stays.
 - Plugin paths under `.obsidian/plugins/<id>` map to `Basalt/Plugins/<id>`. Like `.obsidian` in
   Obsidian, `Basalt/Plugins` is not vault content for plugins: it is missing from `getFiles()`
   and vault events and is reachable only through the adapter and the loader. This keeps sync

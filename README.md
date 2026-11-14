@@ -114,6 +114,17 @@ Basalt ships its own implementation of the Obsidian plugin API. Plugins live in 
 `Basalt/Plugins/<id>/` (`manifest.json`, `main.js`, optional `styles.css`) and only run after
 you enable each one in the settings.
 
+Settings → Community plugins installs them for you:
+
+- **Browse** the Obsidian community catalog. Plugins Basalt has checked are marked; all others
+  are untested and may work, partly work or fail visibly.
+- **From GitHub** installs the latest release of any repository, such as your own plugin or a
+  beta that is not in the catalog.
+- **From files** installs a plugin you built yourself from its `manifest.json`, `main.js` and
+  `styles.css`.
+- **Check for updates** offers newer releases of installed plugins; updates keep their settings,
+  and every replaced or uninstalled file is backed up in the vault.
+
 > [!WARNING]
 > Plugin code is not sandboxed and runs with the same permissions as the app. Only enable
 > plugins you trust.
