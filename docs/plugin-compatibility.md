@@ -130,6 +130,10 @@ The loader follows a deliberately narrow but real execution model:
   the host.
 - No bundle is loaded without explicit consent. Plugins are activated one by one in the settings,
   and the choice is saved and restored per vault.
+- `app.plugins` offers `getPlugin`, `enablePlugin`/`disablePlugin` and the `...AndSave` variants
+  for installed bundles, so plugins that update their own files can reload themselves.
+  `enablePlugin` re-reads the bundle from disk and rejects on failure instead of resolving
+  `false`.
 - Plugin code deliberately gets access to the DOM, WebView storage and the app's Tauri commands.
   That is why `'unsafe-eval'` is needed in the CSP; it is a trust decision for locally installed
   bundles, not a sandbox.

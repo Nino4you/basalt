@@ -4,7 +4,10 @@ import { Editor } from "../../src/compat/editor-adapter";
 import { EditorExtensionRegistry } from "../../src/compat/editor-extensions";
 import type { FileEntry, FileStats } from "../../src/compat/files";
 import { fetchRequestUrl, nativeRequestUrl } from "../../src/compat/request";
-import { CompatibilitySession } from "../../src/compat/session";
+import {
+  CompatibilitySession,
+  type CompatibilityOptions,
+} from "../../src/compat/session";
 import type { VaultStoragePort } from "../../src/compat/storage-port";
 
 beforeEach(() => localStorage.clear());
@@ -100,7 +103,10 @@ function seedPlugin(port: MemoryPort) {
   port.seed("Note.md", "# Note");
 }
 
-async function open(port: MemoryPort) {
+async function open(
+  port: MemoryPort,
+  pluginUi?: CompatibilityOptions["pluginUi"],
+) {
   const editor = new Editor({
     state: EditorState.create({ doc: "" }),
     hasFocus: false,
@@ -118,6 +124,7 @@ async function open(port: MemoryPort) {
     container: document.createElement("div"),
     navigate: async () => {},
     port,
+    pluginUi,
   });
 }
 
@@ -305,5 +312,62 @@ it("applies the same semantics to the browser fetch transport", async () => {
     expect(response.text).toBe("nope");
   } finally {
     fetchMock.mockRestore();
+  }
+});
+
+const SELF_UPDATING = (version: string) => `
+const { Plugin } = require("obsidian");
+module.exports = class extends Plugin {
+  onload() {
+    (globalThis.loadedVersions ??= []).push(${JSON.stringify(version)});
+  }
+  async update(source) {
+    const dir = this.manifest.dir;
+    await this.app.vault.adapter.write(dir + "/main.js", source);
+    const plugins = this.app.plugins;
+    await plugins.disablePlugin(this.manifest.id);
+    await plugins.enablePlugin(this.manifest.id);
+  }
+};
+`;
+
+it("lets a plugin reload itself through app.plugins after updating its files", async () => {
+  const port = new MemoryPort("reload");
+  seedPlugin(port);
+  port.seed("Basalt/Plugins/fixture/main.js", SELF_UPDATING("1"));
+  const release = vi.fn();
+  const refresh = vi.fn();
+  const session = await open(port, { release, refresh });
+  const globals = globalThis as { loadedVersions?: string[] };
+  globals.loadedVersions = [];
+  try {
+    const plugin = (await session.bundleHost.enable("fixture")) as unknown as {
+      update(source: string): Promise<void>;
+    };
+    expect(session.plugins.getPlugin("fixture")).toBe(plugin);
+    await plugin.update(SELF_UPDATING("2"));
+    expect(globals.loadedVersions).toEqual(["1", "2"]);
+    expect(session.plugins.getPlugin("fixture")).not.toBe(plugin);
+    expect(session.bundleHost.isEnabled("fixture")).toBe(true);
+    expect(release).toHaveBeenCalledOnce();
+    expect(refresh).toHaveBeenLastCalledWith("fixture");
+
+    await session.plugins.disablePluginAndSave("fixture");
+    expect(session.bundleHost.isEnabled("fixture")).toBe(false);
+    expect(localStorage.getItem('basalt-plugin-enabled:"reload"')).toBe("[]");
+    await session.plugins.enablePluginAndSave("fixture");
+    expect(localStorage.getItem('basalt-plugin-enabled:"reload"')).toBe(
+      '["fixture"]',
+    );
+
+    port.seed("Basalt/Plugins/fixture/main.js", "throw new Error('broken')");
+    await session.plugins.disablePlugin("fixture");
+    await expect(session.plugins.enablePlugin("fixture")).rejects.toThrow(
+      /broken/,
+    );
+    expect(refresh).toHaveBeenLastCalledWith("fixture", expect.any(Error));
+  } finally {
+    delete globals.loadedVersions;
+    await session.dispose();
   }
 });

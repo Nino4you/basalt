@@ -54,6 +54,15 @@ export interface CompatibilityOptions {
   updateLinks?: () => boolean;
   /** The attachment folder setting (see `attachmentFolder`); "./" if not given. */
   attachmentFolder?: () => string;
+  /**
+   * Called around plugin (re)loads that plugins start themselves through
+   * `app.plugins`: the app releases plugin-owned UI before a plugin unloads
+   * and rebuilds it afterwards (`error` is set when loading failed).
+   */
+  pluginUi?: {
+    release(): void;
+    refresh(id: string, error?: unknown): void;
+  };
 }
 
 /** Internal app bridge, not an external plugin loader or a global `window.app`. */
@@ -197,6 +206,29 @@ export class CompatibilitySession {
       },
     });
     this.editorInfoCleanup = options.extensions.register(editorInfoField);
+    const ui = options.pluginUi;
+    this.plugins.setToggleHost({
+      enable: async (id) => {
+        // A self-update writes new files first; pick them up before loading.
+        await this.configVault.refresh();
+        try {
+          await this.bundleHost.enable(id);
+        } catch (error) {
+          ui?.refresh(id, error);
+          throw error;
+        }
+        ui?.refresh(id);
+      },
+      disable: async (id) => {
+        ui?.release();
+        try {
+          await this.bundleHost.disable(id);
+        } finally {
+          ui?.refresh(id);
+        }
+      },
+      save: () => this.saveEnabledPlugins(),
+    });
   }
 
   static async create(
