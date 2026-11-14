@@ -118,21 +118,37 @@ const formatDate = (iso: string) => {
       );
 };
 
-/** "1.2.0 · 3 Mar 2026 · pre-release · installed" for the version picker. */
+/** A short picker entry: "2.1.0-beta.2 (Vorabversion) ⚠". */
 function releaseLabel(
   release: PluginRelease,
   installedVersion: string | undefined,
-  verified: string | null,
 ): string {
-  return [
-    release.version,
-    formatDate(release.publishedAt),
+  const notes = [
     release.prerelease ? t("Vorabversion") : "",
     release.version === installedVersion ? t("installiert") : "",
-    release.version === verified ? t("geprüft") : "",
-    supportsMinAppVersion(release.minAppVersion)
-      ? ""
-      : t("braucht Obsidian {min}", { min: release.minAppVersion ?? "" }),
+  ].filter(Boolean);
+  return `${release.version}${notes.length ? ` (${notes.join(", ")})` : ""}${
+    supportsMinAppVersion(release.minAppVersion) ? "" : " ⚠"
+  }`;
+}
+
+/** The line under "Version": what the picked release is. */
+function releaseDetail(
+  release: PluginRelease,
+  installedVersion: string | undefined,
+  verified: string | null,
+  latest: boolean,
+): string {
+  const date = formatDate(release.publishedAt);
+  return [
+    latest
+      ? t("Neueste Version {version}", { version: release.version })
+      : release.prerelease
+        ? t("Vorabversion")
+        : t("Version {version}", { version: release.version }),
+    date ? t("vom {date}", { date }) : "",
+    release.version === installedVersion ? t("installiert") : "",
+    release.version === verified ? t("mit Basalt geprüft") : "",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -457,12 +473,19 @@ export function openPluginCatalog(app: App, changed: () => void): void {
     const picker = h(
       "select",
       {
-        class: "plugin-catalog-version",
+        class: "dropdown plugin-catalog-version",
         attrs: { "aria-label": t("Version"), disabled: true },
       },
       latestOption,
     );
-    const versionNote = h("p", { class: "plugin-catalog-note" });
+    const versionInfo = h("div", {
+      class: "setting-item-description",
+      text: t("Versionen werden geladen …"),
+    });
+    const versionNote = h("p", {
+      class: "plugin-warning plugin-catalog-compat",
+      attrs: { hidden: true },
+    });
     const pickedRelease = () =>
       picker.value
         ? listed.find((release) => release.tag === picker.value)
@@ -482,15 +505,18 @@ export function openPluginCatalog(app: App, changed: () => void): void {
             ? t("Installiert")
             : t("Aktualisieren");
       action.disabled = !app.compatibility || order === 0;
+      if (release)
+        versionInfo.textContent = releaseDetail(
+          release,
+          version,
+          entry.verified,
+          !picker.value,
+        );
       versionNote.textContent =
         release && !supportsMinAppVersion(release.minAppVersion)
           ? t(
-              "Version {version} verlangt Obsidian {min}; Basalt bietet die Plugin-Schnittstelle von Obsidian {api}.",
-              {
-                version: release.version,
-                min: release.minAppVersion ?? "",
-                api: API_VERSION,
-              },
+              "Braucht Obsidian {min}, Basalt bietet die Schnittstelle von {api}. Das Plugin startet womöglich nicht oder nur teilweise.",
+              { min: release.minAppVersion ?? "", api: API_VERSION },
             )
           : "";
       versionNote.hidden = !versionNote.textContent;
@@ -506,13 +532,14 @@ export function openPluginCatalog(app: App, changed: () => void): void {
         listed = list;
         const latest = list.find((release) => !release.prerelease);
         if (latest)
-          latestOption.textContent = t("Neueste Version ({version})", {
+          latestOption.textContent = t("Neueste ({version})", {
             version: latest.version,
           });
+        else versionInfo.textContent = "";
         picker.append(
           ...list.map((release) =>
             h("option", {
-              text: releaseLabel(release, version, entry.verified),
+              text: releaseLabel(release, version),
               attrs: { value: release.tag },
             }),
           ),
@@ -523,11 +550,10 @@ export function openPluginCatalog(app: App, changed: () => void): void {
       },
       (error) => {
         if (selected !== entry || !modal.isOpen) return;
-        versionNote.textContent = t(
+        versionInfo.textContent = t(
           "Ältere Versionen konnten nicht geladen werden: {error}",
           { error: errorMessage(error) },
         );
-        versionNote.hidden = false;
       },
     );
     action.addEventListener("click", () => {
@@ -601,27 +627,37 @@ export function openPluginCatalog(app: App, changed: () => void): void {
       h("p", { class: "plugin-catalog-description", text: entry.description }),
       h("p", {
         class: "plugin-catalog-note",
-        text: entry.verified
-          ? t("Mit Basalt geprüft (Version {version})", {
-              version: entry.verified,
-            })
-          : t(
-              "Nicht mit Basalt geprüft: kann funktionieren, teilweise funktionieren oder sichtbar scheitern.",
-            ),
+        text: [
+          entry.verified
+            ? t("Mit Basalt geprüft (Version {version})", {
+                version: entry.verified,
+              })
+            : t(
+                "Nicht mit Basalt geprüft: kann funktionieren, teilweise funktionieren oder sichtbar scheitern.",
+              ),
+          app.compatibility
+            ? ""
+            : t("Plugins lassen sich nur in der nativen App installieren."),
+        ]
+          .filter(Boolean)
+          .join(" "),
       }),
-      app.compatibility
-        ? ""
-        : h("p", {
-            class: "plugin-catalog-note",
-            text: t("Plugins lassen sich nur in der nativen App installieren."),
-          }),
       h(
-        "label",
-        "plugin-catalog-version-row",
-        h("span", { text: t("Version") }),
-        picker,
+        "div",
+        "plugin-catalog-install",
+        h(
+          "div",
+          "setting-item",
+          h(
+            "div",
+            "setting-item-info",
+            h("div", { class: "setting-item-name", text: t("Version") }),
+            versionInfo,
+          ),
+          h("div", "setting-item-control", picker),
+        ),
+        versionNote,
       ),
-      versionNote,
       h(
         "div",
         "modal-button-container",

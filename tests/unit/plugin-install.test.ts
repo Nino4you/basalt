@@ -204,9 +204,9 @@ it("installs a picked older release from the catalog", async () => {
       return found;
     });
     const options = [...picker.options].map((option) => option.textContent);
-    expect(options[0]).toBe("Neueste Version (1.1.0)");
+    expect(options[0]).toBe("Neueste (1.1.0)");
     expect(options[1]).toContain("installiert");
-    expect(options[1]).toContain("braucht Obsidian 99.0.0");
+    expect(options[1]).toBe("1.1.0 (installiert) ⚠");
     const action = document.querySelector<HTMLButtonElement>(
       ".plugin-catalog-details .mod-cta",
     )!;
