@@ -179,6 +179,12 @@ No UI framework: DOM is built with the `h()` / `icon()` helpers in `src/ui/dom.t
   other apps round-trip losslessly.
 - `src/markdown.ts` — `marked` rendering, always sanitized through DOMPurify; remote image
   sources are stripped.
+- `src/dates.ts` — Moment.js-style date formatting/parsing (locale names, ISO weeks,
+  `[literal]`) for templates and daily notes (folder, format and template are settings; the
+  previous/next commands parse existing note names). There is no `moment` dependency.
+- `src/app/commands.ts` — `CommandRegistry` with user hotkey overrides (`basalt-hotkeys` in
+  localStorage, edited in Settings → Hotkeys). Show `hotkeyOf(id)`, not `command.hotkey`, which
+  is only the default. A hotkey belongs to one command; assigning it elsewhere moves it.
 
 ### Plugin compatibility layer (`src/compat/`)
 
