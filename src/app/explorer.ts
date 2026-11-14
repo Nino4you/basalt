@@ -377,6 +377,11 @@ export class Explorer extends Component {
   }
 
   /** Every folder of the tree, in display order. */
+  /** Every folder of the vault, sorted like the tree. */
+  folderPaths(): string[] {
+    return this.allFolders();
+  }
+
   private allFolders(node: FolderNode = this.root): string[] {
     return [...node.folders.values()]
       .sort((a, b) => collator.compare(a.name, b.name))

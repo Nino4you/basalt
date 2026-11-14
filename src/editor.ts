@@ -85,6 +85,8 @@ const PHRASES: Record<string, string> = {
 
 export interface EditorHost extends LinkHost, CompletionHost, EditorSuggestHost {
   onChange(text: string): void;
+  /** The selected text changed (empty when nothing is selected). */
+  onSelection?(selected: string): void;
   save(): void;
   /** Live-preview rendering of code blocks registered by plugins. */
   pluginCodeBlock?(language: string): CodeBlockProcessor | undefined;
@@ -198,6 +200,14 @@ export class MarkdownEditor {
       EditorView.updateListener.of((update) => {
         if (update.docChanged && !this.suppress)
           host.onChange(update.state.doc.toString());
+        if (host.onSelection && (update.selectionSet || update.docChanged)) {
+          const state = update.state;
+          host.onSelection(
+            state.selection.ranges
+              .map((range) => state.sliceDoc(range.from, range.to))
+              .join("\n"),
+          );
+        }
       }),
     ];
     this.view = new EditorView({ parent, state: this.createState("") });

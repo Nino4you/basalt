@@ -35,7 +35,7 @@ const de = {
     "Ein gemeinsamer Rust-Kern, eine native App und eine Oberfläche für Maus, Tastatur, Touch und Stift.",
   "p4.title": "Sorgsam mit deinen Daten",
   "p4.text":
-    "Jede Änderung wird vor dem Speichern gesichert. Änderungen von außen werden erkannt statt überschrieben.",
+    "Frühere Fassungen werden vor dem Überschreiben gesichert und lassen sich zurückholen. Änderungen von außen werden erkannt statt überschrieben.",
   "f1.title": "Markdown, das dir nicht im Weg steht",
   "f1.text":
     "In der Live-Vorschau tritt die Syntax beim Schreiben zurück. Links und Checkboxen sind anklickbar, Formeln, Diagramme und Tabellen erscheinen direkt im Editor. Maßgeblich bleibt das Markdown darunter.",
@@ -52,10 +52,13 @@ const de = {
   "f2.title": "Sieh, wie alles zusammenhängt",
   "f2.text":
     "Jeder Link funktioniert in beide Richtungen. Rückverweise zeigen den Satz um jede Erwähnung, und der Graph zeichnet deinen Vault als das, was er ist: ein Netz.",
-  "f2.a": "Rückverweise mit Kontext, ausgehende Links, Tags und Gliederung",
+  "f2.a":
+    "Rückverweise mit Kontext und unverlinkte Erwähnungen, die zu Links werden",
   "f2.b":
     "Volltextsuche mit <code>tag:</code>, <code>path:</code> und <code>file:</code>",
   "f2.c": "Graph des ganzen Vaults oder lokaler Graph einer Notiz",
+  "f2.d":
+    "Benenne eine Notiz um oder verschiebe sie, und alle Links ziehen mit",
   "f2.alt":
     "Graphansicht: acht Notizen als verbundene Knoten, daneben die Filtereinstellungen",
   "f3.title": "Platz zum Ausbreiten",
@@ -121,7 +124,7 @@ const de = {
     "Basalt ist eine Vorschau (0.2) und noch kein vollständiger Ersatz für Obsidian. Der Kern ist stabil und getestet, aber ein paar Dinge fehlen:",
   "s.a": "keine automatischen Updates, keine eingebaute Synchronisation",
   "s.b": "Plugin-Unterstützung nur für ausgewählte Plugins",
-  "s.c": "Sicherungen müssen vorerst von Hand zurückgespielt werden",
+  "s.c": "Sicherungen werden noch nicht automatisch aufgeräumt",
   "s.d":
     "nur Direktdownloads, noch kein Play Store und keine Distributionspakete",
   "s.tip":

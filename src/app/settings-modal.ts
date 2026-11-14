@@ -7,9 +7,14 @@ import {
   formatHotkey,
   h,
   icon,
+  iconButton,
   trackSliderFill,
 } from "../ui/dom";
 import { Modal } from "../ui/modal";
+import { notify } from "../ui/notice";
+import { eventHotkey, isAssignable, type Command } from "./commands";
+import { formatDate } from "../dates";
+import { templatePaths } from "./templates";
 import type { App } from "./app";
 import { DEFAULT_ACCENT, type Settings } from "./settings";
 
@@ -35,6 +40,93 @@ function row(parent: HTMLElement, name: string, description = ""): Row {
   );
   parent.append(el);
   return { el, control };
+}
+
+/**
+ * One command's hotkey with buttons to record a new one, remove it and go
+ * back to the default. Recording takes the next key combination; Escape
+ * cancels, and combinations that would type text are refused.
+ */
+function hotkeyRow(target: Row, app: App, command: Command): void {
+  const registry = app.commands;
+  const name = command.name;
+  const render = (recording = false): void => {
+    const hotkey = registry.hotkeyOf(command.id);
+    const children: HTMLElement[] = [
+      recording
+        ? h("kbd", {
+            class: "setting-hotkey mod-recording",
+            text: t("Tastenkombination drücken …"),
+          })
+        : hotkey
+          ? h("kbd", { class: "setting-hotkey", text: formatHotkey(hotkey) })
+          : h("span", { class: "setting-hotkey mod-empty", text: t("Leer") }),
+    ];
+    if (!recording) {
+      if (registry.isCustomized(command.id))
+        children.push(
+          iconButton(
+            "rotate-ccw",
+            t("„{name}“ auf das Standardkürzel zurücksetzen", { name }),
+            () => {
+              const displaced = registry.resetHotkey(command.id);
+              if (displaced) moved(displaced);
+              render();
+            },
+          ),
+        );
+      if (hotkey)
+        children.push(
+          iconButton("x", t("Tastenkürzel von „{name}“ entfernen", { name }), () => {
+            registry.setHotkey(command.id, null);
+            render();
+          }),
+        );
+      const record = iconButton(
+        "keyboard",
+        t("Tastenkürzel für „{name}“ festlegen", { name }),
+        () => {
+          render(true);
+          const cancel = target.control.querySelector<HTMLElement>(
+            ".mod-recording",
+          );
+          cancel?.setAttribute("tabindex", "-1");
+          cancel?.focus();
+          const listen = (event: KeyboardEvent) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.key === "Escape") return stop();
+            const pressed = eventHotkey(event);
+            if (!pressed) return;
+            if (!isAssignable(pressed)) {
+              notify(t("Bitte mit Strg, Alt oder einer F-Taste kombinieren."), true);
+              return;
+            }
+            const displaced = registry.setHotkey(command.id, pressed);
+            if (displaced) moved(displaced);
+            stop();
+          };
+          const stop = () => {
+            window.removeEventListener("keydown", listen, true);
+            window.removeEventListener("pointerdown", stop, true);
+            render();
+            target.control.querySelector<HTMLElement>("button")?.focus();
+          };
+          // Capture before the modal's own Escape and the app's hotkeys.
+          window.addEventListener("keydown", listen, true);
+          window.addEventListener("pointerdown", stop, true);
+        },
+      );
+      children.push(record);
+    }
+    target.control.replaceChildren(...children);
+  };
+  const moved = (displaced: Command) =>
+    notify(
+      t("Das Tastenkürzel wurde von „{name}“ entfernt.", { name: displaced.name }),
+    );
+  render();
+  target.el.classList.add("mod-hotkey");
 }
 
 function heading(parent: HTMLElement, text: string): void {
@@ -93,6 +185,24 @@ function dropdown<T extends string>(
   );
   select.addEventListener("change", () => onChange(select.value as T));
   target.control.append(select);
+}
+
+/** A text field that applies its value when it is committed (Enter or leaving it). */
+function textField(
+  target: Row,
+  label: string,
+  value: string,
+  onChange: (value: string) => void,
+  placeholder = "",
+): HTMLInputElement {
+  const input = h("input", {
+    label,
+    attrs: { type: "text", placeholder, spellcheck: "false", autocomplete: "off" },
+  });
+  input.value = value;
+  input.addEventListener("change", () => onChange(input.value.trim()));
+  target.control.append(input);
+  return input;
 }
 
 type CoreTab =
@@ -363,6 +473,80 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         settings.get("newNoteLocation"),
         set("newNoteLocation"),
       );
+      toggle(
+        row(
+          content,
+          t("Interne Links automatisch aktualisieren"),
+          t("Passt Links an, wenn eine Notiz oder Canvas umbenannt oder verschoben wird. Jede geänderte Datei wird vorher gesichert."),
+        ),
+        t("Interne Links automatisch aktualisieren"),
+        settings.get("updateLinks"),
+        set("updateLinks"),
+      );
+      heading(content, t("Vorlagen"));
+      textField(
+        row(
+          content,
+          t("Vorlagenordner"),
+          t("Notizen in diesem Ordner stehen unter „Vorlage einfügen“ zur Wahl. Leer: jeder Ordner namens „_templates“."),
+        ),
+        t("Vorlagenordner"),
+        settings.get("templateFolder"),
+        set("templateFolder"),
+        "_templates",
+      );
+      heading(content, t("Tagesnotizen"));
+      textField(
+        row(
+          content,
+          t("Ordner für neue Tagesnotizen"),
+          t("Leer lassen für den Vault-Stammordner. Fehlende Ordner werden angelegt."),
+        ),
+        t("Ordner für neue Tagesnotizen"),
+        settings.get("dailyFolder"),
+        set("dailyFolder"),
+        t("Tagebuch"),
+      );
+      const formatRow = row(
+        content,
+        t("Datumsformat"),
+        t("Moment.js-Format, Text in [eckigen Klammern] bleibt wörtlich."),
+      );
+      const example = h("div", { class: "setting-item-description" });
+      formatRow.el.querySelector(".setting-item-info")!.append(example);
+      const showExample = (pattern: string) => {
+        example.textContent = t("Beispiel: {name}", {
+          name: formatDate(new Date(), pattern || "YYYY-MM-DD", getLocale()),
+        });
+      };
+      const formatInput = textField(
+        formatRow,
+        t("Datumsformat"),
+        settings.get("dailyFormat"),
+        (value) => settings.set("dailyFormat", value || "YYYY-MM-DD"),
+        "YYYY-MM-DD",
+      );
+      formatInput.addEventListener("input", () => showExample(formatInput.value.trim()));
+      showExample(settings.get("dailyFormat"));
+      dropdown(
+        row(
+          content,
+          t("Vorlage"),
+          t("Eine Notiz aus dem Vorlagenordner. {date} und {title} werden ersetzt.", {
+            date: "{{date}}",
+            title: "{{title}}",
+          }),
+        ),
+        t("Vorlage"),
+        [
+          ["", t("Keine Vorlage")],
+          ...templatePaths(app.index.files, settings.get("templateFolder")).map(
+            (path) => [path, path] as [string, string],
+          ),
+        ],
+        settings.get("dailyTemplate"),
+        set("dailyTemplate"),
+      );
       heading(content, t("Archivierte Entwürfe"));
       content.append(
         h("p", {
@@ -505,17 +689,8 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
       const commands = app.commands
         .list()
         .sort((a, b) => a.name.localeCompare(b.name, getLocale()));
-      for (const command of commands) {
-        const item = row(list, command.name);
-        item.control.append(
-          command.hotkey
-            ? h("kbd", {
-                class: "setting-hotkey",
-                text: formatHotkey(command.hotkey),
-              })
-            : h("span", { class: "setting-hotkey mod-empty", text: t("Leer") }),
-        );
-      }
+      for (const command of commands)
+        hotkeyRow(row(list, command.name), app, command);
       heading(list, t("Im Editor"));
       for (const [name, hotkey] of [
         [t("Fett"), "Mod+B"],

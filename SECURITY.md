@@ -14,13 +14,18 @@ will get a response once the report has been reviewed.
 - The Rust core uses `cap-std` instead of joined absolute file paths. Only an explicit vault
   selection opens a new file system root.
 - Existing notes are never overwritten when creating a note. Saving checks the previously
-  loaded version and first writes a copy to `.basalt/history/`.
+  loaded version and first writes a copy to `.basalt/history/`. One exception keeps the history
+  readable: while someone keeps typing, the app's own autosaved content is backed up at most
+  every five minutes per note (`NoteStore`, `save_note` with `backup: false`). Content the app
+  did not write itself in this session, such as the version loaded from disk or an external
+  change, is always backed up before it is replaced, and so is everything a restore or a link
+  update replaces. Android (SAF) still backs up every save.
 - On Linux, a save first writes a separate file and replaces the target by rename.
   Uncoordinated external writers can still write between the check and the rename: there is no
   compare-and-swap that is guaranteed across file systems.
 - Android SAF providers do not guarantee an atomic replace. There, Basalt backs up before
   writing and checks for conflicts again. An interrupted provider write can damage the current
-  file; the previous backup then has to be restored.
+  file; the previous backup can then be restored with File recovery.
 - Reads on Android remember for up to 10 seconds which SAF document belongs to which path, so
   that not every read lists the whole folder again. Size, modification time and content are
   still queried fresh every time, and the name is cross-checked. With providers that use opaque
@@ -93,11 +98,21 @@ will get a response once the report has been reviewed.
   not a test of the native file system.
 - Renaming is currently not atomic: first an exclusive copy, then a checked deletion of the
   original. If the deletion fails in an unclear way, the target copy is kept for recovery and
-  the error is shown. Timestamps and file permissions may change in the process; links are not
-  updated automatically yet. Case-only renames on case-insensitive file systems are not covered.
+  the error is shown. Timestamps and file permissions may change in the process. Case-only
+  renames on case-insensitive file systems are not covered.
+- After a rename or move in the app, links that pointed to the file are rewritten (setting
+  "Automatically update internal links", on by default). Only links whose target would
+  otherwise change are touched; each affected note or canvas goes through the normal
+  version-checked save, so its previous content is backed up. A file that fails to save keeps
+  its content and is named in a notice. The plugin API `FileManager.renameFile` follows the
+  same setting and writes each affected file with a version-checked `Vault.process`.
 - These plugin file operations are limited to 64 MiB per file. Trash and version backups are
-  not cleaned up automatically; they keep using storage and are not secure deletion. Restoring
-  is currently manual.
+  not cleaned up automatically; they keep using storage and are not secure deletion.
+- File recovery lists only backups of notes and canvases (`backup_list`) and reads only such
+  backup locations (`backup_read`); other hidden files stay unreadable through it. Restoring a
+  version is a normal version-checked save, so the replaced content becomes a backup itself.
+  Restoring a deleted file is an exclusive creation, under a new name if the old one is taken.
+  Backups of attachments are not listed and still have to be restored by hand.
 - No automatic sync, no account and no telemetry.
 - Debug-signed Android APKs are test artifacts, not production-signed releases. The fixed
   development key is stored as an Actions secret, not in the git history. Production releases

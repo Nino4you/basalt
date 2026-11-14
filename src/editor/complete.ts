@@ -7,9 +7,34 @@ import type {
 import type { EditorView } from "@codemirror/view";
 
 export interface CompletionHost {
-  /** Link text to insert plus the folder shown as detail. */
-  notes(): Array<{ link: string; detail: string }>;
+  /**
+   * Link text to insert plus the folder shown as detail; with `alias`, the
+   * alias is offered and inserted as `link|alias`.
+   */
+  notes(): Array<{ link: string; detail: string; alias?: string }>;
   tags(): string[];
+  /**
+   * Headings (`[[Note#`) or block ids (`[[Note#^`) of the note a link target
+   * names; an empty target is the note being edited.
+   */
+  subpaths?(
+    target: string,
+    blocks: boolean,
+  ): Array<{ label: string; detail?: string }>;
+}
+
+function insertWikiLink(
+  view: EditorView,
+  text: string,
+  from: number,
+  to: number,
+): void {
+  const closed = view.state.doc.sliceString(to, to + 2) === "]]";
+  view.dispatch({
+    changes: { from, to, insert: text + (closed ? "" : "]]") },
+    selection: { anchor: from + text.length + 2 },
+    userEvent: "input.complete",
+  });
 }
 
 function applyWikiLink(
@@ -18,13 +43,7 @@ function applyWikiLink(
   from: number,
   to: number,
 ): void {
-  const closed = view.state.doc.sliceString(to, to + 2) === "]]";
-  const insert = completion.label + (closed ? "" : "]]");
-  view.dispatch({
-    changes: { from, to, insert },
-    selection: { anchor: from + completion.label.length + 2 },
-    userEvent: "input.complete",
-  });
+  insertWikiLink(view, completion.label, from, to);
 }
 
 export function completionSources(host: CompletionHost): CompletionSource[] {
@@ -33,12 +52,26 @@ export function completionSources(host: CompletionHost): CompletionSource[] {
     if (!match) return null;
     return {
       from: match.from + 2,
-      options: host.notes().map((note) => ({
-        label: note.link,
-        detail: note.detail,
-        type: "file",
-        apply: applyWikiLink,
-      })),
+      options: host.notes().map((note) =>
+        note.alias === undefined
+          ? {
+              label: note.link,
+              detail: note.detail,
+              type: "file",
+              apply: applyWikiLink,
+            }
+          : {
+              label: note.alias,
+              detail: note.detail,
+              type: "text",
+              apply: (
+                view: EditorView,
+                _: Completion,
+                from: number,
+                to: number,
+              ) => insertWikiLink(view, `${note.link}|${note.alias}`, from, to),
+            },
+      ),
       validFor: /^[^\]\[|#\n]*$/,
     };
   };
@@ -56,5 +89,26 @@ export function completionSources(host: CompletionHost): CompletionSource[] {
       validFor: /^[\p{L}\p{N}_/-]*$/u,
     };
   };
-  return [wiki, tag];
+  const subpath = (context: CompletionContext): CompletionResult | null => {
+    if (!host.subpaths) return null;
+    const match = context.matchBefore(/\[\[[^\]\[|#\n]*#\^?[^\]\[|#\n]*/);
+    if (!match) return null;
+    const hash = match.text.indexOf("#");
+    const target = match.text.slice(2, hash);
+    const block = match.text[hash + 1] === "^";
+    const from = match.from + hash + (block ? 2 : 1);
+    const options = host.subpaths(target, block);
+    if (!options.length) return null;
+    return {
+      from,
+      options: options.map((option) => ({
+        label: option.label,
+        detail: option.detail,
+        type: block ? "constant" : "keyword",
+        apply: applyWikiLink,
+      })),
+      validFor: /^[^\]\[|#^\n]*$/,
+    };
+  };
+  return [wiki, subpath, tag];
 }

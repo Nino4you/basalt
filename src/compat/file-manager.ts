@@ -1,4 +1,7 @@
 import { Document, parseDocument } from "yaml";
+import { LinkUpdate } from "../app/link-update";
+import { scanNote } from "../app/vault-index";
+import { canvasIndexText } from "../canvas/model";
 import { getFrontMatterInfo } from "./frontmatter";
 import type { TFile, TFolder } from "./files";
 import type { Vault } from "./vault";
@@ -16,7 +19,11 @@ function folderPath(path: string): string {
 
 /** The small, non-destructive part of Obsidian's FileManager used by plugins. */
 export class FileManager {
-  constructor(private readonly vault: Vault) {}
+  constructor(
+    private readonly vault: Vault,
+    /** The user's "Automatically update internal links" preference. */
+    private readonly updateLinks: () => boolean = () => false,
+  ) {}
 
   getNewFileParent(sourcePath: string): TFolder {
     return (
@@ -62,8 +69,55 @@ export class FileManager {
     return this.vault.createFolder(path);
   }
 
+  /**
+   * Renames or moves a file and, if the user wants that, rewrites the links
+   * to it like a rename in the app does. Each rewrite is a version-checked
+   * `Vault.process`; a failed one leaves that file unchanged and is reported
+   * after the others were tried.
+   */
   async renameFile(file: TFile, newPath: string): Promise<void> {
+    const oldPath = file.path;
+    const update =
+      this.updateLinks() && newPath !== oldPath
+        ? new LinkUpdate(
+            this.vault.getFiles().map((entry) => entry.path),
+            new Map([[oldPath, newPath]]),
+          )
+        : null;
+    const sources = update ? await this.linkSources(update) : [];
     await this.vault.rename(file, newPath);
+    if (!update) return;
+    const failures: unknown[] = [];
+    for (const source of sources) {
+      const target = this.vault.getFileByPath(update.moved(source));
+      if (!target) continue;
+      try {
+        await this.vault.process(
+          target,
+          (text) => update.rewrite(text, source) ?? text,
+        );
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    if (failures.length)
+      throw new AggregateError(
+        failures,
+        `Renamed ${oldPath} to ${newPath}, but links in ${failures.length} file(s) could not be updated`,
+      );
+  }
+
+  /** Notes and canvases whose links the update would change (old paths). */
+  private async linkSources(update: LinkUpdate): Promise<string[]> {
+    const sources: string[] = [];
+    for (const entry of this.vault.getFiles()) {
+      const canvas = entry.extension.toLowerCase() === "canvas";
+      if (!canvas && entry.extension.toLowerCase() !== "md") continue;
+      const text = await this.vault.cachedRead(entry);
+      const links = scanNote(canvas ? canvasIndexText(text) : text).links;
+      if (update.affects(entry.path, links)) sources.push(entry.path);
+    }
+    return sources;
   }
 
   async trashFile(file: TFile): Promise<void> {

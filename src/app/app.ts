@@ -1,4 +1,4 @@
-import { plural, t, type Locale } from "../i18n";
+import { getLocale, plural, t, type Locale } from "../i18n";
 import type { EditorState } from "@codemirror/state";
 import {
   backend,
@@ -34,7 +34,7 @@ import {
   icon,
 } from "../ui/dom";
 import { closeMenu, showMenu, type MenuEntry } from "../ui/menu";
-import { Modal, topModal } from "../ui/modal";
+import { Modal, SuggestModal, topModal } from "../ui/modal";
 import { notify } from "../ui/notice";
 import { installTooltips } from "../ui/tooltip";
 import { CommandRegistry } from "./commands";
@@ -48,6 +48,7 @@ import { ReadingView } from "./reading";
 import { LinkPreview } from "./link-preview";
 import { SearchView } from "./search";
 import { expandTemplate, templatePaths } from "./templates";
+import { formatDate, parseDate } from "../dates";
 import { SettingsStore } from "./settings";
 import { openSettings } from "./settings-modal";
 import {
@@ -86,6 +87,8 @@ import {
 } from "./split";
 import { installTabDrag } from "./tab-drag";
 import { openCommandPalette, openQuickSwitcher } from "./switcher";
+import { openFileRecovery } from "./file-recovery";
+import { LinkUpdate } from "./link-update";
 import { VaultIndex } from "./vault-index";
 
 export interface Tab {
@@ -175,6 +178,8 @@ const LAYOUT_KEY = "basalt-layout";
 export class App {
   readonly settings = new SettingsStore();
   readonly index = new VaultIndex();
+  /** Text selected in the editor, for the status bar counts. */
+  private selected = "";
   readonly commands = new CommandRegistry();
   readonly shell: Shell;
   readonly editor: MarkdownEditor;
@@ -234,6 +239,8 @@ export class App {
   }, 1500);
 
   constructor(root: HTMLElement) {
+    // Until start() has restored the layout, sidebars appear without sliding.
+    document.documentElement.classList.add("is-starting");
     this.shell = buildShell(root);
     this.attachmentView = new AttachmentView(this.shell.attachmentHost);
     this.layout = loadLayout();
@@ -247,6 +254,11 @@ export class App {
     });
     this.editor = new MarkdownEditor(this.shell.editorEl, {
       onChange: (text) => this.onEditorChange(text),
+      onSelection: (selected) => {
+        if (selected === this.selected) return;
+        this.selected = selected;
+        this.updateStatus();
+      },
       save: () => void this.save().catch((error) => this.report(error)),
       resolves: (target) =>
         !!this.activePath &&
@@ -263,6 +275,7 @@ export class App {
       openTag: (tag) => this.searchFor(`tag:#${tag}`),
       notes: () => this.linkCandidates(),
       tags: () => [...this.index.tags().keys()].sort(),
+      subpaths: (target, blocks) => this.subpathCandidates(target, blocks),
       editorSuggests: () =>
         (this.compatibility?.services.getEditorSuggests() ??
           []) as EditorSuggestRegistration[],
@@ -408,11 +421,17 @@ export class App {
   // ── vault lifecycle ───────────────────────────────────────────────────────
 
   async start(): Promise<void> {
+    const root = document.documentElement;
+    root.classList.add("is-starting");
     try {
       await this.loadVault(await backend.info());
     } catch (error) {
       this.setSaveStatus("error", t("Vault konnte nicht geöffnet werden"));
       this.report(error);
+    } finally {
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => root.classList.remove("is-starting")),
+      );
     }
   }
 
@@ -557,6 +576,7 @@ export class App {
         ribbonEl: this.shell.pluginRibbon,
         statusBarEl: this.shell.pluginStatus,
         requestUrl: nativeRequestUrl(),
+        updateLinks: () => this.settings.get("updateLinks"),
       });
       if (this.vault !== next) {
         await session.dispose().catch((error) => this.report(error));
@@ -1258,21 +1278,58 @@ export class App {
     this.search.setQuery(query);
   }
 
-  private linkCandidates(): Array<{ link: string; detail: string }> {
+  /** Headings, or block ids when asked for those, that `[[target#` can name. */
+  private subpathCandidates(
+    target: string,
+    blocks: boolean,
+  ): Array<{ label: string; detail?: string }> {
+    const source = this.activePath;
+    if (!source) return [];
+    const path = target.trim() ? this.index.resolve(target, source) : source;
+    if (!path || !/\.md$/i.test(path)) return [];
+    const text =
+      this.store?.notes.get(path)?.text ?? this.index.content(path) ?? "";
+    if (!blocks) {
+      const seen = new Set<string>();
+      return documentOutline(text)
+        .filter((entry) => !seen.has(entry.text) && seen.add(entry.text))
+        .map((entry) => ({ label: entry.text, detail: `H${entry.depth}` }));
+    }
+    const ids: Array<{ label: string; detail?: string }> = [];
+    for (const line of text.split("\n")) {
+      const id = /\s\^([A-Za-z0-9-]+)\s*$/.exec(line);
+      if (id)
+        ids.push({
+          label: id[1],
+          detail: line.slice(0, id.index).trim().slice(0, 60),
+        });
+    }
+    return ids;
+  }
+
+  private linkCandidates(): Array<{
+    link: string;
+    detail: string;
+    alias?: string;
+  }> {
     const counts = new Map<string, number>();
     const notes = this.index.files.filter((path) => /\.md$/i.test(path));
     for (const path of notes) {
       const name = basename(path).toLowerCase();
       counts.set(name, (counts.get(name) ?? 0) + 1);
     }
-    return notes.map((path) => {
+    return notes.flatMap((path) => {
       const name = basename(path);
       // Ambiguous names need the full path to resolve.
       const unique = counts.get(name.toLowerCase()) === 1;
-      return {
-        link: unique ? name : path.replace(/\.md$/i, ""),
-        detail: dirname(path),
-      };
+      const link = unique ? name : path.replace(/\.md$/i, "");
+      return [
+        { link, detail: dirname(path) },
+        // An alias links to the note and shows the alias: [[Note|Alias]].
+        ...this.index
+          .aliasesOf(path)
+          .map((alias) => ({ link, alias, detail: `→ ${name}` })),
+      ];
     });
   }
 
@@ -1459,7 +1516,7 @@ export class App {
 
   private renderEmpty(): void {
     const action = (text: string, command: string) => {
-      const hotkey = this.commands.get(command)?.hotkey;
+      const hotkey = this.commands.hotkeyOf(command);
       return h("button", {
         class: "empty-state-action",
         text: hotkey ? `${text} (${formatHotkey(hotkey)})` : text,
@@ -1599,15 +1656,20 @@ export class App {
       );
     else this.setSaveStatus("saved", t("Alle Änderungen gespeichert"));
     if (!markdown) return;
-    const words = wordCount(note.text);
-    shell.wordCount.textContent = plural(words, {
+    // With a selection, the counts are about the selected text, as in Obsidian.
+    const counted = this.selected && !tab.reading ? this.selected : note.text;
+    const words = wordCount(counted);
+    const wordText = plural(words, {
       one: "{count} Wort",
       other: "{count} Wörter",
     });
-    shell.charCount.textContent = plural(note.text.length, {
+    const charText = plural(counted.length, {
       one: "{count} Schriftzeichen",
       other: "{count} Zeichen",
     });
+    shell.wordCount.textContent =
+      counted === note.text ? wordText : t("{count} ausgewählt", { count: wordText });
+    shell.charCount.textContent = charText;
     this.updateBacklinkCount();
   }
 
@@ -1667,7 +1729,11 @@ export class App {
     );
   }
 
-  async save(note: Note | null = this.activeNote): Promise<void> {
+  /** `backup: true` always backs up the replaced content (see `NoteStore.save`). */
+  async save(
+    note: Note | null = this.activeNote,
+    options: { backup?: boolean } = {},
+  ): Promise<void> {
     const store = this.store;
     if (!note || !store) return;
     clearTimeout(this.saveTimers.get(note));
@@ -1675,7 +1741,7 @@ export class App {
     if (note === this.activeDocument && note.text !== note.saved)
       this.setSaveStatus("saving", t("Wird gespeichert …"));
     try {
-      await store.save(note);
+      await store.save(note, options);
       this.failed.delete(note.path);
       this.savedPaths.add(note.path);
       this.refreshCompatLater();
@@ -1724,6 +1790,155 @@ export class App {
     } catch (error) {
       this.report(error);
     }
+  }
+
+  /**
+   * Replaces a document's content with a backup through the normal,
+   * version-checked save, so the replaced content becomes a backup itself.
+   * Unsaved edits are saved first; if that fails, nothing is replaced.
+   */
+  async restoreVersion(path: string, text: string): Promise<void> {
+    const store = this.store;
+    if (!store) throw new Error(t("Kein Vault geöffnet."));
+    const note = await store.load(path);
+    if (store !== this.store) throw new Error(t("Der Vault wurde inzwischen gewechselt."));
+    if (note.text !== note.saved) await this.save(note);
+    if (note.text === text) return;
+    await this.replaceText(note, text);
+  }
+
+  /**
+   * Turns a plain-text mention of `target` in `source` into a link. Refuses
+   * when the text at that place no longer names the target.
+   */
+  async linkMention(
+    source: string,
+    place: { line: number; col: number; length: number },
+    target: string,
+  ): Promise<void> {
+    const store = this.store;
+    if (!store) throw new Error(t("Kein Vault geöffnet."));
+    const note = await store.load(source);
+    const lines = note.text.split("\n");
+    const line = lines[place.line] ?? "";
+    const written = line.slice(place.col, place.col + place.length);
+    const name = basename(target);
+    if (
+      !this.index
+        .namesOf(target)
+        .some((candidate) => candidate.toLowerCase() === written.toLowerCase())
+    )
+      throw new Error(t("Die Stelle hat sich inzwischen geändert. Bitte erneut versuchen."));
+    const link =
+      this.index.resolve(name, source) === target
+        ? name
+        : target.replace(/\.md$/i, "");
+    lines[place.line] =
+      line.slice(0, place.col) +
+      (link === written ? `[[${link}]]` : `[[${link}|${written}]]`) +
+      line.slice(place.col + place.length);
+    await this.replaceText(note, lines.join("\n"));
+  }
+
+  /** Saves new content for a loaded document and shows it wherever it is open. */
+  private async replaceText(note: Note, text: string): Promise<void> {
+    const store = this.store;
+    if (!store) throw new Error(t("Kein Vault geöffnet."));
+    store.edit(note, text);
+    // Restores and link updates are not typing: always keep what they replace.
+    await this.save(note, { backup: true });
+    for (const tab of this.allTabs) if (tab.note === note) tab.state = null;
+    if (this.activeDocument === note) {
+      if (this.active.kind === "canvas") this.canvasView?.setText(text);
+      else {
+        this.editor.setText(text);
+        if (this.active.reading) this.reading.render(note.path, text);
+      }
+      this.updateStatus();
+    }
+    this.renderGroups();
+    this.emit("tabs");
+  }
+
+  /**
+   * The notes and canvases whose links a move would break, read from the
+   * index (files it has not read yet are read now). Paths before the move.
+   */
+  private async linkSources(update: LinkUpdate): Promise<string[]> {
+    const vault = this.vault;
+    const sources: string[] = [];
+    for (const path of this.index.files) {
+      if (!/\.(md|canvas)$/i.test(path)) continue;
+      if (!this.index.metaOf(path) && vault) {
+        const text =
+          this.store?.notes.get(path)?.text ?? (await backend.read(path, vault.id));
+        this.index.setContent(path, text, true);
+      }
+      const meta = this.index.metaOf(path);
+      if (meta && update.affects(path, meta.links)) sources.push(path);
+    }
+    return sources;
+  }
+
+  /**
+   * Rewrites links after a move, one file at a time through the normal,
+   * version-checked save (each file gets a backup). Files that fail keep
+   * their content; the user is told which.
+   */
+  private async updateLinks(update: LinkUpdate, sources: string[]): Promise<void> {
+    const store = this.store;
+    if (!store) return;
+    let updated = 0;
+    const failed: string[] = [];
+    for (const source of sources) {
+      const path = update.moved(source);
+      try {
+        const note = await store.load(path);
+        if (store !== this.store) return;
+        const next = update.rewrite(note.text, source);
+        if (next === null) continue;
+        await this.replaceText(note, next);
+        updated++;
+      } catch (error) {
+        failed.push(path);
+        console.warn(error);
+      }
+    }
+    if (updated)
+      notify(
+        plural(updated, {
+          one: "Links in {count} Datei aktualisiert.",
+          other: "Links in {count} Dateien aktualisiert.",
+        }),
+      );
+    if (failed.length)
+      notify(
+        t("Links in {files} konnten nicht aktualisiert werden. Die Dateien sind unverändert.", {
+          files: failed.map((path) => `„${basename(path)}“`).join(", "),
+        }),
+        true,
+      );
+  }
+
+  /**
+   * Creates a deleted document again. It is never written over an existing
+   * file: a taken name gets a "(restored)" copy instead. Returns the path.
+   */
+  async restoreDeleted(path: string, text: string): Promise<string> {
+    const vault = this.vault;
+    if (!vault) throw new Error(t("Kein Vault geöffnet."));
+    const dot = path.lastIndexOf(".");
+    const stem = path.slice(0, dot);
+    const extension = path.slice(dot);
+    let target = path;
+    for (let n = 1; this.index.has(target); n++)
+      target = `${stem} (${t("wiederhergestellt")}${n > 1 ? ` ${n}` : ""})${extension}`;
+    await backend.create(target, text, vault.id);
+    if (vault !== this.vault) return target;
+    this.setFiles((await backend.info()).files);
+    await this.refreshCompatibility().catch((error) => this.report(error));
+    if (this.compatibility) this.syncVisibleFiles();
+    return target;
   }
 
   exportNote(path = this.activePath): void {
@@ -1808,7 +2023,7 @@ export class App {
       }),
       h("p", {
         class: "modal-description",
-        text: t("Plugin-Dateien vorher speichern. Die Sicherung enthält den zuletzt gespeicherten Dateistand; die Wiederherstellung erfolgt derzeit manuell."),
+        text: t("Plugin-Dateien vorher speichern. Die Sicherung enthält den zuletzt gespeicherten Dateistand und lässt sich über die Dateiwiederherstellung zurückholen."),
       }),
       error,
       h("div", "modal-button-container", cancel, submit),
@@ -1857,6 +2072,49 @@ export class App {
     } finally {
       if (store === this.store) this.showActive();
     }
+  }
+
+  /** Asks for a folder and moves the file there, links and all. */
+  promptMoveFile(path: string): void {
+    if (!this.index.has(path)) return;
+    const current = dirname(path);
+    const folders = ["", ...this.explorer.folderPaths()].filter(
+      (folder) => folder !== current,
+    );
+    const modal = new SuggestModal(
+      t("Ordner suchen …"),
+      t("Datei verschieben nach"),
+      (raw) => {
+        const query = raw.trim().toLowerCase();
+        return folders
+          .filter((folder) => (folder || "/").toLowerCase().includes(query))
+          .map((folder) => ({
+            render(parent: HTMLElement) {
+              parent.append(
+                h(
+                  "div",
+                  "suggestion-content",
+                  h("div", {
+                    class: "suggestion-title",
+                    text: folder || t("Oberste Ebene"),
+                  }),
+                ),
+              );
+            },
+            run: () =>
+              void this.moveFile(path, folder).catch((error) =>
+                this.report(error),
+              ),
+          }));
+      },
+      [
+        ["↑↓", t("navigieren")],
+        ["↵", t("verschieben")],
+        ["esc", t("schließen")],
+      ],
+      t("Kein passender Ordner."),
+    );
+    modal.open();
   }
 
   /** Moves a file into `folder` ("" is the vault root), keeping its name. */
@@ -1969,6 +2227,12 @@ export class App {
     const store = this.store;
     const vault = this.vault;
     if (!store || !vault || !this.index.has(path)) return;
+    const update = this.settings.get("updateLinks")
+      ? new LinkUpdate(this.index.files, new Map([[path, target]]))
+      : null;
+    // Find the affected files while the index still describes the old paths.
+    const sources = update ? await this.linkSources(update) : [];
+    if (store !== this.store) return;
     const note = store.notes.get(path);
     if (note) {
       // The move saves pending edits itself.
@@ -2005,6 +2269,8 @@ export class App {
     } finally {
       if (store === this.store) this.showActive();
     }
+    if (update && sources.length && store === this.store)
+      await this.updateLinks(update, sources);
   }
 
   promptNewNote(folder?: string): void {
@@ -2193,7 +2459,10 @@ export class App {
       notify(t("Vorlagen lassen sich nur in Markdown-Notizen einfügen."));
       return;
     }
-    const paths = templatePaths(this.index.files);
+    const paths = templatePaths(
+      this.index.files,
+      this.settings.get("templateFolder"),
+    );
     if (!paths.length) {
       notify(t("Keine Markdown-Vorlagen unter _templates gefunden."));
       return;
@@ -2236,13 +2505,87 @@ export class App {
     }
   }
 
-  async dailyNote(): Promise<void> {
-    const now = new Date();
-    const pad = (value: number) => String(value).padStart(2, "0");
-    const name = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    const path = `${name}.md`;
-    if (this.index.has(path)) await this.openPath(path);
-    else await this.createNote(name);
+  /** Path of the daily note for `date`, after the daily note settings. */
+  dailyNotePath(date: Date): string {
+    const folder = this.settings.get("dailyFolder").replace(/^\/+|\/+$/g, "");
+    const name = formatDate(
+      date,
+      this.settings.get("dailyFormat").trim() || "YYYY-MM-DD",
+      getLocale(),
+    );
+    return `${folder ? `${folder}/` : ""}${name}.md`;
+  }
+
+  /** The day a note stands for, if it is a daily note. */
+  private dailyNoteDate(path: string): Date | null {
+    const folder = this.settings.get("dailyFolder").replace(/^\/+|\/+$/g, "");
+    const prefix = folder ? `${folder}/` : "";
+    if (!path.startsWith(prefix) || !/\.md$/i.test(path)) return null;
+    return parseDate(
+      path.slice(prefix.length, -3),
+      this.settings.get("dailyFormat").trim() || "YYYY-MM-DD",
+      getLocale(),
+    );
+  }
+
+  /** Opens the daily note for `date`, creating it (and its folders) from the template. */
+  async dailyNote(date = new Date()): Promise<void> {
+    const vault = this.vault;
+    if (!vault) return;
+    const path = this.dailyNotePath(date);
+    if (this.index.has(path)) return this.openPath(path);
+    try {
+      const template = this.settings.get("dailyTemplate");
+      const text =
+        template && this.index.has(template)
+          ? expandTemplate(
+              await backend.read(template, vault.id),
+              basename(path),
+              date,
+            )
+          : undefined;
+      await this.ensureFolder(dirname(path));
+      await this.createNote(path, { text, throwOnError: true });
+    } catch (error) {
+      this.report(error);
+    }
+  }
+
+  /** Steps to the closest earlier or later daily note that exists. */
+  async adjacentDailyNote(direction: 1 | -1): Promise<void> {
+    const from =
+      (this.activePath ? this.dailyNoteDate(this.activePath) : null) ?? new Date();
+    const day = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime();
+    let best: { path: string; time: number } | null = null;
+    for (const path of this.index.files) {
+      const date = this.dailyNoteDate(path);
+      if (!date) continue;
+      const time = date.getTime();
+      if (direction > 0 ? time <= day : time >= day) continue;
+      if (!best || (direction > 0 ? time < best.time : time > best.time))
+        best = { path, time };
+    }
+    if (best) await this.openPath(best.path);
+    else
+      notify(
+        direction > 0
+          ? t("Keine spätere Tagesnotiz gefunden.")
+          : t("Keine frühere Tagesnotiz gefunden."),
+      );
+  }
+
+  /** Creates the missing folders of `folder`, one level at a time. */
+  private async ensureFolder(folder: string): Promise<void> {
+    if (!folder) return;
+    const existing = new Set(this.folders());
+    const parts = folder.split("/");
+    for (let i = 1; i <= parts.length; i++) {
+      const path = parts.slice(0, i).join("/");
+      if (existing.has(path)) continue;
+      // The browser demo has no folders of its own; files carry their path.
+      if (!this.compatibility) return;
+      await this.compatibility.vault.createFolder(path);
+    }
   }
 
   // ── bookmarks ─────────────────────────────────────────────────────────────
@@ -2932,7 +3275,7 @@ export class App {
     };
     const { el, tabList, mirror } = view;
     for (const button of el.querySelectorAll<HTMLElement>("[data-command]")) {
-      const hotkey = this.commands.get(button.dataset.command!)?.hotkey;
+      const hotkey = this.commands.hotkeyOf(button.dataset.command!);
       if (hotkey) button.dataset.hotkey = formatHotkey(hotkey);
     }
     const alive = () => this.groups.includes(group);
@@ -3205,6 +3548,13 @@ export class App {
             .then(() => notify(t("Pfad kopiert.")))
             .catch(() => notify(t("Kopieren nicht möglich."), true)),
       },
+      /\.(md|canvas)$/i.test(path)
+        ? {
+            title: t("Versionsverlauf"),
+            icon: "history",
+            onClick: () => openFileRecovery(this, path),
+          }
+        : null,
       /\.md$/i.test(path)
         ? {
             title: t("Als Markdown exportieren"),
@@ -3480,15 +3830,25 @@ export class App {
       { passive: true },
     );
 
-    // Tooltips show the hotkey of the command behind each button.
+    this.showHotkeyHints();
+    this.commands.onChange(() => {
+      this.showHotkeyHints();
+      if (!this.tabs.some((tab) => tab.path)) this.renderEmpty();
+    });
+  }
+
+  /** Tooltips show the hotkey of the command behind each button. */
+  private showHotkeyHints(): void {
+    const shell = this.shell;
     // The strip buttons are not in the document while they change groups.
     for (const button of [
       ...document.querySelectorAll<HTMLElement>("[data-command]"),
       ...shell.stripActions.querySelectorAll<HTMLElement>("[data-command]"),
       shell.inlineToggle,
     ]) {
-      const hotkey = this.commands.get(button.dataset.command!)?.hotkey;
+      const hotkey = this.commands.hotkeyOf(button.dataset.command!);
       if (hotkey) button.dataset.hotkey = formatHotkey(hotkey);
+      else delete button.dataset.hotkey;
     }
   }
 
@@ -3543,6 +3903,20 @@ export class App {
       hotkey: "Mod+W",
       icon: "x",
       run: () => this.closeTab(),
+    });
+    add({
+      id: "move-file",
+      name: t("Aktuelle Datei verschieben nach …"),
+      icon: "folder-closed",
+      when: () => !!this.activePath,
+      run: () => this.promptMoveFile(this.activePath!),
+    });
+    add({
+      id: "delete-file",
+      name: t("Aktuelle Datei löschen"),
+      icon: "trash-2",
+      when: () => !!this.activePath,
+      run: () => this.promptDeleteFile(this.activePath!),
     });
     add({
       id: "rename-file",
@@ -3758,6 +4132,18 @@ export class App {
       run: () => void this.dailyNote(),
     });
     add({
+      id: "daily-note-previous",
+      name: t("Vorherige Tagesnotiz öffnen"),
+      icon: "chevron-left",
+      run: () => void this.adjacentDailyNote(-1),
+    });
+    add({
+      id: "daily-note-next",
+      name: t("Nächste Tagesnotiz öffnen"),
+      icon: "chevron-right",
+      run: () => void this.adjacentDailyNote(1),
+    });
+    add({
       id: "insert-template",
       name: t("Vorlage einfügen"),
       icon: "file-plus",
@@ -3770,6 +4156,25 @@ export class App {
       icon: "download",
       when: hasNote,
       run: () => this.exportNote(),
+    });
+    add({
+      id: "file-recovery",
+      name: t("Dateiwiederherstellung öffnen"),
+      icon: "history",
+      global: true,
+      run: () => {
+        closeMenu();
+        openFileRecovery(this);
+      },
+    });
+    add({
+      id: "version-history",
+      name: t("Versionsverlauf der aktuellen Datei anzeigen"),
+      icon: "history",
+      when: () => !!this.activeDocument,
+      run: () => {
+        if (this.activePath) openFileRecovery(this, this.activePath);
+      },
     });
     add({
       id: "open-vault",

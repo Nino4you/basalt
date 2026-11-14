@@ -50,6 +50,8 @@ export interface CompatibilityOptions {
    * with the native port; isolated ports get none unless a test passes one.
    */
   resources?: PluginResourceHost | null;
+  /** Whether `FileManager.renameFile` rewrites links; off unless given. */
+  updateLinks?: () => boolean;
 }
 
 /** Internal app bridge, not an external plugin loader or a global `window.app`. */
@@ -126,7 +128,7 @@ export class CompatibilitySession {
       this.configVault,
       resources,
     );
-    this.fileManager = new FileManager(this.vault);
+    this.fileManager = new FileManager(this.vault, options.updateLinks);
     this.metadataCache = new MetadataCache(this.vault);
     this.embedRegistry = new EmbedRegistry(this.metadataCache);
     const view = new MarkdownView(options.editor, options.container);

@@ -19,6 +19,8 @@ export interface LinkRef {
 export interface NoteMeta {
   links: LinkRef[];
   tags: string[];
+  /** Other names from the frontmatter (`aliases:` or `alias:`). */
+  aliases: string[];
   /** Same tags with their source position, in first-seen order. */
   tagRefs: TagRef[];
 }
@@ -97,6 +99,41 @@ function frontmatterTags(lines: readonly string[], end: number): TagRef[] {
   return tags;
 }
 
+/** One frontmatter value as written: unquoted, without surrounding spaces. */
+function unquote(value: string): string {
+  const trimmed = value.trim();
+  const quoted = /^(["'])(.*)\1$/.exec(trimmed);
+  return (quoted ? quoted[2] : trimmed).trim();
+}
+
+/**
+ * `aliases:` / `alias:` as an inline list (`[a, "b"]`), a comma-separated or
+ * single value, or a block list. Good enough for what people write by hand;
+ * the YAML parser of the plugin layer handles the rest.
+ */
+function frontmatterAliases(lines: readonly string[], end: number): string[] {
+  const aliases: string[] = [];
+  for (let i = 1; i < end - 1; i++) {
+    const key = /^alias(?:es)?:\s*(.*)$/i.exec(lines[i]);
+    if (!key) continue;
+    const rest = key[1].trim();
+    if (rest) {
+      const inner = /^\[(.*)\]$/.exec(rest)?.[1] ?? rest;
+      for (const part of inner.match(/\s*"[^"]*"\s*|\s*'[^']*'\s*|[^,]+/g) ?? []) {
+        const alias = unquote(part);
+        if (alias) aliases.push(alias);
+      }
+    } else
+      for (let j = i + 1; j < end - 1; j++) {
+        const item = /^\s*-\s+(.+)$/.exec(lines[j]);
+        if (!item) break;
+        const alias = unquote(item[1]);
+        if (alias) aliases.push(alias);
+      }
+  }
+  return [...new Set(aliases)];
+}
+
 export function scanNote(text: string): NoteMeta {
   const links: LinkRef[] = [];
   const tags = new Map<string, TagRef>();
@@ -167,7 +204,62 @@ export function scanNote(text: string): NoteMeta {
       }
     }
   }
-  return { links, tags: [...tags.keys()], tagRefs: [...tags.values()] };
+  return {
+    links,
+    tags: [...tags.keys()],
+    tagRefs: [...tags.values()],
+    aliases: frontmatterAliases(lines, start),
+  };
+}
+
+/**
+ * Places where `name` appears as plain text in a note: whole words only,
+ * case-insensitive, outside frontmatter, code, existing links, tags and URLs.
+ * Columns refer to the original line.
+ */
+export function findUnlinkedMentions(
+  text: string,
+  name: string,
+): Array<{ line: number; col: number; length: number }> {
+  const needle = name.trim();
+  if (!needle || !text.toLowerCase().includes(needle.toLowerCase())) return [];
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const word = new RegExp(
+    `(?<![\\p{L}\\p{N}_#/])${escaped}(?![\\p{L}\\p{N}_])`,
+    "giu",
+  );
+  const lines = text.split("\n");
+  const links = new Map<number, LinkRef[]>();
+  for (const link of scanNote(text).links) {
+    const list = links.get(link.line);
+    if (list) list.push(link);
+    else links.set(link.line, [link]);
+  }
+  const found: Array<{ line: number; col: number; length: number }> = [];
+  let fence: string | null = null;
+  for (let i = frontmatterEnd(lines); i < lines.length; i++) {
+    const raw = lines[i];
+    const delimiter = FENCE.exec(raw);
+    if (delimiter) {
+      if (!fence) fence = delimiter[1];
+      else if (delimiter[1][0] === fence[0] && delimiter[1].length >= fence.length)
+        fence = null;
+      continue;
+    }
+    if (fence) continue;
+    let line = maskInlineCode(raw).replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, (url) =>
+      " ".repeat(url.length),
+    );
+    for (const link of links.get(i) ?? [])
+      line =
+        line.slice(0, link.col) +
+        " ".repeat(link.length) +
+        line.slice(link.col + link.length);
+    word.lastIndex = 0;
+    for (let m = word.exec(line); m; m = word.exec(line))
+      found.push({ line: i, col: m.index, length: m[0].length });
+  }
+  return found;
 }
 
 /** Cached marker for links that point at their own source note. */
@@ -242,13 +334,73 @@ export class NoteGraph {
   }
 }
 
+/**
+ * Link resolution for one file list: the same folder first, then the vault
+ * root, then a unique basename (like `resolveNote` in markdown.ts).
+ */
+export class LinkResolver {
+  private readonly fileSet: Set<string>;
+  private readonly byName = new Map<string, string[]>();
+  private readonly lowerPath = new Map<string, string>();
+  /** Results by source folder and target. */
+  private readonly resolved = new Map<string, string | null>();
+
+  constructor(files: Iterable<string>) {
+    this.fileSet = new Set(files);
+    for (const path of this.fileSet) {
+      const name = path.slice(path.lastIndexOf("/") + 1).toLowerCase();
+      const list = this.byName.get(name);
+      if (list) list.push(path);
+      else this.byName.set(name, [path]);
+      this.lowerPath.set(path.toLowerCase(), path);
+    }
+  }
+
+  has(path: string): boolean {
+    return this.fileSet.has(path);
+  }
+
+  resolve(target: string, source: string): string | null {
+    // The answer depends only on the file list and the source's folder, and
+    // backlinks and the graph resolve every link in the vault on each rebuild.
+    const key = `${source.slice(0, source.lastIndexOf("/") + 1)}\0${target}`;
+    let cached = this.resolved.get(key);
+    if (cached === undefined) {
+      cached = this.resolveUncached(target, source);
+      this.resolved.set(key, cached);
+    }
+    // An empty name links to the source itself, which differs per source.
+    return cached === SELF ? source : cached;
+  }
+
+  private resolveUncached(target: string, source: string): string | null {
+    const name = linkName(target);
+    if (!name) return SELF;
+    if (this.fileSet.has(name)) return name;
+    const requested = /\.md$/i.test(name) ? name : `${name}.md`;
+    const slash = source.lastIndexOf("/");
+    if (slash >= 0) {
+      const sibling = source.slice(0, slash + 1) + requested;
+      if (this.fileSet.has(sibling)) return sibling;
+    }
+    if (this.fileSet.has(requested)) return requested;
+    const exact = this.lowerPath.get(requested.toLowerCase());
+    if (exact) return exact;
+    if (requested.includes("/")) return null;
+    const matches = this.byName.get(requested.toLowerCase());
+    return matches?.length === 1 ? matches[0] : null;
+  }
+}
+
+/** The file part of a link target, without `#heading` or `^block`. */
+export function linkName(target: string): string {
+  return target.split("#")[0].split("^")[0].trim();
+}
+
 export class VaultIndex {
   files: string[] = [];
   private fileSet = new Set<string>();
-  private byName = new Map<string, string[]>();
-  private lowerPath = new Map<string, string>();
-  /** `resolve` results by source folder and target; reset with the file list. */
-  private resolved = new Map<string, string | null>();
+  private resolver = new LinkResolver([]);
   private readonly contents = new Map<string, string>();
   private readonly lowered = new Map<string, string>();
   private readonly meta = new Map<string, NoteMeta>();
@@ -273,17 +425,8 @@ export class VaultIndex {
   setFiles(files: string[]): void {
     this.files = files;
     this.fileSet = new Set(files);
-    this.byName = new Map();
-    this.lowerPath = new Map();
-    this.resolved = new Map();
+    this.resolver = new LinkResolver(files);
     this.graph = null;
-    for (const path of files) {
-      const name = path.slice(path.lastIndexOf("/") + 1).toLowerCase();
-      const list = this.byName.get(name);
-      if (list) list.push(path);
-      else this.byName.set(name, [path]);
-      this.lowerPath.set(path.toLowerCase(), path);
-    }
     for (const path of [...this.contents.keys()])
       if (!this.fileSet.has(path)) {
         this.contents.delete(path);
@@ -344,39 +487,9 @@ export class VaultIndex {
     return value;
   }
 
-  /**
-   * Same rules as `resolveNote` in markdown.ts (same folder, vault root, then a
-   * unique basename), backed by maps instead of scanning the file list.
-   */
+  /** See `LinkResolver`; cached until the file list changes. */
   resolve(target: string, source: string): string | null {
-    // The answer depends only on the file list and the source's folder, and
-    // backlinks and the graph resolve every link in the vault on each rebuild.
-    const key = `${source.slice(0, source.lastIndexOf("/") + 1)}\0${target}`;
-    let cached = this.resolved.get(key);
-    if (cached === undefined) {
-      cached = this.resolveUncached(target, source);
-      this.resolved.set(key, cached);
-    }
-    // An empty name links to the source itself, which differs per source.
-    return cached === SELF ? source : cached;
-  }
-
-  private resolveUncached(target: string, source: string): string | null {
-    const name = target.split("#")[0].split("^")[0].trim();
-    if (!name) return SELF;
-    if (this.fileSet.has(name)) return name;
-    const requested = /\.md$/i.test(name) ? name : `${name}.md`;
-    const slash = source.lastIndexOf("/");
-    if (slash >= 0) {
-      const sibling = source.slice(0, slash + 1) + requested;
-      if (this.fileSet.has(sibling)) return sibling;
-    }
-    if (this.fileSet.has(requested)) return requested;
-    const exact = this.lowerPath.get(requested.toLowerCase());
-    if (exact) return exact;
-    if (requested.includes("/")) return null;
-    const matches = this.byName.get(requested.toLowerCase());
-    return matches?.length === 1 ? matches[0] : null;
+    return this.resolver.resolve(target, source);
   }
 
   /** The note link graph, built once per file list and then kept current. */
@@ -440,6 +553,44 @@ export class VaultIndex {
       }
     }
     return result;
+  }
+
+  /**
+   * Notes that name `path` in plain text without linking to it, with each
+   * place and its line, for "Unlinked mentions".
+   */
+  unlinkedMentions(path: string): Mention[] {
+    const names = this.namesOf(path);
+    const result: Mention[] = [];
+    for (const [source, text] of this.contents) {
+      if (source === path || !isNote(source)) continue;
+      const lower = this.lower(source);
+      const present = names.filter((name) => lower.includes(name.toLowerCase()));
+      if (!present.length) continue;
+      const lines = text.split("\n");
+      const places = present
+        .flatMap((name) => findUnlinkedMentions(text, name))
+        .sort((a, b) => a.line - b.line || a.col - b.col || b.length - a.length);
+      // A longer name wins where two overlap ("Basalt" inside "Basalt rock").
+      let end = { line: -1, col: -1 };
+      for (const place of places) {
+        if (place.line === end.line && place.col < end.col) continue;
+        end = { line: place.line, col: place.col + place.length };
+        result.push({ source, ...place, text: lines[place.line] });
+      }
+    }
+    return result;
+  }
+
+  /** Frontmatter aliases of a note. */
+  aliasesOf(path: string): string[] {
+    return this.meta.get(path)?.aliases ?? [];
+  }
+
+  /** The note's name followed by its aliases. */
+  namesOf(path: string): string[] {
+    const name = path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/i, "");
+    return [name, ...this.aliasesOf(path).filter((alias) => alias !== name)];
   }
 
   backlinks(path: string): Mention[] {

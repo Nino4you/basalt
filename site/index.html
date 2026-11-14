@@ -153,8 +153,8 @@
             <span class="hex" aria-hidden="true"></span>
             <h3 data-i18n="p4.title">Careful with your data</h3>
             <p data-i18n="p4.text">
-              Every change is backed up before it is saved. External edits are
-              detected instead of overwritten.
+              Earlier versions are backed up before they are overwritten and can
+              be restored. External edits are detected, not overwritten.
             </p>
           </article>
         </div>
@@ -240,7 +240,8 @@
               </p>
               <ul class="ticks">
                 <li data-i18n="f2.a">
-                  Backlinks with context, outgoing links, tags and outline
+                  Backlinks with context, and unlinked mentions to turn into
+                  links
                 </li>
                 <li data-i18n="f2.b">
                   Full-text search with <code>tag:</code>,
@@ -249,6 +250,9 @@
                 </li>
                 <li data-i18n="f2.c">
                   Graph of the whole vault, or a local graph of one note
+                </li>
+                <li data-i18n="f2.d">
+                  Rename or move a note and every link to it follows
                 </li>
               </ul>
             </div>
@@ -501,7 +505,7 @@
               <li data-i18n="s.a">no automatic updates and no built-in sync</li>
               <li data-i18n="s.b">plugin support for selected plugins only</li>
               <li data-i18n="s.c">
-                backups have to be restored by hand for now
+                backups are never cleaned up automatically yet
               </li>
               <li data-i18n="s.d">
                 direct downloads only, no Play Store or distribution packages

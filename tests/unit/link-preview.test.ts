@@ -45,3 +45,31 @@ it("cancels a pending preview and ignores unresolved notes", () => {
   expect(document.querySelector(".link-preview")).toBeNull();
   preview.dispose();
 });
+
+it("only closes when the area holding the link scrolls", () => {
+  vi.useFakeTimers();
+  const preview = new LinkPreview(() => ({ title: "Ziel", text: "Inhalt" }));
+  const box = (left: number, top: number, width: number, height: number) => {
+    const element = document.createElement("div");
+    element.getBoundingClientRect = () => new DOMRect(left, top, width, height);
+    document.body.append(element);
+    return element;
+  };
+  const tabStrip = box(0, 0, 800, 40);
+  const editor = box(0, 40, 800, 600);
+  preview.show("Ziel", "Quelle.md", new DOMRect(100, 200, 60, 20));
+  // The tab strip scrolling its active tab into view must not cancel it.
+  tabStrip.dispatchEvent(new Event("scroll"));
+  vi.advanceTimersByTime(300);
+  expect(document.querySelector(".link-preview")).not.toBeNull();
+  tabStrip.dispatchEvent(new Event("scroll"));
+  expect(document.querySelector(".link-preview")).not.toBeNull();
+  editor.dispatchEvent(new Event("scroll"));
+  expect(document.querySelector(".link-preview")).toBeNull();
+
+  preview.show("Ziel", "Quelle.md", new DOMRect(100, 200, 60, 20));
+  document.dispatchEvent(new Event("scroll"));
+  vi.advanceTimersByTime(300);
+  expect(document.querySelector(".link-preview")).toBeNull();
+  preview.dispose();
+});

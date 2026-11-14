@@ -34,7 +34,25 @@ export class LinkPreview {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private request = 0;
   private target: string | null = null;
+  /** Where the hovered link was, to tell its scroll container from others. */
+  private anchor: DOMRect | null = null;
   private readonly dismiss = (): void => this.hide();
+  /**
+   * Scrolling moves the link away from its card, but only scrolling of an
+   * area that contains the link does: the tab strip scrolling its active tab
+   * into view must not cancel a preview that is about to open.
+   */
+  private readonly scrolled = (event: Event): void => {
+    const target = event.target;
+    if (this.anchor && target instanceof Element) {
+      const box = target.getBoundingClientRect();
+      const x = this.anchor.left + this.anchor.width / 2;
+      const y = this.anchor.top + this.anchor.height / 2;
+      if (x < box.left || x > box.right || y < box.top || y > box.bottom)
+        return;
+    }
+    this.hide();
+  };
   private readonly escape = (event: KeyboardEvent): void => {
     if (event.key === "Escape") this.hide();
   };
@@ -46,17 +64,19 @@ export class LinkPreview {
     ) => PreviewNote | null,
   ) {
     document.addEventListener("pointerdown", this.dismiss, true);
-    document.addEventListener("scroll", this.dismiss, true);
+    document.addEventListener("scroll", this.scrolled, true);
     document.addEventListener("keydown", this.escape, true);
   }
 
   show(target: string, source: string, anchor: DOMRect): void {
     if (target === this.target) {
+      this.anchor = anchor;
       if (this.card) this.position(anchor);
       return;
     }
     this.hide();
     this.target = target;
+    this.anchor = anchor;
     const request = this.request;
     this.timer = setTimeout(() => {
       this.timer = undefined;
@@ -87,6 +107,7 @@ export class LinkPreview {
   hide(): void {
     this.request++;
     this.target = null;
+    this.anchor = null;
     if (this.timer !== undefined) clearTimeout(this.timer);
     this.timer = undefined;
     this.card?.remove();
@@ -96,7 +117,7 @@ export class LinkPreview {
   dispose(): void {
     this.hide();
     document.removeEventListener("pointerdown", this.dismiss, true);
-    document.removeEventListener("scroll", this.dismiss, true);
+    document.removeEventListener("scroll", this.scrolled, true);
     document.removeEventListener("keydown", this.escape, true);
   }
 

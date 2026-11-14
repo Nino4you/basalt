@@ -69,6 +69,28 @@ export function openQuickSwitcher(app: App): void {
       run: open(entry.path),
     });
 
+    /** A note found by one of its aliases: the alias, then the note it names. */
+    const aliasSuggestion = (
+      entry: (typeof entries)[number],
+      alias: string,
+      positions: number[],
+    ): Suggestion => ({
+      render(parent) {
+        parent.append(
+          h(
+            "div",
+            "suggestion-content",
+            h("div", "suggestion-title", highlightMatch(alias, positions)),
+            h("div", {
+              class: "suggestion-note",
+              text: `→ ${entry.path.replace(/\.md$/i, "")}`,
+            }),
+          ),
+        );
+      },
+      run: open(entry.path),
+    });
+
     return new SuggestModal(
       t("Notiz suchen oder erstellen …"),
       t("Schnellauswahl"),
@@ -94,6 +116,24 @@ export function openQuickSwitcher(app: App): void {
             scored.push({
               score: byName.score + 100,
               suggestion: fileSuggestion(entry, byName.positions, null),
+            });
+            continue;
+          }
+          const alias = app.index
+            .aliasesOf(entry.path)
+            .map((name) => ({
+              name,
+              match: fuzzyMatch(query, name, name.toLowerCase()),
+            }))
+            .find((candidate) => candidate.match);
+          if (alias?.match) {
+            scored.push({
+              score: alias.match.score + 90,
+              suggestion: aliasSuggestion(
+                entry,
+                alias.name,
+                alias.match.positions,
+              ),
             });
             continue;
           }
@@ -144,7 +184,7 @@ export function openQuickSwitcher(app: App): void {
         return results;
       },
       [
-        ["↑↓", "navigieren"],
+        ["↑↓", t("navigieren")],
         ["↵", t("öffnen")],
         [`${formatHotkey("Mod")} ↵`, t("in neuem Tab öffnen")],
         ["esc", t("schließen")],
@@ -163,7 +203,7 @@ export function openCommandPalette(app: App): void {
         name: command.name,
         lower: command.name.toLowerCase(),
         icon: command.icon ?? "terminal",
-        hotkey: command.hotkey ? formatHotkey(command.hotkey) : "",
+        hotkey: formatHotkey(app.commands.hotkeyOf(command.id) ?? ""),
         run: () => app.commands.run(command.id),
       }));
     const session = app.compatibility;
@@ -237,7 +277,7 @@ export function openCommandPalette(app: App): void {
         }));
       },
       [
-        ["↑↓", "navigieren"],
+        ["↑↓", t("navigieren")],
         ["↵", t("ausführen")],
         ["esc", t("schließen")],
       ],

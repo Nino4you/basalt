@@ -102,7 +102,8 @@ src/ (WebView UI)  ──invoke──▶  src-tauri/src/lib.rs (IPC commands)  �
   (entry snapshots, mkdir, delete). `DirectoryVault` implements them on a `cap-std` directory
   handle so nothing can escape the vault root; `crates/vault-core/tests/vault.rs` covers path and
   symlink escapes. Saves are compare-and-swap against the previously loaded content and first
-  write a backup to `.basalt/history/`.
+  write a backup to `.basalt/history/`; `save_text_unbacked` skips that backup for the app's
+  own recent autosaves only (Android keeps backing up).
 - **`src-tauri`** holds one `Mutex<Session>` with a boxed storage backend. Commands that read or
   write vault files take a `vaultId` and are rejected (`lock_session`) if it does not match the
   current session, so stale frontend state
@@ -111,7 +112,11 @@ src/ (WebView UI)  ──invoke──▶  src-tauri/src/lib.rs (IPC commands)  �
   only compiled with `cfg(target_os = "android")`.
 - There are three IPC families that the frontend uses for different purposes:
   - `vault_info` / `read_note` / `create_note` / `save_note` / `choose_vault` / `export_note` —
-    text notes for the app itself, wrapped by `src/backend.ts`.
+    text notes for the app itself, wrapped by `src/backend.ts`. `backup_list` / `backup_read`
+    list and read the `.basalt/history/` and `.basalt/trash/` backups of notes and canvases
+    (`vault_core::list_backups` / `read_backup`; layouts parsed in `src/backups.ts` too) for
+    the file recovery dialog (`src/app/file-recovery.ts`), which restores through the normal
+    version-checked save or an exclusive create — never by overwriting.
   - `plugin_vault_*` — base64 binary access with opaque SHA-256 version tokens (64 MiB cap,
     deletes backed up to `.basalt/trash/`), wrapped by `src/compat/native-port.ts`.
   - `plugin_resource_grant` / `plugin_resource_revoke` — per-plugin tokens for the read-only
@@ -142,7 +147,14 @@ No UI framework: DOM is built with the `h()` / `icon()` helpers in `src/ui/dom.t
 - `src/store.ts` — `NoteStore` serializes saves and keeps localStorage drafts that remember the
   original conflict base, so recovery cannot silently overwrite external changes.
 - `src/app/vault-index.ts` — in-memory link/tag/heading index and the search query parser
-  (`tag:`, `path:`, `file:`) behind backlinks, outgoing links, tags and search.
+  (`tag:`, `path:`, `file:`) behind backlinks, unlinked mentions, outgoing links, tags and
+  search. Frontmatter `aliases` are indexed for completion (`[[Note|Alias]]`), the quick
+  switcher and unlinked mentions; like in Obsidian, `[[Alias]]` alone does not resolve.
+  `LinkResolver`
+  resolves links for any file list; `src/app/link-update.ts` compares resolution before and
+  after a rename/move and rewrites only links whose target would change (wiki links, embeds,
+  Markdown links, canvas file cards), saved through `NoteStore` like any edit; the plugin
+  `FileManager.renameFile` uses the same engine through `Vault.process`.
 - `src/editor.ts` + `src/editor/` — the CodeMirror 6 editor: live preview decorations, syntax,
   completion for `[[wiki links]]` and `#tags`.
   - **Markdown stays authoritative.** `rich-preview.ts` renders KaTeX, Mermaid and tables as
@@ -168,6 +180,12 @@ No UI framework: DOM is built with the `h()` / `icon()` helpers in `src/ui/dom.t
   other apps round-trip losslessly.
 - `src/markdown.ts` — `marked` rendering, always sanitized through DOMPurify; remote image
   sources are stripped.
+- `src/dates.ts` — Moment.js-style date formatting/parsing (locale names, ISO weeks,
+  `[literal]`) for templates and daily notes (folder, format and template are settings; the
+  previous/next commands parse existing note names). There is no `moment` dependency.
+- `src/app/commands.ts` — `CommandRegistry` with user hotkey overrides (`basalt-hotkeys` in
+  localStorage, edited in Settings → Hotkeys). Show `hotkeyOf(id)`, not `command.hotkey`, which
+  is only the default. A hotkey belongs to one command; assigning it elsewhere moves it.
 
 ### Plugin compatibility layer (`src/compat/`)
 
@@ -212,7 +230,9 @@ These are deliberate and documented in `SECURITY.md` / `docs/`:
 - Plugin code is trusted, not sandboxed. `'unsafe-eval'` in the CSP (`src-tauri/tauri.conf.json`)
   exists solely for the CommonJS loader; do not widen the CSP further without need.
 - Writes never overwrite blindly: creation is exclusive, replacement and deletion are
-  version-checked and backed up first. Folder deletion is rejected.
+  version-checked and backed up first. The only exception: `NoteStore` backs up its *own*
+  autosaved content at most every five minutes per note; anything it did not write itself, and
+  whatever a restore or link update replaces, is always backed up. Folder deletion is rejected.
 - Basalt implements the public `obsidian.d.ts` API surface. Never commit
   Obsidian application code, unpacked app packages or decompiler output.
 - Storage changes usually need both paths (note `Backend` and plugin `NativeVaultPort`) and both

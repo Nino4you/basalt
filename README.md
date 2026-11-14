@@ -29,8 +29,9 @@ Obsidian vaults and selected Obsidian plugins.
   behave as you expect; existing Obsidian vaults open directly.
 - **Built for Linux and Android.** One shared Rust core, one native Tauri app for both
   platforms, and an interface that adapts to mouse, keyboard, touch and pen.
-- **Careful with your data.** Every change is backed up before it is saved, external edits are
-  detected instead of overwritten, and file access is confined to the vault.
+- **Careful with your data.** Content is backed up before it is overwritten (while you type,
+  every few minutes), external edits are detected instead of overwritten, and file access is
+  confined to the vault.
 
 ## Features
 
@@ -39,25 +40,32 @@ Obsidian vaults and selected Obsidian plugins.
 - CodeMirror 6 editor with live preview: Markdown syntax fades away, links and checkboxes are
   clickable, and KaTeX math, Mermaid diagrams and tables render right in the editor. Tables
   are edited cell by cell while the Markdown stays the source of truth.
-- Completion for `[[wiki links]]` and `#tags`, page previews when hovering links, templates
-  with title and date placeholders, and a source mode.
+- Completion for `[[wiki links]]` (including `#headings`, `#^blocks` and note aliases) and
+  `#tags`, page previews when hovering links, templates from a folder you choose (with title
+  and Moment.js date placeholders), and a source mode.
 - Reading view with callouts, properties, note embeds and syntax highlighting.
 - PDFs, images, audio and video open in their own tabs; PDFs are rendered locally.
 
 **Organizing**
 
 - File tree with folders, bookmarks, drag & drop and safe renaming that carries open tabs,
-  bookmarks and unsaved changes along.
-- Backlinks with context, outgoing links, tags, outline and full-text search
-  (`tag:`, `path:`, `file:`, exclusion with `-`).
+  bookmarks and unsaved changes along; links to a renamed or moved note are updated.
+- Backlinks with context, unlinked mentions that become links with one click, outgoing links,
+  tags, outline and full-text search (`tag:`, `path:`, `file:`, exclusion with `-`).
+- Daily notes with their own folder, date format (Moment.js style) and template, and commands
+  to step to the previous or next one.
 - Graph view for the whole vault and as a local graph of the active note, with group colors.
 - Canvas in the open JSON Canvas format (`.canvas`) with text, note, link and group cards.
+- File recovery: every earlier version of a note or canvas and every deleted file can be
+  compared with the current content and restored (command palette → "Open file recovery", or
+  "Version history" in the file menu).
 
 **Workspace**
 
 - Tabs with their own history, split editors and freely dockable side views like in VS Code;
   the layout is saved per vault.
-- Quick switcher (Ctrl+O), command palette (Ctrl+P) and full keyboard navigation.
+- Quick switcher (Ctrl+O), command palette (Ctrl+P), full keyboard navigation and hotkeys you
+  can change in the settings.
 - Light and dark theme with an accent color; a dedicated phone layout with drawers, a bottom
   navigation bar and a formatting toolbar.
 
@@ -94,7 +102,8 @@ stable and tested, but some things are still missing:
 
 - no automatic updates and no built-in sync,
 - plugin compatibility only for selected plugins (see below),
-- backups in `.basalt/history/` and `.basalt/trash/` have to be restored by hand for now,
+- backups in `.basalt/history/` and `.basalt/trash/` are never cleaned up automatically yet,
+  and backups of attachments have to be restored by hand,
 - no Play Store or distribution packages yet, only direct downloads.
 
 Make a copy of any important vault before opening it for the first time.

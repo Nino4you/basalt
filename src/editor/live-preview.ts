@@ -529,8 +529,15 @@ export const linkPreviews = EditorView.domEventHandlers({
     const element = event.target as HTMLElement | null;
     if (!host?.previewLink || !element?.closest?.(LINK_SELECTOR)) return false;
     const next = event.relatedTarget as Node | null;
-    if (!next || !element.closest(LINK_SELECTOR)?.contains(next))
-      host.previewLink(null);
+    if (next && element.closest(LINK_SELECTOR)?.contains(next)) return false;
+    // CodeMirror redraws a line (when the index resolves its links, say) by
+    // replacing the link under a still pointer; that is no reason to close.
+    // Moving onto another link fires its own mouseover, which decides.
+    const under = view.dom.ownerDocument.elementFromPoint(
+      event.clientX,
+      event.clientY,
+    );
+    if (!under?.closest(LINK_SELECTOR)) host.previewLink(null);
     return false;
   },
   mouseleave(_event, view) {

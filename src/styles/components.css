@@ -872,6 +872,14 @@ input.prompt-input:focus {
   color: var(--text-faint);
   font-size: var(--font-ui-smaller);
 }
+.setting-hotkey.mod-recording {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+  color: var(--text-accent);
+}
+.setting-item.mod-hotkey .setting-item-control {
+  gap: 4px;
+}
 .settings-search {
   position: relative;
   display: flex;
@@ -884,7 +892,8 @@ input.prompt-input:focus {
   color: var(--text-faint);
   pointer-events: none;
 }
-.settings-search .settings-search-input {
+/* Specific enough to beat the generic search field padding. */
+.settings-search > input.settings-search-input {
   width: 100%;
   padding-left: 32px;
 }

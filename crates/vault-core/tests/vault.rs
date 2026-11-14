@@ -3,8 +3,8 @@ use std::io;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use vault_core::{
-    BinaryVaultStorage, DirectoryVault, EntryKind, MetadataVaultStorage, VaultPath, VaultStorage,
-    search,
+    Backup, BackupKind, BinaryVaultStorage, DirectoryVault, EntryKind, MetadataVaultStorage,
+    VaultPath, VaultStorage, list_backups, read_backup, search,
 };
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
@@ -470,4 +470,136 @@ fn binary_and_metadata_apis_reject_symlinks_even_within_the_vault() {
             .collect::<Vec<_>>(),
         vec!["real", "real/file.xlsx"]
     );
+}
+
+#[test]
+fn backups_are_listed_newest_first_and_read_back_exactly() {
+    let fixture = Fixture::new();
+    let vault = fixture.vault();
+    assert!(list_backups(&vault).unwrap().is_empty());
+    fs::create_dir(fixture.0.join("Notes")).unwrap();
+    let note = path("Notes/a.md");
+    vault.create_text(&note, "one").unwrap();
+    vault.save_text(&note, "two", "one").unwrap();
+    vault.save_text(&note, "three", "two").unwrap();
+    let doomed = path("gone.canvas");
+    vault.create_text(&doomed, "{}").unwrap();
+    vault.remove_file(&doomed, b"{}").unwrap();
+
+    let backups = list_backups(&vault).unwrap();
+    assert_eq!(backups.len(), 3);
+    assert!(backups.windows(2).all(|pair| pair[0].time >= pair[1].time));
+    assert!(backups.iter().all(|backup| backup.time > 1_600_000_000_000));
+    let versions: Vec<_> = backups
+        .iter()
+        .filter(|backup| backup.kind == BackupKind::Version)
+        .collect();
+    assert_eq!(versions.len(), 2);
+    assert!(versions.iter().all(|backup| backup.original == note));
+    let texts: Vec<_> = versions
+        .iter()
+        .map(|backup| read_backup(&vault, &backup.location).unwrap())
+        .collect();
+    assert_eq!(texts, ["two", "one"]);
+    assert_eq!(versions[0].size, 3);
+
+    let deleted = backups
+        .iter()
+        .find(|backup| backup.kind == BackupKind::Deleted)
+        .unwrap();
+    assert_eq!(deleted.original, doomed);
+    assert_eq!(read_backup(&vault, &deleted.location).unwrap(), "{}");
+}
+
+#[test]
+fn only_backup_locations_of_documents_can_be_read() {
+    let fixture = Fixture::new();
+    let vault = fixture.vault();
+    vault.create_text(&path("note.md"), "secret").unwrap();
+    let binary = path("drawing.ink");
+    vault.create_binary(&binary, b"a").unwrap();
+    vault.save_binary(&binary, b"b", b"a").unwrap();
+    fs::create_dir_all(fixture.0.join(".basalt/history/.hidden.md")).unwrap();
+    fs::write(fixture.0.join(".basalt/history/.hidden.md/1-0.md"), "x").unwrap();
+
+    let backups = list_backups(&vault).unwrap();
+    assert_eq!(backups.len(), 1, "hidden originals are not backups");
+    assert_eq!(backups[0].original, binary);
+    for location in [
+        "note.md",
+        ".basalt/history/.hidden.md/1-0.md",
+        ".basalt/other/note.md",
+        backups[0].location.as_str(),
+    ] {
+        let error = read_backup(&vault, &path(location)).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput, "{location}");
+    }
+}
+
+#[test]
+fn backup_locations_parse_both_layouts() {
+    let version = Backup::parse(
+        &path(".basalt/history/A/b.md/1700000000123456789-42-0.md"),
+        7,
+    )
+    .unwrap();
+    assert_eq!(version.kind, BackupKind::Version);
+    assert_eq!(version.original, path("A/b.md"));
+    assert_eq!(version.time, 1_700_000_000_123);
+    assert_eq!(version.size, 7);
+    let deleted =
+        Backup::parse(&path(".basalt/trash/1700000000000000000-3/A/c.canvas"), 0).unwrap();
+    assert_eq!(deleted.kind, BackupKind::Deleted);
+    assert_eq!(deleted.original, path("A/c.canvas"));
+    assert_eq!(deleted.time, 1_700_000_000_000);
+    let unknown_id = Backup::parse(&path(".basalt/trash/some-uuid/n.md"), 0).unwrap();
+    assert_eq!(unknown_id.time, 0);
+    for location in [
+        ".basalt/history/a.md",
+        ".basalt/history/a.md/1.txt",
+        ".basalt/trash/1",
+        ".basalt/history2/a.md/1.md",
+        "notes/a.md",
+    ] {
+        assert!(Backup::parse(&path(location), 0).is_none(), "{location}");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn backup_listing_ignores_symlinks() {
+    let fixture = Fixture::new();
+    let outside = Fixture::new();
+    fs::create_dir_all(outside.0.join("a.md")).unwrap();
+    fs::write(outside.0.join("a.md/1-0.md"), "outside").unwrap();
+    fs::create_dir(fixture.0.join(".basalt")).unwrap();
+    std::os::unix::fs::symlink(&outside.0, fixture.0.join(".basalt/history")).unwrap();
+    assert!(list_backups(&fixture.vault()).unwrap().is_empty());
+
+    fs::remove_file(fixture.0.join(".basalt/history")).unwrap();
+    fs::create_dir_all(fixture.0.join(".basalt/history/b.md")).unwrap();
+    std::os::unix::fs::symlink(
+        outside.0.join("a.md/1-0.md"),
+        fixture.0.join(".basalt/history/b.md/2-0.md"),
+    )
+    .unwrap();
+    assert!(list_backups(&fixture.vault()).unwrap().is_empty());
+    let error = read_backup(&fixture.vault(), &path(".basalt/history/b.md/2-0.md")).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+}
+
+#[test]
+fn unbacked_saves_keep_the_conflict_check_but_skip_the_history() {
+    let fixture = Fixture::new();
+    let vault = fixture.vault();
+    let note = path("note.md");
+    vault.create_text(&note, "one").unwrap();
+    vault.save_text_unbacked(&note, "two", "one").unwrap();
+    assert_eq!(vault.read_text(&note).unwrap(), "two");
+    assert!(!fixture.0.join(".basalt").exists());
+    let error = vault.save_text_unbacked(&note, "three", "one").unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::AlreadyExists);
+    assert_eq!(vault.read_text(&note).unwrap(), "two");
+    vault.save_text(&note, "three", "two").unwrap();
+    assert_eq!(list_backups(&vault).unwrap().len(), 1);
 }

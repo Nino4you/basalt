@@ -7,8 +7,8 @@ use tauri::{Manager, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_fs::FsExt;
 use vault_core::{
-    BinaryVaultStorage, DirectoryVault, EntryKind, FileStats, MetadataVaultStorage, VaultPath,
-    VaultStorage,
+    BackupKind, BinaryVaultStorage, DirectoryVault, EntryKind, FileStats, MetadataVaultStorage,
+    VaultPath, VaultStorage,
 };
 
 #[cfg(target_os = "android")]
@@ -501,22 +501,75 @@ async fn create_note(
         .map_err(error)
 }
 
+/// `backup: false` skips the history backup; the frontend asks for that only when the
+/// replaced content is its own recent, already backed-up write. Missing means `true`.
 #[tauri::command]
 async fn save_note(
     path: String,
     text: String,
     expected: String,
     vault_id: String,
+    backup: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<()> {
     let path = VaultPath::parse(&path).map_err(error)?;
     if !path.is_document() {
         return Err("Only Markdown notes and canvases can be edited".into());
     }
-    lock_session(&state, &vault_id)?
-        .storage
-        .save_text(&path, &text, &expected)
-        .map_err(error)
+    let session = lock_session(&state, &vault_id)?;
+    if backup == Some(false) {
+        session.storage.save_text_unbacked(&path, &text, &expected)
+    } else {
+        session.storage.save_text(&path, &text, &expected)
+    }
+    .map_err(error)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BackupInfo {
+    /// `version` (content before a save) or `deleted` (content of a deleted file).
+    kind: &'static str,
+    path: String,
+    location: String,
+    time: u64,
+    size: u64,
+}
+
+/// Backups of notes and canvases, newest first. Attachments are left out: the
+/// note IPC can neither show nor restore them.
+fn document_backups(session: &Session) -> Result<Vec<BackupInfo>> {
+    Ok(vault_core::list_backups(&*session.storage)
+        .map_err(error)?
+        .into_iter()
+        .filter(|backup| backup.original.is_document())
+        .map(|backup| BackupInfo {
+            kind: match backup.kind {
+                BackupKind::Version => "version",
+                BackupKind::Deleted => "deleted",
+            },
+            path: backup.original.as_str().to_owned(),
+            location: backup.location.as_str().to_owned(),
+            time: backup.time,
+            size: backup.size,
+        })
+        .collect())
+}
+
+#[tauri::command]
+async fn backup_list(vault_id: String, state: State<'_, AppState>) -> Result<Vec<BackupInfo>> {
+    let session = lock_session(&state, &vault_id)?;
+    document_backups(&session)
+}
+
+#[tauri::command]
+async fn backup_read(
+    location: String,
+    vault_id: String,
+    state: State<'_, AppState>,
+) -> Result<String> {
+    let location = VaultPath::parse(&location).map_err(error)?;
+    vault_core::read_backup(&*lock_session(&state, &vault_id)?.storage, &location).map_err(error)
 }
 
 #[tauri::command]
@@ -644,6 +697,8 @@ pub fn run() {
             save_note,
             choose_vault,
             export_note,
+            backup_list,
+            backup_read,
             plugin_vault_snapshot,
             plugin_vault_read,
             plugin_vault_read_many,
@@ -822,6 +877,31 @@ mod tests {
             .path()
             .join("drawing.ink");
         assert_eq!(std::fs::read(trash).unwrap(), content);
+    }
+
+    #[test]
+    fn backup_listing_covers_documents_only() {
+        let fixture = Fixture::new();
+        let session = fixture.session();
+        let note = VaultPath::parse("note.md").unwrap();
+        session.storage.create_text(&note, "old").unwrap();
+        session.storage.save_text(&note, "new", "old").unwrap();
+        let drawing = plugin_path("drawing.ink").unwrap();
+        session.storage.create_binary(&drawing, &[1]).unwrap();
+        session.storage.save_binary(&drawing, &[2], &[1]).unwrap();
+        session.storage.remove_file(&note, b"new").unwrap();
+
+        let backups = document_backups(&session).unwrap();
+        assert_eq!(backups.len(), 2);
+        assert!(backups.iter().all(|backup| backup.path == "note.md"));
+        let deleted = backups.iter().find(|b| b.kind == "deleted").unwrap();
+        let version = backups.iter().find(|b| b.kind == "version").unwrap();
+        let read = |location: &str| {
+            vault_core::read_backup(&*session.storage, &VaultPath::parse(location).unwrap())
+        };
+        assert_eq!(read(&deleted.location).unwrap(), "new");
+        assert_eq!(read(&version.location).unwrap(), "old");
+        assert!(read("drawing.ink").is_err());
     }
 
     #[test]

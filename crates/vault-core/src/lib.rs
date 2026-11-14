@@ -68,6 +68,14 @@ pub trait VaultStorage {
     /// Must fail rather than overwrite an existing file. Parent folders must exist.
     fn create_text(&self, path: &VaultPath, text: &str) -> io::Result<()>;
     fn save_text(&self, path: &VaultPath, text: &str, expected: &str) -> io::Result<()>;
+    /// Like [`save_text`](Self::save_text), but the replaced content gets no history backup.
+    ///
+    /// Only for callers that know the replaced content is their own recent write that is
+    /// already backed up (autosave while typing). Storages may keep backing up; the default
+    /// does.
+    fn save_text_unbacked(&self, path: &VaultPath, text: &str, expected: &str) -> io::Result<()> {
+        self.save_text(path, text, expected)
+    }
 }
 
 /// Optional attachment storage. Native IPC and Android SAF adapters must opt in explicitly.
@@ -116,6 +124,117 @@ pub trait MetadataVaultStorage: VaultStorage {
             "removing files is not supported by this vault",
         ))
     }
+
+    /// Every regular file below [`HISTORY_DIR`] and [`TRASH_DIR`] with its size, in any
+    /// order. Symlinks are skipped; a missing backup folder is an empty listing.
+    fn backup_files(&self) -> io::Result<Vec<(VaultPath, u64)>> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "listing backups is not supported by this vault",
+        ))
+    }
+}
+
+/// Previous versions, written before every save: `.basalt/history/<path>/<id>.<md|bin>`.
+pub const HISTORY_DIR: &str = ".basalt/history";
+/// Deleted files: `.basalt/trash/<id>/<path>`.
+pub const TRASH_DIR: &str = ".basalt/trash";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackupKind {
+    /// The content a file had before it was saved.
+    Version,
+    /// The content a file had when it was deleted.
+    Deleted,
+}
+
+/// One backup the app wrote, recognized from its location alone.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Backup {
+    pub kind: BackupKind,
+    /// The file the backup belongs to.
+    pub original: VaultPath,
+    /// Where the backup itself is stored.
+    pub location: VaultPath,
+    /// Milliseconds since the Unix epoch, taken from the backup id; 0 when unknown.
+    pub time: u64,
+    pub size: u64,
+}
+
+impl Backup {
+    /// Recognizes the two backup layouts. Anything else, including backups of
+    /// hidden files, is not a backup and yields `None`.
+    pub fn parse(location: &VaultPath, size: u64) -> Option<Self> {
+        let value = location.as_str();
+        let (kind, original, id) = if let Some(rest) = value
+            .strip_prefix(HISTORY_DIR)
+            .and_then(|r| r.strip_prefix('/'))
+        {
+            let (original, file) = rest.rsplit_once('/')?;
+            let id = file
+                .strip_suffix(".md")
+                .or_else(|| file.strip_suffix(".bin"))?;
+            (BackupKind::Version, original, id)
+        } else {
+            let rest = value.strip_prefix(TRASH_DIR)?.strip_prefix('/')?;
+            let (id, original) = rest.split_once('/')?;
+            (BackupKind::Deleted, original, id)
+        };
+        if id.is_empty() || original.split('/').any(|part| part.starts_with('.')) {
+            return None;
+        }
+        Some(Self {
+            kind,
+            original: VaultPath::parse(original).ok()?,
+            location: location.clone(),
+            time: backup_time(id),
+            size,
+        })
+    }
+}
+
+/// Backup ids start with the write time in nanoseconds (`<nanos>-...`).
+fn backup_time(id: &str) -> u64 {
+    let digits = id.split('-').next().unwrap_or_default();
+    digits
+        .parse::<u128>()
+        .map(|nanos| (nanos / 1_000_000).min(u64::MAX as u128) as u64)
+        .unwrap_or(0)
+}
+
+/// All backups of the vault, newest first.
+pub fn list_backups<S: MetadataVaultStorage + ?Sized>(storage: &S) -> io::Result<Vec<Backup>> {
+    let mut backups: Vec<Backup> = storage
+        .backup_files()?
+        .into_iter()
+        .filter_map(|(location, size)| Backup::parse(&location, size))
+        .collect();
+    backups.sort_by(|a, b| {
+        b.time
+            .cmp(&a.time)
+            .then_with(|| a.location.cmp(&b.location))
+    });
+    Ok(backups)
+}
+
+/// Text of a backup of a note or canvas. Refuses every other path, so this
+/// cannot be used to read arbitrary hidden files.
+pub fn read_backup<S: BinaryVaultStorage + ?Sized>(
+    storage: &S,
+    location: &VaultPath,
+) -> io::Result<String> {
+    let backup = Backup::parse(location, 0)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "not a backup location"))?;
+    if !backup.original.is_document()
+        || (backup.kind == BackupKind::Version && !location.as_str().ends_with(".md"))
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "only backups of notes and canvases can be read as text",
+        ));
+    }
+    String::from_utf8(storage.read_binary(location)?)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
 }
 
 pub fn timestamp_millis(time: SystemTime) -> u64 {
@@ -181,7 +300,7 @@ impl DirectoryVault {
     /// Atomic replacement with a previous-version backup and optimistic conflict check.
     /// Callers must serialize writes. Uncooperative external writers can still race the final rename.
     pub fn save_text(&self, path: &VaultPath, text: &str, expected: &str) -> io::Result<()> {
-        self.save_bytes(path, text.as_bytes(), expected.as_bytes(), true)
+        self.save_bytes(path, text.as_bytes(), expected.as_bytes(), true, true)
     }
 
     fn create_bytes(&self, path: &VaultPath, data: &[u8]) -> io::Result<()> {
@@ -198,6 +317,7 @@ impl DirectoryVault {
         data: &[u8],
         expected: &[u8],
         text: bool,
+        backup: bool,
     ) -> io::Result<()> {
         if self
             .directory
@@ -233,13 +353,15 @@ impl DirectoryVault {
             std::process::id(),
             NEXT_WRITE.fetch_add(1, Ordering::Relaxed)
         );
-        let history = format!(".basalt/history/{}", path.as_str());
-        self.directory.create_dir_all(&history)?;
-        let extension = if text { "md" } else { "bin" };
-        self.create_bytes(
-            &VaultPath::parse(&format!("{history}/{id}.{extension}"))?,
-            &current,
-        )?;
+        if backup {
+            let history = format!(".basalt/history/{}", path.as_str());
+            self.directory.create_dir_all(&history)?;
+            let extension = if text { "md" } else { "bin" };
+            self.create_bytes(
+                &VaultPath::parse(&format!("{history}/{id}.{extension}"))?,
+                &current,
+            )?;
+        }
         let parent = Path::new(path.as_str()).parent().unwrap_or(Path::new(""));
         let temp = parent.join(format!(".basalt-{id}.tmp"));
         let mut options = OpenOptions::new();
@@ -271,6 +393,10 @@ impl VaultStorage for DirectoryVault {
         DirectoryVault::save_text(self, path, text, expected)
     }
 
+    fn save_text_unbacked(&self, path: &VaultPath, text: &str, expected: &str) -> io::Result<()> {
+        self.save_bytes(path, text.as_bytes(), expected.as_bytes(), true, false)
+    }
+
     fn document_files(&self) -> io::Result<Vec<VaultPath>> {
         let mut files = Vec::new();
         collect_documents(&self.directory, "", &mut files, 0)?;
@@ -300,7 +426,7 @@ impl BinaryVaultStorage for DirectoryVault {
 
     fn save_binary(&self, path: &VaultPath, data: &[u8], expected: &[u8]) -> io::Result<()> {
         self.check_path(path, false)?;
-        self.save_bytes(path, data, expected, false)
+        self.save_bytes(path, data, expected, false, true)
     }
 }
 
@@ -365,6 +491,71 @@ impl MetadataVaultStorage for DirectoryVault {
         }
         self.directory.remove_file(path.as_str())
     }
+
+    fn backup_files(&self) -> io::Result<Vec<(VaultPath, u64)>> {
+        let mut files = Vec::new();
+        for root in [HISTORY_DIR, TRASH_DIR] {
+            // Every component of the backup root must be a real folder; a
+            // symlinked `.basalt` must not make backups appear from elsewhere.
+            let mut prefix = String::new();
+            let mut usable = true;
+            for part in root.split('/') {
+                if !prefix.is_empty() {
+                    prefix.push('/');
+                }
+                prefix.push_str(part);
+                match self.directory.symlink_metadata(&prefix) {
+                    Ok(metadata) if metadata.is_dir() => (),
+                    Ok(_) => {
+                        usable = false;
+                        break;
+                    }
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                        usable = false;
+                        break;
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
+            if usable {
+                collect_files(&self.directory.open_dir(root)?, root, &mut files, 0)?;
+            }
+        }
+        Ok(files)
+    }
+}
+
+/// Regular files below `dir`, hidden names included, symlinks skipped.
+fn collect_files(
+    dir: &Dir,
+    prefix: &str,
+    files: &mut Vec<(VaultPath, u64)>,
+    depth: usize,
+) -> io::Result<()> {
+    // Backups mirror vault paths below two extra levels.
+    if depth > 66 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "backup nesting exceeds 66 folders",
+        ));
+    }
+    for entry in dir.entries()? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let Some(name_text) = name.to_str() else {
+            continue;
+        };
+        let metadata = dir.symlink_metadata(&name)?;
+        let path = format!("{prefix}/{name_text}");
+        if metadata.is_dir() {
+            collect_files(&dir.open_dir(&name)?, &path, files, depth + 1)?;
+        } else if metadata.is_file()
+            && let Ok(path) = VaultPath::parse(&path)
+        {
+            files.push((path, metadata.len()));
+        }
+    }
+    Ok(())
 }
 
 fn collect_entries(
