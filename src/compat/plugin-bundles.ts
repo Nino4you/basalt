@@ -9,8 +9,8 @@ export const PLUGIN_DIRECTORY = "Basalt/Plugins";
  * Iconize's `.obsidian/icons`. Reachable for plugins only via the adapter.
  */
 export const CONFIG_DIRECTORY = "Basalt/Config";
-const MAX_MANIFEST_BYTES = 64 * 1024;
-const MAX_STYLES_BYTES = 1024 * 1024;
+export const MAX_MANIFEST_BYTES = 64 * 1024;
+export const MAX_STYLES_BYTES = 1024 * 1024;
 const PLUGIN_ID = /^[a-z0-9][a-z0-9_-]*$/;
 
 export interface PluginBundleListing {
