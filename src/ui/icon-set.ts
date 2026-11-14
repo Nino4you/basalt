@@ -6,6 +6,7 @@ import {
   ArrowUpNarrowWide,
   ArrowUpRight,
   BadgeCheck,
+  Focus,
   FileCode,
   Printer,
   Footprints,
@@ -143,6 +144,8 @@ export const hostIcons: Record<string, IconNode> = {
   ArrowUpNarrowWide,
   ArrowUpRight,
   BadgeCheck,
+  // Named as the window `focus` event, which the icon test cannot tell apart.
+  Focus,
   FileCode,
   Printer,
   Footprints,

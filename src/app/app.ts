@@ -19,6 +19,13 @@ import {
 import { addProperty } from "../editor/properties";
 import { insertFootnote } from "../editor/footnotes";
 import { exportHtml, printNote } from "./print-export";
+import {
+  ConflictWatcher,
+  conflictSummary,
+  findConflicts,
+  openSyncConflicts,
+  type Conflict,
+} from "./sync-conflicts";
 import { foldAll, toggleFold, unfoldAll } from "@codemirror/language";
 import { emptyCanvas } from "../canvas/model";
 import { CanvasView } from "../canvas/view";
@@ -243,7 +250,11 @@ export class App {
   private mobilePanel: PanelId | null = null;
 
   private readonly saveWorkspace = debounce(() => this.writeWorkspace(), 250);
-  private readonly emitIndex = debounce(() => this.emit("index"), 120);
+  private readonly emitIndex = debounce(() => {
+    this.emit("index");
+    this.checkSyncConflicts();
+  }, 120);
+  private readonly conflictWatcher = new ConflictWatcher();
   private readonly docEdited = debounce(() => this.flushDoc(), 200);
   /** Notes saved since the plugin vault last looked at them. */
   private readonly savedPaths = new Set<string>();
@@ -481,6 +492,7 @@ export class App {
     this.compatibility = null;
     this.vaultStyles.clear();
     this.appearance = { cssTheme: "", enabledCssSnippets: [] };
+    this.conflictWatcher.reset();
     // The old session must have released the shared editor before a new one binds it.
     if (previous) await previous.dispose().catch((error) => this.report(error));
     if (epoch !== this.epoch) return;
@@ -651,6 +663,61 @@ export class App {
     } catch (error) {
       this.report(error);
     }
+  }
+
+  /** Sync conflict copies and notes with merge markers in this vault. */
+  syncConflicts(): Conflict[] {
+    this.checkSyncConflicts();
+    return this.conflictWatcher.conflicts;
+  }
+
+  private checkSyncConflicts(): void {
+    const conflicts = findConflicts(this.index.files, (path) =>
+      this.index.content(path),
+    );
+    const fresh = this.conflictWatcher.update(conflicts);
+    const button = document.getElementById("sync-conflicts");
+    if (button) {
+      button.textContent = conflictSummary(conflicts);
+      button.hidden = !conflicts.length;
+    }
+    if (fresh.length)
+      notify(
+        t("Sync-Konflikt gefunden: {files}. Befehl „Sync-Konflikte anzeigen“ hilft beim Lösen.", {
+          files: fresh.map((conflict) => `„${basename(conflict.path)}“`).join(", "),
+        }),
+        true,
+      );
+  }
+
+  /** The current text of a note or canvas, unsaved edits included. */
+  async readNote(path: string): Promise<string> {
+    const store = this.store;
+    if (!store) throw new Error(t("Kein Vault geöffnet."));
+    return (await store.load(path)).text;
+  }
+
+  /**
+   * Replaces `original` with the text of its conflict copy (backed up and
+   * version-checked like any restore), then moves the copy to the trash.
+   */
+  async adoptConflictCopy(copy: string, original: string): Promise<void> {
+    const text = await this.readNote(copy);
+    const { failed } = await this.rewriteNotes([original], () => text);
+    if (failed.length)
+      throw new Error(
+        t("„{name}“ konnte nicht geändert werden und ist unverändert.", {
+          name: basename(original),
+        }),
+      );
+    await this.trashFile(copy);
+  }
+
+  /** Moves a note or canvas to the vault trash without asking. */
+  async trashFile(path: string): Promise<void> {
+    const store = this.store;
+    if (!store) throw new Error(t("Kein Vault geöffnet."));
+    await this.deleteFile(path, store);
   }
 
   /** Reads appearance.json and applies the vault's theme and snippets. */
@@ -3863,6 +3930,9 @@ export class App {
       this.showPanel("backlinks"),
     );
     document
+      .getElementById("sync-conflicts")!
+      .addEventListener("click", () => openSyncConflicts(this));
+    document
       .getElementById("export-draft")!
       .addEventListener("click", () => this.exportNote());
     document
@@ -3894,6 +3964,15 @@ export class App {
         [...this.store.notes.values()].some((note) => note.text !== note.saved)
       )
         event.preventDefault();
+    });
+    // Switching back to the window does not change visibility on desktops.
+    window.addEventListener("focus", () => {
+      if (
+        this.compatibility &&
+        this.vault?.platform !== "android" &&
+        Date.now() - this.lastFullRefresh > 5000
+      )
+        void this.refreshCompatibility().catch((error) => this.report(error));
     });
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) {
@@ -4303,6 +4382,12 @@ export class App {
       icon: "file-plus",
       when: hasNote,
       run: () => this.insertTemplate(),
+    });
+    add({
+      id: "sync-conflicts",
+      name: t("Sync-Konflikte anzeigen"),
+      icon: "triangle-alert",
+      run: () => openSyncConflicts(this),
     });
     add({
       id: "print-note",
