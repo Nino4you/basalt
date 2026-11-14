@@ -17,6 +17,7 @@ mod request;
 mod resources;
 #[cfg(any(target_os = "android", test))]
 mod saf_cache;
+mod updates;
 
 /// Whether a SAF provider created an entry exactly where it was asked to.
 /// `tauri-plugin-android-fs` reports the created path relative to the base
@@ -672,7 +673,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init());
     #[cfg(target_os = "android")]
     let builder = builder.plugin(tauri_plugin_android_fs::builder().build());
-    builder
+    updates::register(builder)
         .register_asynchronous_uri_scheme_protocol(resources::SCHEME, |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             tauri::async_runtime::spawn_blocking(move || {
@@ -743,7 +744,9 @@ pub fn run() {
             plugin_vault_mkdir,
             plugin_request_url,
             plugin_resource_grant,
-            plugin_resource_revoke
+            plugin_resource_revoke,
+            updates::app_update_check,
+            updates::app_update_install
         ])
         .run(tauri::generate_context!())
         .expect("Basalt could not start");

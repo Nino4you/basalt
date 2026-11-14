@@ -563,12 +563,43 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         const update = app.availableUpdate;
         version.control.querySelector(".mod-update")?.remove();
         if (!update) return;
+        if (!update.installable) {
+          version.control.append(
+            h("button", {
+              class: "mod-cta mod-update",
+              text: t("Herunterladen"),
+              attrs: { type: "button" },
+              on: { click: () => app.openExternal(update.url) },
+            }),
+          );
+          return;
+        }
+        const label = t("Installieren und neu starten");
         version.control.append(
           h("button", {
             class: "mod-cta mod-update",
-            text: t("Herunterladen"),
+            text: label,
             attrs: { type: "button" },
-            on: { click: () => app.openExternal(update.url) },
+            on: {
+              click: (event) => {
+                const button = event.currentTarget as HTMLButtonElement;
+                button.disabled = true;
+                button.textContent = t("Wird heruntergeladen …");
+                void app
+                  .installUpdate(({ downloaded, total }) => {
+                    button.textContent = total
+                      ? t("Wird heruntergeladen … {percent} %", {
+                          percent: Math.min(100, Math.floor((downloaded / total) * 100)),
+                        })
+                      : t("Wird heruntergeladen …");
+                  })
+                  .catch((error) => {
+                    app.report(error);
+                    button.textContent = label;
+                    button.disabled = false;
+                  });
+              },
+            },
           }),
         );
       };

@@ -19,7 +19,13 @@ import {
 import { addProperty } from "../editor/properties";
 import { insertFootnote } from "../editor/footnotes";
 import { exportHtml, printNote } from "./print-export";
-import { checkForUpdate, updateCheckDue, type ReleaseInfo } from "./update-check";
+import {
+  findUpdate,
+  installSignedUpdate,
+  updateCheckDue,
+  type AvailableUpdate,
+  type UpdateProgress,
+} from "./update-check";
 import { hostRequest } from "./plugin-install";
 import { APP_VERSION } from "../version";
 import {
@@ -218,7 +224,7 @@ export class App {
   readonly vaultStyles = new VaultStyles();
   appearance: Appearance = { cssTheme: "", enabledCssSnippets: [] };
   /** A newer release found by the update check, if any. */
-  availableUpdate: ReleaseInfo | null = null;
+  availableUpdate: AvailableUpdate | null = null;
   /** Editor groups; the focused one hosts the live editor and views. */
   groups: Group[] = [];
   group!: Group;
@@ -676,20 +682,36 @@ export class App {
    * Asks GitHub for a newer release. `manual` checks right away and reports
    * the result; otherwise only when enabled and due, quietly unless found.
    */
-  async checkForUpdates(manual = false): Promise<ReleaseInfo | null> {
+  async checkForUpdates(manual = false): Promise<AvailableUpdate | null> {
     if (!manual && (!this.settings.get("updateCheck") || !updateCheckDue()))
       return null;
-    const update = await checkForUpdate(hostRequest, APP_VERSION);
+    const update = await findUpdate(hostRequest, APP_VERSION);
     this.availableUpdate = update;
     if (update)
       notify(
-        t("Basalt {version} ist verfügbar. Einstellungen → Allgemein führt zum Download.", {
-          version: update.version,
-        }),
+        update.installable
+          ? t("Basalt {version} ist verfügbar. Unter Einstellungen → Allgemein kannst du es installieren.", {
+              version: update.version,
+            })
+          : t("Basalt {version} ist verfügbar. Einstellungen → Allgemein führt zum Download.", {
+              version: update.version,
+            }),
       );
     else if (manual)
       notify(t("Basalt ist aktuell ({version}).", { version: APP_VERSION }));
     return update;
+  }
+
+  /**
+   * Saves every open buffer and the workspace, then lets the native updater
+   * install the announced release; Basalt restarts when it succeeds.
+   */
+  async installUpdate(onProgress: (progress: UpdateProgress) => void): Promise<void> {
+    if (!this.availableUpdate?.installable)
+      throw new Error(t("Für dieses Update gibt es keine automatische Installation."));
+    await saveBeforeLeaving(this);
+    this.writeWorkspace();
+    await installSignedUpdate(onProgress);
   }
 
   /** Sync conflict copies and notes with merge markers in this vault. */

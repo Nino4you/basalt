@@ -26,6 +26,10 @@ getrandom = "0.3"
 ureq = { version = "3", default-features = false, features = ["rustls", "gzip"] }
 vault-core = { path = "../crates/vault-core" }
 
+# Self-update for the desktop packages (AppImage, .deb, Windows installer).
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
+
 [target.'cfg(target_os = "android")'.dependencies]
 tauri-plugin-android-fs = "=30.2.0"
 

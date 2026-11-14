@@ -2,12 +2,22 @@
 
 ## Updates in the app
 
-Basalt does not update itself. Settings → General shows the installed version and can ask
-GitHub for the latest release: on request ("Check now") or, when "Check for updates
-automatically" is on, at most once a day at startup. The check is one request to
-`api.github.com/repos/Nino4you/basalt/releases/latest`; it sends no data about the user or the
-vault. A newer release is only announced, with a link to its GitHub page. Installing stays a
-manual step, so every download can be verified against the signing fingerprints in the README.
+Settings → General shows the installed version and can look for a newer release: on request
+("Check now") or, when "Check for updates automatically" is on, at most once a day at startup.
+Nothing is installed without the user pressing a button, and no data about the user or the vault
+is sent.
+
+- **Desktop (AppImage, `.deb`, Windows installer):** the app reads
+  `github.com/Nino4you/basalt/releases/latest/download/latest.json`. A newer version shows
+  "Install and restart": Basalt saves all open notes, downloads the package for the way it was
+  installed, checks its updater signature against the public key built into the app and restarts
+  into the new version. A `.deb` asks for the administrator password; the Windows installer runs
+  without questions. If the release has no `latest.json` or Basalt was built from source, the
+  update is only announced with a download link.
+- **Android and the browser demo:** one request to
+  `api.github.com/repos/Nino4you/basalt/releases/latest`; a newer release is announced with a
+  link to its GitHub page. Installing stays manual, so every download can be verified against the
+  signing fingerprints in the README.
 
 ## Store listing metadata
 

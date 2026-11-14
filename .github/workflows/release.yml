@@ -96,16 +96,25 @@ jobs:
           ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
           RELEASE_GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
           RELEASE_GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           missing=0
           for name in ANDROID_RELEASE_KEYSTORE ANDROID_RELEASE_KEYSTORE_PASSWORD \
                       ANDROID_RELEASE_KEY_ALIAS ANDROID_RELEASE_KEY_PASSWORD \
-                      RELEASE_GPG_PRIVATE_KEY RELEASE_GPG_PASSPHRASE; do
+                      RELEASE_GPG_PRIVATE_KEY RELEASE_GPG_PASSPHRASE \
+                      TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD; do
             if [ -z "${!name}" ]; then
               echo "::error::Secret $name is not set (see docs/release-signing.md)"
               missing=1
             fi
           done
+          # Installed apps verify updates against this key; an empty one would
+          # ship a desktop build that can never install an update.
+          if [ -z "$(jq -r '.plugins.updater.pubkey // ""' src-tauri/tauri.conf.json)" ]; then
+            echo "::error::plugins.updater.pubkey in src-tauri/tauri.conf.json is empty (see docs/release-signing.md)"
+            missing=1
+          fi
           exit "$missing"
 
   linux:
@@ -113,6 +122,7 @@ jobs:
     needs: prepare
     runs-on: ubuntu-22.04
     timeout-minutes: 45
+    environment: release
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -128,8 +138,34 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
-      - run: npm run tauri -- build --bundles deb,appimage
+      # Desktop builds also sign their packages for the in-app updater
+      # (minisign, separate from the OpenPGP key). Test runs use a throwaway
+      # key and embed its public key instead of the committed one.
+      - name: Updater signing key
         env:
+          TEST_KEYS: ${{ needs.prepare.outputs.test_keys }}
+        run: |
+          set -euo pipefail
+          if [ "$TEST_KEYS" = "true" ]; then
+            pass=$(openssl rand -hex 24)
+            echo "::add-mask::$pass"
+            npx tauri signer generate --ci -w "$RUNNER_TEMP/updater-test.key" -p "$pass" -f > /dev/null
+            {
+              echo "TEST_UPDATER_KEY=$RUNNER_TEMP/updater-test.key"
+              echo "TEST_UPDATER_PASSWORD=$pass"
+            } >> "$GITHUB_ENV"
+            UPDATER_PUBKEY=$(cat "$RUNNER_TEMP/updater-test.key.pub") node -e '
+              const config = { bundle: { createUpdaterArtifacts: true } };
+              config.plugins = { updater: { pubkey: process.env.UPDATER_PUBKEY } };
+              require("fs").writeFileSync(process.argv[1], JSON.stringify(config));
+            ' "$RUNNER_TEMP/updater.json"
+          else
+            echo '{"bundle":{"createUpdaterArtifacts":true}}' > "$RUNNER_TEMP/updater.json"
+          fi
+      - run: npm run tauri -- build --bundles deb,appimage --config "$RUNNER_TEMP/updater.json"
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ needs.prepare.outputs.test_keys == 'true' && env.TEST_UPDATER_KEY || secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ needs.prepare.outputs.test_keys == 'true' && env.TEST_UPDATER_PASSWORD || secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPIMAGE_EXTRACT_AND_RUN: "1"
       - name: Native Linux startup smoke test
         run: |
@@ -164,7 +200,9 @@ jobs:
           set -euo pipefail
           mkdir -p out
           cp src-tauri/target/release/bundle/deb/*.deb out/
+          cp src-tauri/target/release/bundle/deb/*.deb.sig out/
           cp src-tauri/target/release/bundle/appimage/*.AppImage out/
+          cp src-tauri/target/release/bundle/appimage/*.AppImage.sig out/
           ls -l out
       # Packages travel to the publish job through the Actions cache: the
       # artifact quota of a private repository (500 MB on the free plan) is
@@ -181,6 +219,7 @@ jobs:
     needs: prepare
     runs-on: windows-2022
     timeout-minutes: 45
+    environment: release
     defaults:
       run:
         shell: bash
@@ -196,7 +235,34 @@ jobs:
       # The installer is not Authenticode-signed (no certificate yet), so
       # SmartScreen warns on first start; the OpenPGP signature and
       # SHA256SUMS from the publish job still cover it.
-      - run: npm run tauri -- build --bundles nsis
+      # Desktop builds also sign their packages for the in-app updater
+      # (minisign, separate from the OpenPGP key). Test runs use a throwaway
+      # key and embed its public key instead of the committed one.
+      - name: Updater signing key
+        env:
+          TEST_KEYS: ${{ needs.prepare.outputs.test_keys }}
+        run: |
+          set -euo pipefail
+          if [ "$TEST_KEYS" = "true" ]; then
+            pass=$(openssl rand -hex 24)
+            echo "::add-mask::$pass"
+            npx tauri signer generate --ci -w "$RUNNER_TEMP/updater-test.key" -p "$pass" -f > /dev/null
+            {
+              echo "TEST_UPDATER_KEY=$RUNNER_TEMP/updater-test.key"
+              echo "TEST_UPDATER_PASSWORD=$pass"
+            } >> "$GITHUB_ENV"
+            UPDATER_PUBKEY=$(cat "$RUNNER_TEMP/updater-test.key.pub") node -e '
+              const config = { bundle: { createUpdaterArtifacts: true } };
+              config.plugins = { updater: { pubkey: process.env.UPDATER_PUBKEY } };
+              require("fs").writeFileSync(process.argv[1], JSON.stringify(config));
+            ' "$RUNNER_TEMP/updater.json"
+          else
+            echo '{"bundle":{"createUpdaterArtifacts":true}}' > "$RUNNER_TEMP/updater.json"
+          fi
+      - run: npm run tauri -- build --bundles nsis --config "$RUNNER_TEMP/updater.json"
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ needs.prepare.outputs.test_keys == 'true' && env.TEST_UPDATER_KEY || secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ needs.prepare.outputs.test_keys == 'true' && env.TEST_UPDATER_PASSWORD || secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       - name: Native Windows startup smoke test
         shell: pwsh
         run: |
@@ -209,6 +275,7 @@ jobs:
           set -euo pipefail
           mkdir -p out
           cp src-tauri/target/release/bundle/nsis/*-setup.exe out/
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe.sig out/
           ls -l out
       # Same hand-over as Linux; the archive must be readable on Ubuntu.
       - name: Hand packages to the publish job
@@ -381,6 +448,18 @@ jobs:
         run: |
           mv out dist-release
           ls -l dist-release
+      # The in-app updater reads latest.json from the latest published
+      # release, so drafts and pre-releases are never offered as updates.
+      - name: Update manifest for the desktop updater
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          notes="docs/releases/$VERSION.md"
+          [ -f "$notes" ] || notes=""
+          node tools/updater_manifest.mjs dist-release "$VERSION" \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$TAG" $notes
       - name: Import release signing key
         if: needs.prepare.outputs.test_keys != 'true'
         env:
@@ -420,7 +499,7 @@ jobs:
               --passphrase-fd 0 --local-user "$GPG_FPR" --armor --detach-sign --output "$1.asc" "$1"
           }
           shopt -s failglob
-          packages=(./*.deb ./*.AppImage ./*-setup.exe ./*.apk ./*.aab)
+          packages=(./*.deb ./*.AppImage ./*-setup.exe ./*.apk ./*.aab ./latest.json)
           sha256sum "${packages[@]#./}" > SHA256SUMS
           for file in "${packages[@]#./}" SHA256SUMS; do
             sign "$file"
