@@ -1,1 +1,1 @@
-Second preview: graph, canvas, live preview with math, diagrams and tables, properties, footnotes, folding, search and replace, file recovery, attachments by paste and drop, sync conflict help, print and HTML export, themes and CSS snippets, a community plugin catalog and optional update checks.
+Second preview: graph, canvas, dockable panels, live preview with math, diagrams and tables, broader plugin compatibility, a faster start and the first production-signed packages.
