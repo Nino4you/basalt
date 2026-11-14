@@ -43,8 +43,10 @@ const de = {
     "Vervollständigung für <code>[[Wiki-Links]]</code> und <code>#Tags</code>",
   "f1.b":
     "KaTeX-Formeln, Mermaid-Diagramme, Tabellen Zelle für Zelle bearbeiten",
-  "f1.c": "Seitenvorschau beim Überfahren, Vorlagen, ein Quelltextmodus",
-  "f1.d": "Leseansicht mit Callouts, Eigenschaften und Einbettungen",
+  "f1.c":
+    "Seitenvorschau, Vorlagen, Fußnoten, Einklappen, Vim-Tasten auf Wunsch",
+  "f1.d":
+    "Bearbeitbare Eigenschaften, eingefügte Bilder, Druck als PDF oder HTML",
   "f1.alt":
     "Links der Markdown-Quelltext, rechts dieselbe Notiz in der Live-Vorschau",
   "f1.source": "was du tippst",

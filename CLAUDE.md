@@ -117,6 +117,8 @@ src/ (WebView UI)  ──invoke──▶  src-tauri/src/lib.rs (IPC commands)  �
     (`vault_core::list_backups` / `read_backup`; layouts parsed in `src/backups.ts` too) for
     the file recovery dialog (`src/app/file-recovery.ts`), which restores through the normal
     version-checked save or an exclusive create — never by overwriting.
+    `backup_remove` permanently deletes backups for the retention cleanup and "Empty trash"
+    (`vault_core::remove_backup` accepts backup locations only).
   - `plugin_vault_*` — base64 binary access with opaque SHA-256 version tokens (64 MiB cap,
     deletes backed up to `.basalt/trash/`), wrapped by `src/compat/native-port.ts`.
   - `plugin_resource_grant` / `plugin_resource_revoke` — per-plugin tokens for the read-only
@@ -176,6 +178,14 @@ No UI framework: DOM is built with the `h()` / `icon()` helpers in `src/ui/dom.t
   (`src/ui/icon-library.ts`) is a lazy chunk that `PluginBundleHost` loads before any plugin
   runs, because `setIcon` is synchronous. mermaid's KaTeX is deduplicated via `overrides` in
   `package.json`.
+- Newer features, each in its own module: `attachment-import.ts` (paste/drop files, attachment
+  folder setting), `backup-cleanup.ts` (retention, empty trash via `backup_remove`),
+  `search-replace.ts` (vault-wide replace through `App.rewriteNotes`), `sync-conflicts.ts`
+  (Syncthing/Nextcloud/Dropbox conflict copies and Git markers), `vault-styles.ts` (themes and
+  CSS snippets from `Basalt/Config`), `print-export.ts` (print/PDF, standalone HTML) and
+  `update-check.ts` (opt-in GitHub release check) in `src/app/`; `properties.ts` +
+  `properties-model.ts` (frontmatter fields, edited through the `yaml` document model),
+  `footnotes.ts` and `attachments.ts` in `src/editor/`. Vim key bindings are a lazy chunk.
 - `src/canvas/` — JSON Canvas 1.0 (`.canvas`). Parsing keeps unknown fields so files written by
   other apps round-trip losslessly.
 - `src/markdown.ts` — `marked` rendering, always sanitized through DOMPurify; remote image
