@@ -623,6 +623,26 @@ export const en = {
   "Repository-Link kopieren": "Copy repository link",
   "Seine Einstellungen bleiben erhalten; die ersetzten Dateien werden gesichert.": "Its settings stay; the replaced files are backed up.",
   "Ungeprüft": "Unchecked",
+  "Plugin-Version wechseln": "Change plugin version",
+  "Version wechseln": "Change version",
+  "Diese Version verlangt Obsidian {min}; Basalt bietet die Plugin-Schnittstelle von Obsidian {api}. Sie startet womöglich nicht oder nur teilweise.":
+    "This version requires Obsidian {min}; Basalt provides the plugin interface of Obsidian {api}. It may not start or only partly work.",
+  "Eine ältere Version kann mit Einstellungen, die eine neuere gespeichert hat, nicht immer umgehen.":
+    "An older version cannot always handle settings saved by a newer one.",
+  "Neueste Version": "Latest version",
+  Version: "Version",
+  "Braucht Obsidian {min}, Basalt bietet die Schnittstelle von {api}. Das Plugin startet womöglich nicht oder nur teilweise.":
+    "Needs Obsidian {min}; Basalt provides the interface of {api}. The plugin may not start or only partly work.",
+  "Versionen werden geladen …": "Loading versions …",
+  "Neueste ({version})": "Latest ({version})",
+  "Neueste Version {version}": "Latest version {version}",
+  "Version {version}": "Version {version}",
+  "vom {date}": "from {date}",
+  "mit Basalt geprüft": "checked with Basalt",
+  "Ältere Versionen konnten nicht geladen werden: {error}":
+    "Older versions could not be loaded: {error}",
+  Vorabversion: "pre-release",
+  installiert: "installed",
   "Updates verfügbar: {count}": "Updates available: {count}",
   "Version {version} ersetzt {old} · {id} · aus {origin}": "Version {version} replaces {old} · {id} · from {origin}",
   "Version {version} · {id} · aus {origin}": "Version {version} · {id} · from {origin}",

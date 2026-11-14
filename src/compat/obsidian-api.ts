@@ -1,4 +1,5 @@
 import { getLocale } from "../i18n";
+import { API_VERSION } from "./api-version";
 import { StateEffect, StateField } from "@codemirror/state";
 import DOMPurify from "dompurify";
 import {
@@ -158,7 +159,6 @@ export interface RequestUrlResponsePromise extends Promise<RequestUrlResponse> {
 }
 
 const customIcons = new Map<string, string>();
-const API_VERSION = "1.15.0";
 
 /** A plugin-registered SVG, or a built-in lucide icon, as a detached element. */
 function iconElement(iconId: string): SVGSVGElement | null {

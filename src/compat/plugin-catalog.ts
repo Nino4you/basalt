@@ -1,3 +1,4 @@
+import { API_VERSION } from "./api-version";
 import { TFile, TFolder } from "./files";
 import type { PluginManifest } from "./plugin";
 import {
@@ -203,8 +204,126 @@ export function validatePluginFiles(
   return { manifest, manifestText, main, styles };
 }
 
-function releaseUrl(repo: string, file: string): string {
-  return `https://github.com/${repo}/releases/latest/download/${file}`;
+/** Release tags that are safe to put into a download URL. */
+const TAG = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,99}$/;
+
+/**
+ * A file of a repository's release: the latest one, or the release tagged
+ * `tag`.
+ */
+function releaseUrl(repo: string, file: string, tag?: string): string {
+  if (tag === undefined)
+    return `https://github.com/${repo}/releases/latest/download/${file}`;
+  if (!TAG.test(tag)) throw new Error(`Invalid release tag ${tag}`);
+  return `https://github.com/${repo}/releases/download/${tag}/${file}`;
+}
+
+/** Releases listed per repository; older ones are rarely worth installing. */
+export const RELEASE_LIMIT = 30;
+
+export const releasesUrl = (repo: string) =>
+  `https://api.github.com/repos/${repo}/releases?per_page=${RELEASE_LIMIT}`;
+
+/**
+ * The `versions.json` that Obsidian plugins keep in their default branch: the
+ * minimum Obsidian version for each plugin version.
+ */
+export const versionsUrl = (repo: string) =>
+  `https://raw.githubusercontent.com/${repo}/HEAD/versions.json`;
+
+export interface PluginRelease {
+  /** The release tag, which names the download folder. */
+  tag: string;
+  /** The plugin version, the tag without a leading `v`. */
+  version: string;
+  prerelease: boolean;
+  /** ISO date, or "" when GitHub gave none. */
+  publishedAt: string;
+  /** The Obsidian version this release needs, from `versions.json`, if known. */
+  minAppVersion: string | null;
+}
+
+/**
+ * Installable releases from the GitHub releases API, newest version first.
+ * Drafts and releases without `manifest.json` and `main.js` are dropped.
+ */
+export function parseReleases(
+  value: unknown,
+  versions?: unknown,
+): PluginRelease[] {
+  if (!Array.isArray(value)) throw new Error("The release list is not a list");
+  const minimums =
+    versions && typeof versions === "object" && !Array.isArray(versions)
+      ? (versions as Record<string, unknown>)
+      : {};
+  const seen = new Set<string>();
+  const releases: PluginRelease[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const raw = item as Record<string, unknown>;
+    const tag = text(raw.tag_name);
+    if (raw.draft === true || !TAG.test(tag) || seen.has(tag)) continue;
+    if (Array.isArray(raw.assets)) {
+      const names = new Set(
+        raw.assets.map((asset) =>
+          asset && typeof asset === "object"
+            ? text((asset as { name?: unknown }).name)
+            : "",
+        ),
+      );
+      if (!names.has("manifest.json") || !names.has("main.js")) continue;
+    }
+    seen.add(tag);
+    const version = tag.replace(/^v(?=\d)/i, "");
+    const minimum = minimums[version] ?? minimums[tag];
+    releases.push({
+      tag,
+      version,
+      prerelease: raw.prerelease === true,
+      publishedAt: text(raw.published_at),
+      minAppVersion:
+        typeof minimum === "string" && minimum.trim() ? minimum.trim() : null,
+    });
+  }
+  return releases.sort((a, b) => compareVersions(b.version, a.version));
+}
+
+/**
+ * A repository's installable releases. A missing or broken `versions.json`
+ * only leaves `minAppVersion` unknown.
+ */
+export async function listReleases(
+  repo: string,
+  request: RequestUrl,
+): Promise<PluginRelease[]> {
+  if (!REPO.test(repo)) throw new Error(`Invalid repository ${repo}`);
+  const [releases, versions] = await Promise.all([
+    request({
+      url: releasesUrl(repo),
+      headers: { Accept: "application/vnd.github+json" },
+      throw: false,
+    }),
+    request({ url: versionsUrl(repo), throw: false }).then(
+      (response) => (response.status === 200 ? response.json : undefined),
+      () => undefined,
+    ),
+  ]);
+  if (releases.status !== 200)
+    throw new Error(
+      `The releases of ${repo} could not be listed (HTTP ${releases.status})`,
+    );
+  return parseReleases(releases.json, versions);
+}
+
+/**
+ * Whether Basalt's Obsidian API is at least `minAppVersion`. Unknown
+ * requirements count as compatible: most plugins declare one.
+ */
+export function supportsMinAppVersion(
+  minAppVersion: string | null | undefined,
+  apiVersion = API_VERSION,
+): boolean {
+  return !minAppVersion || compareVersions(apiVersion, minAppVersion) >= 0;
 }
 
 /** The manifest of a repository's latest release. */
@@ -225,15 +344,17 @@ export async function latestManifest(
 
 /**
  * Downloads `manifest.json`, `main.js` and the optional `styles.css` of a
- * repository's latest release, the files Obsidian installs too.
+ * repository's latest release, or of the release tagged `tag`: the files
+ * Obsidian installs too.
  */
 export async function downloadRelease(
   repo: string,
   request: RequestUrl,
   expectedId?: string,
+  tag?: string,
 ): Promise<PluginFiles> {
   const get = (file: string) =>
-    request({ url: releaseUrl(repo, file), throw: false });
+    request({ url: releaseUrl(repo, file, tag), throw: false });
   const [manifest, main, styles] = await Promise.all([
     get("manifest.json"),
     get("main.js"),
@@ -241,7 +362,7 @@ export async function downloadRelease(
   ]);
   if (manifest.status !== 200 || main.status !== 200)
     throw new Error(
-      `${repo} has no release with manifest.json and main.js (HTTP ${manifest.status}/${main.status})`,
+      `${repo} has no ${tag === undefined ? "release" : `release ${tag}`} with manifest.json and main.js (HTTP ${manifest.status}/${main.status})`,
     );
   return validatePluginFiles(
     manifest.text,
