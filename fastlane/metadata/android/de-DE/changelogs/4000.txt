@@ -1,0 +1,1 @@
+Vierte Vorschau: Die Desktop-App installiert signierte Updates selbst, Linux-Pakete laufen auf Ubuntu 22.04 und Debian 12, und der Plugin-Katalog markiert nur Plugins aus ihrem Katalog-Repository als geprüft.
