@@ -8,6 +8,7 @@ a **draft** GitHub release. Nothing is published until the draft is released man
 | `Basalt_<version>_android-universal.apk` | Android release key (APK signature scheme v1–v3)             |
 | `Basalt_<version>_android-universal.aab` | Android release key (JAR signature, upload key)              |
 | `.deb`, `.AppImage` (Linux x86_64)       | detached OpenPGP signature `<file>.asc`                      |
+| `_x64-setup.exe` (Windows x64)           | detached OpenPGP signature `<file>.asc` (no Authenticode)    |
 | `SHA256SUMS`                             | checksums of all packages, OpenPGP-signed (`SHA256SUMS.asc`) |
 | `basalt-release-key.asc`, `SIGNING.txt`  | public OpenPGP key and both fingerprints                     |
 

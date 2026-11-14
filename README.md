@@ -91,6 +91,7 @@ Packages are published under [Releases](https://github.com/Nino4you/basalt/relea
 | Platform                | Package                                  |
 | ----------------------- | ---------------------------------------- |
 | Linux x86_64            | `.deb` or AppImage                       |
+| Windows x64             | `Basalt_<version>_x64-setup.exe`         |
 | Android (ARM64, x86_64) | `Basalt_<version>_android-universal.apk` |
 
 All downloads are signed. Please verify them against these fingerprints as described in
