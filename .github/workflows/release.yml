@@ -1,6 +1,6 @@
 name: Signed release
 
-# Builds production-signed Linux and Android artifacts and attaches them to a
+# Builds production-signed Linux, Windows and Android artifacts and attaches them to a
 # draft GitHub release. Signing keys come exclusively from the `release`
 # environment / repository secrets; see docs/release-signing.md.
 #
@@ -155,6 +155,48 @@ jobs:
           path: out
           key: release-linux-${{ github.run_id }}
 
+  windows:
+    name: Windows x64 (NSIS installer)
+    needs: prepare
+    runs-on: windows-2022
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      # No build cache for release artifacts: they are built from a clean state.
+      - run: npm ci
+      # The installer is not Authenticode-signed (no certificate yet), so
+      # SmartScreen warns on first start; the OpenPGP signature and
+      # SHA256SUMS from the publish job still cover it.
+      - run: npm run tauri -- build --bundles nsis
+      - name: Native Windows startup smoke test
+        shell: pwsh
+        run: |
+          $app = Start-Process src-tauri/target/release/basalt.exe -PassThru
+          Start-Sleep -Seconds 12
+          if ($app.HasExited) { throw "Basalt exited at startup with code $($app.ExitCode)" }
+          Stop-Process -Id $app.Id -Force
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe out/
+          ls -l out
+      # Same hand-over as Linux; the archive must be readable on Ubuntu.
+      - name: Hand packages to the publish job
+        uses: actions/cache/save@v4
+        with:
+          path: out
+          key: release-windows-${{ github.run_id }}
+          enableCrossOsArchive: true
+
   android:
     name: Android (release APK, AAB)
     needs: prepare
@@ -284,7 +326,7 @@ jobs:
 
   publish:
     name: Checksums, signatures and draft release
-    needs: [prepare, linux, android]
+    needs: [prepare, linux, windows, android]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: release
@@ -300,6 +342,13 @@ jobs:
         with:
           path: out
           key: release-linux-${{ env.CACHE_SUFFIX }}
+          fail-on-cache-miss: true
+      - name: Restore Windows packages
+        uses: actions/cache/restore@v4
+        with:
+          path: out
+          key: release-windows-${{ env.CACHE_SUFFIX }}
+          enableCrossOsArchive: true
           fail-on-cache-miss: true
       - name: Restore Android packages
         uses: actions/cache/restore@v4
@@ -350,7 +399,7 @@ jobs:
               --passphrase-fd 0 --local-user "$GPG_FPR" --armor --detach-sign --output "$1.asc" "$1"
           }
           shopt -s failglob
-          packages=(./*.deb ./*.AppImage ./*.apk ./*.aab)
+          packages=(./*.deb ./*.AppImage ./*-setup.exe ./*.apk ./*.aab)
           sha256sum "${packages[@]#./}" > SHA256SUMS
           for file in "${packages[@]#./}" SHA256SUMS; do
             sign "$file"
@@ -413,6 +462,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for job in linux android; do
+          for job in linux windows android; do
             gh cache delete "release-$job-$CACHE_SUFFIX" --repo "$GITHUB_REPOSITORY" || true
           done
