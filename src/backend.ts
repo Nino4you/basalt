@@ -301,8 +301,9 @@ export class BrowserBackend implements Backend {
   }
 
   async export(path: string, text: string): Promise<boolean> {
+    const type = /\.html?$/i.test(path) ? "text/html" : "text/markdown";
     const url = URL.createObjectURL(
-      new Blob([text], { type: "text/markdown;charset=utf-8" }),
+      new Blob([text], { type: `${type};charset=utf-8` }),
     );
     const link = document.createElement("a");
     link.href = url;

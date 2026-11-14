@@ -637,11 +637,16 @@ async fn choose_vault(
 #[tauri::command]
 async fn export_note(app: tauri::AppHandle, name: String, text: String) -> Result<bool> {
     let name = name.rsplit('/').next().unwrap_or("Notiz.md");
+    let (label, extensions): (&str, &[&str]) = if name.to_lowercase().ends_with(".html") {
+        ("HTML", &["html", "htm"])
+    } else {
+        ("Markdown", &["md"])
+    };
     let Some(path) = app
         .dialog()
         .file()
         .set_file_name(name)
-        .add_filter("Markdown", &["md"])
+        .add_filter(label, extensions)
         .blocking_save_file()
     else {
         return Ok(false);

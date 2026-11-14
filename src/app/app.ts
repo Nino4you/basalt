@@ -18,6 +18,7 @@ import {
 } from "./vault-styles";
 import { addProperty } from "../editor/properties";
 import { insertFootnote } from "../editor/footnotes";
+import { exportHtml, printNote } from "./print-export";
 import { foldAll, toggleFold, unfoldAll } from "@codemirror/language";
 import { emptyCanvas } from "../canvas/model";
 import { CanvasView } from "../canvas/view";
@@ -3821,6 +3822,23 @@ export class App {
                 onClick: () => this.commands.run("save"),
               }
             : null,
+          note && this.vault?.platform !== "android"
+            ? {
+                title: t("Drucken oder als PDF speichern"),
+                icon: "printer",
+                hotkey: this.commands.hotkeyOf("print-note")
+                  ? formatHotkey(this.commands.hotkeyOf("print-note")!)
+                  : undefined,
+                onClick: () => this.commands.run("print-note"),
+              }
+            : null,
+          note
+            ? {
+                title: t("Als HTML exportieren"),
+                icon: "file-code",
+                onClick: () => this.commands.run("export-html"),
+              }
+            : null,
           "separator",
           {
             title: t("Rückverweise anzeigen"),
@@ -4285,6 +4303,34 @@ export class App {
       icon: "file-plus",
       when: hasNote,
       run: () => this.insertTemplate(),
+    });
+    add({
+      id: "print-note",
+      name: t("Drucken oder als PDF speichern"),
+      hotkey: "Mod+Shift+P",
+      icon: "printer",
+      // Android's WebView has no print dialog; HTML export works there.
+      when: () => hasNote() && this.vault?.platform !== "android",
+      run: () => {
+        const note = this.activeNote;
+        if (note)
+          void printNote(this, note.path, note.text).catch((error) =>
+            this.report(error),
+          );
+      },
+    });
+    add({
+      id: "export-html",
+      name: t("Aktuelle Notiz als HTML exportieren"),
+      icon: "file-code",
+      when: hasNote,
+      run: () => {
+        const note = this.activeNote;
+        if (note)
+          void exportHtml(this, note.path, note.text).catch((error) =>
+            this.report(error),
+          );
+      },
     });
     add({
       id: "export-note",

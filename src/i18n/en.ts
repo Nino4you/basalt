@@ -704,4 +704,8 @@ export const en = {
   "Neu laden": "Reload",
   "Keine Snippets gefunden.": "No snippets found.",
   "Snippet {name}": "Snippet {name}",
+  "Drucken oder als PDF speichern": "Print or save as PDF",
+  "Aktuelle Notiz als HTML exportieren": "Export current note as HTML",
+  "Als HTML exportieren": "Export as HTML",
+  "HTML-Datei exportiert.": "HTML file exported.",
 } as const;
