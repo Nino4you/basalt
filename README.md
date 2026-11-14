@@ -88,10 +88,10 @@ Obsidian vaults and selected Obsidian plugins.
 
 Packages are published under [Releases](https://github.com/Nino4you/basalt/releases):
 
-| Platform                       | Package                                  |
-| ------------------------------ | ---------------------------------------- |
-| Linux x86_64                   | `.deb` or AppImage                       |
-| Android (ARM64, ARMv7, x86_64) | `Basalt_<version>_android-universal.apk` |
+| Platform                | Package                                  |
+| ----------------------- | ---------------------------------------- |
+| Linux x86_64            | `.deb` or AppImage                       |
+| Android (ARM64, x86_64) | `Basalt_<version>_android-universal.apk` |
 
 All downloads are signed. Please verify them against these fingerprints as described in
 [docs/release-signing.md](docs/release-signing.md#verifying-downloads):

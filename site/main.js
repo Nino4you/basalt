@@ -87,7 +87,7 @@ const de = {
   "f5.a":
     "Öffnet einen Ordner, den du über den Android-Speicherzugriff auswählst",
   "f5.b": "Gemacht für Touch und Stift",
-  "f5.c": "Ein universelles APK für ARM64, ARMv7 und x86_64",
+  "f5.c": "Ein universelles APK für ARM64 und x86_64",
   "f5.alt":
     "Basalt auf dem Handy: eine Notiz in der Leseansicht mit Navigationsleiste unten",
   "pl.title": "Bring deine Plugins mit. Vorerst die ausgewählten.",
@@ -136,7 +136,7 @@ const de = {
     "Frei und quelloffen. Signierte Pakete werden auf GitHub veröffentlicht.",
   "d.linux": "x86_64, als <code>.deb</code>-Paket oder AppImage.",
   "d.linux.btn": "Für Linux herunterladen",
-  "d.android": "Ein universelles APK für ARM64, ARMv7 und x86_64.",
+  "d.android": "Ein universelles APK für ARM64 und x86_64.",
   "d.android.btn": "Für Android herunterladen",
   "d.verify": "Download überprüfen",
   "d.verify.text":

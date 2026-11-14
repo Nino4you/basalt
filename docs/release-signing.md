@@ -11,7 +11,7 @@ a **draft** GitHub release. Nothing is published until the draft is released man
 | `SHA256SUMS`                             | checksums of all packages, OpenPGP-signed (`SHA256SUMS.asc`) |
 | `basalt-release-key.asc`, `SIGNING.txt`  | public OpenPGP key and both fingerprints                     |
 
-The APK/AAB contains ARM64, ARMv7 and x86_64. Signing keys exist only in GitHub secrets, never
+The APK/AAB contains ARM64 and x86_64 (no 32-bit ARMv7). Signing keys exist only in GitHub secrets, never
 in the git history; the workflow writes the keystore only temporarily to `$RUNNER_TEMP` and
 deletes it at the end of the job.
 
@@ -22,7 +22,7 @@ deletes it at the end of the job.
 **Actions → Signed release → Run workflow** with **test_keys** checked runs the whole pipeline
 before any setup: the run creates throwaway keys (valid for 1–2 days, named
 "Basalt TEST KEY – NOT FOR DISTRIBUTION"), needs no secrets and only uploads the Actions
-artifact `Basalt-v<version>-testkeys-signed`. This tests the build (including ARMv7), signing and
+artifact `Basalt-v<version>-testkeys-signed`. This tests the build, signing and
 verification before real keys exist. **Never distribute** these packages; the switch is not
 available for tag releases.
 
