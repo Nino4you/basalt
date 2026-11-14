@@ -176,12 +176,18 @@ jobs:
           mkdir -p "$HOME/.android"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
           chmod 600 "$HOME/.android/debug.keystore"
+      # Pull requests only need the x86_64 library the emulator runs; skipping
+      # the ARM64 build saves about half of the Rust compile time. Pushes and
+      # manual runs build both, so the uploaded preview installs on phones.
       - name: Build debug-signed APK for sideload testing
-        run: npm run tauri -- android build --apk --debug --target aarch64 --target x86_64
+        env:
+          TARGETS: ${{ github.event_name == 'pull_request' && '--target x86_64' || '--target aarch64 --target x86_64' }}
+        run: npm run tauri -- android build --apk --debug $TARGETS
       # The emulator test runs on this runner against the APK just built, so
       # it needs no artifact round trip and no second job start-up. The
       # upload is only for sideloading and may fail on a full quota.
       - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
         continue-on-error: true
         with:
           name: Basalt-android-arm64-preview

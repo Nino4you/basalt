@@ -8,8 +8,7 @@ name: Signed release
 # - Run manually (workflow_dispatch) for a dry run: everything is built and
 #   signed, but only uploaded as Actions artifacts, no release is created.
 # - A manual run with `test_keys` signs with throwaway keys generated inside
-#   the run. It needs no secrets and checks the whole pipeline (including the
-#   ARMv7 build) before the real keys exist; its output must never be shipped.
+#   the run. It needs no secrets and checks the whole pipeline before the real keys exist; its output must never be shipped.
 
 on:
   push:
@@ -188,7 +187,7 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+          targets: aarch64-linux-android,x86_64-linux-android
       - name: Android SDK and NDK
         run: |
           sdkmanager "platforms;android-36" "build-tools;$BUILD_TOOLS" "ndk;27.2.12479018"
@@ -201,8 +200,10 @@ jobs:
       - run: npm run tauri -- icon public/basalt.svg
       # Gradle produces unsigned release outputs; they are signed below with
       # the production key so the key never enters the Gradle project files.
+      # No ARMv7: 32-bit-only phones are rare, and that build took about a
+      # third of the release time.
       - name: Build unsigned release APK and AAB
-        run: npm run tauri -- android build --apk --aab --target aarch64 --target armv7 --target x86_64
+        run: npm run tauri -- android build --apk --aab --target aarch64 --target x86_64
       - name: Restore release keystore
         if: needs.prepare.outputs.test_keys != 'true'
         env:
