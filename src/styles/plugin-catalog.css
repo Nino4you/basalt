@@ -219,3 +219,26 @@
     display: inline-flex;
   }
 }
+
+/* The version picker reads like a settings row inside a quiet card. */
+.plugin-catalog-install {
+  margin-top: 16px;
+  padding: 0 14px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+}
+
+.plugin-catalog-install .setting-item {
+  padding: 12px 0;
+}
+
+.plugin-catalog-version {
+  width: auto;
+  min-width: 12em;
+  max-width: 100%;
+}
+
+.plugin-catalog-install .plugin-catalog-compat {
+  margin: 0 0 12px;
+}
