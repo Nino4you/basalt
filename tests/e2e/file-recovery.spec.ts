@@ -19,16 +19,20 @@ async function fileMenu(page: Page, item: string) {
   await page.getByRole("menuitem", { name: item }).click();
 }
 
-/** Autosave runs 800 ms after the last edit; the status turns to "saved". */
-async function typeAndSave(page: Page, text: string) {
-  // fill() can append right after a reload; select everything and replace it.
+/**
+ * Replaces the note's text and waits for the autosave (800 ms after the last
+ * edit). fill() can append instead of replace right after the editor swapped
+ * its content, so this selects everything and inserts.
+ */
+async function typeAndSave(page: Page, text: string, path = "Verlauf.md") {
   await editorOf(page).click();
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.insertText(text);
   await expect
     .poll(() =>
       page.evaluate(
-        () => JSON.parse(localStorage.getItem("basalt-demo-v1")!)["Verlauf.md"],
+        (key) => JSON.parse(localStorage.getItem("basalt-demo-v1")!)[key],
+        path,
       ),
     )
     .toBe(text);
@@ -133,14 +137,7 @@ test("brings a deleted note back, as a copy when the name is taken", async ({
   await expect(editorOf(page)).toContainText("Nicht vergessen");
 
   // A new "Weg.md" with other content: the backup comes back as a copy.
-  await editorOf(page).fill("Neuer Inhalt");
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () => JSON.parse(localStorage.getItem("basalt-demo-v1")!)["Weg.md"],
-      ),
-    )
-    .toBe("Neuer Inhalt");
+  await typeAndSave(page, "Neuer Inhalt", "Weg.md");
   await page.keyboard.press("ControlOrMeta+p");
   await page
     .getByRole("textbox", { name: "Befehlspalette" })

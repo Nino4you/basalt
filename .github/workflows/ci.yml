@@ -165,8 +165,14 @@ jobs:
         if: github.event_name != 'pull_request'
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE }}
+        # Without the secret (forks, a new repository) the build falls back to
+        # Gradle's generated debug key: the APK is still built and tested, it
+        # just does not install as an update over earlier sideloaded builds.
         run: |
-          test -n "$KEYSTORE_BASE64"
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::ANDROID_DEBUG_KEYSTORE is not set; signing with a throwaway debug key."
+            exit 0
+          fi
           mkdir -p "$HOME/.android"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
           chmod 600 "$HOME/.android/debug.keystore"
