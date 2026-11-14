@@ -133,6 +133,16 @@ pub trait MetadataVaultStorage: VaultStorage {
             "listing backups is not supported by this vault",
         ))
     }
+
+    /// Permanently delete one backup file; nothing is backed up first. Callers go
+    /// through [`remove_backup`], which accepts backup locations only. Folders the
+    /// removal leaves empty below the backup root may be removed as well.
+    fn remove_backup_file(&self, _location: &VaultPath) -> io::Result<()> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "removing backups is not supported by this vault",
+        ))
+    }
 }
 
 /// Previous versions, written before every save: `.basalt/history/<path>/<id>.<md|bin>`.
@@ -215,6 +225,17 @@ pub fn list_backups<S: MetadataVaultStorage + ?Sized>(storage: &S) -> io::Result
             .then_with(|| a.location.cmp(&b.location))
     });
     Ok(backups)
+}
+
+/// Permanently delete one backup (an old version or a file in the trash). Refuses
+/// every location that is not a backup, so this cannot delete vault content.
+pub fn remove_backup<S: MetadataVaultStorage + ?Sized>(
+    storage: &S,
+    location: &VaultPath,
+) -> io::Result<()> {
+    Backup::parse(location, 0)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "not a backup location"))?;
+    storage.remove_backup_file(location)
 }
 
 /// Text of a backup of a note or canvas. Refuses every other path, so this
@@ -522,6 +543,49 @@ impl MetadataVaultStorage for DirectoryVault {
             }
         }
         Ok(files)
+    }
+
+    fn remove_backup_file(&self, location: &VaultPath) -> io::Result<()> {
+        let path = location.as_str();
+        let root = [HISTORY_DIR, TRASH_DIR]
+            .into_iter()
+            .find(|root| {
+                path.strip_prefix(root)
+                    .is_some_and(|rest| rest.starts_with('/'))
+            })
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "not a backup location"))?;
+        // Like `backup_files`: every folder on the way must be a real folder, so a
+        // symlink below `.basalt` cannot redirect the removal into vault content.
+        let (parent, _) = path.rsplit_once('/').unwrap_or_default();
+        let mut prefix = String::new();
+        for part in parent.split('/') {
+            if !prefix.is_empty() {
+                prefix.push('/');
+            }
+            prefix.push_str(part);
+            if !self.directory.symlink_metadata(&prefix)?.is_dir() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "backup folder is not a real folder",
+                ));
+            }
+        }
+        if !self.directory.symlink_metadata(path)?.is_file() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "only backup files can be removed",
+            ));
+        }
+        self.directory.remove_file(path)?;
+        // Tidy folders that are empty now; `remove_dir` refuses non-empty ones.
+        let mut folder = parent;
+        while folder.len() > root.len() {
+            if self.directory.remove_dir(folder).is_err() {
+                break;
+            }
+            folder = folder.rsplit_once('/').map_or("", |(head, _)| head);
+        }
+        Ok(())
     }
 }
 

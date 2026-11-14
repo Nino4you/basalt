@@ -12,7 +12,13 @@ import {
   indentWithTab,
 } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { indentOnInput, syntaxHighlighting } from "@codemirror/language";
+import {
+  codeFolding,
+  foldGutter,
+  foldKeymap,
+  indentOnInput,
+  syntaxHighlighting,
+} from "@codemirror/language";
 import {
   highlightSelectionMatches,
   search,
@@ -27,12 +33,20 @@ import {
   lineNumbers,
 } from "@codemirror/view";
 import { Editor } from "./compat/editor-adapter";
+import { icon } from "./ui/dom";
 import { EditorExtensionRegistry } from "./compat/editor-extensions";
 import type { PluginEmbed } from "./compat/embeds";
 import { embedHost, pluginEmbeds } from "./editor/plugin-embeds";
+import {
+  attachmentHandlers,
+  attachmentHost,
+  type AttachmentHost,
+} from "./editor/attachments";
 import { insertLink, toggleTask, toggleWrap } from "./editor/commands";
 import { type CompletionHost, completionSources } from "./editor/complete";
 import { richPreview, finishRichSource } from "./editor/rich-preview";
+import { propertiesEditor, propertiesFacet } from "./editor/properties";
+import { footnoteMarks } from "./editor/footnotes";
 import {
   EditorSuggestBridge,
   type EditorSuggestHost,
@@ -83,7 +97,11 @@ const PHRASES: Record<string, string> = {
   Completions: t("Vorschläge"),
 };
 
-export interface EditorHost extends LinkHost, CompletionHost, EditorSuggestHost {
+export interface EditorHost
+  extends LinkHost,
+    CompletionHost,
+    EditorSuggestHost,
+    AttachmentHost {
   onChange(text: string): void;
   /** The selected text changed (empty when nothing is selected). */
   onSelection?(selected: string): void;
@@ -100,6 +118,12 @@ export interface EditorOptions {
   lineNumbers: boolean;
   spellcheck: boolean;
   autoPair: boolean;
+  /** Live preview shows frontmatter as editable properties. */
+  properties: boolean;
+  /** Headings, lists and blocks can be folded from a gutter arrow. */
+  folding: boolean;
+  /** Vim keybindings (loaded on first use). */
+  vim: boolean;
 }
 
 /**
@@ -119,6 +143,10 @@ export class MarkdownEditor {
   private readonly gutter = new Compartment();
   private readonly attributes = new Compartment();
   private readonly pairing = new Compartment();
+  private readonly vimMode = new Compartment();
+  /** The Vim extension once its lazy chunk has loaded. */
+  private vimExtension: Extension | null = null;
+  private vimLoading: Promise<void> | null = null;
   private pluginList: Extension[] = [];
   private readonly suggestBridge: EditorSuggestBridge;
   private isEditable = false;
@@ -128,6 +156,9 @@ export class MarkdownEditor {
     lineNumbers: false,
     spellcheck: true,
     autoPair: true,
+    properties: true,
+    folding: true,
+    vim: false,
   };
   private suppress = false;
   private readonly blockHost: CodeBlockHost;
@@ -161,12 +192,27 @@ export class MarkdownEditor {
       indentOnInput(),
       highlightSelectionMatches({ minSelectionLength: 2 }),
       search({ top: true }),
+      codeFolding({
+        placeholderDOM: (_view, onclick) => {
+          const marker = document.createElement("span");
+          marker.className = "cm-foldPlaceholder";
+          marker.textContent = "…";
+          marker.title = t("Ausklappen");
+          marker.setAttribute("role", "button");
+          marker.addEventListener("click", onclick);
+          return marker;
+        },
+      }),
       EditorView.lineWrapping,
       EditorState.tabSize.of(4),
       EditorState.phrases.of(PHRASES),
       linkHost.of(host),
+      attachmentHost.of(host),
+      attachmentHandlers,
       livePreview,
       richPreview,
+      propertiesEditor,
+      footnoteMarks,
       Prec.highest(keymap.of([{ key: "Escape", run: finishRichSource }])),
       this.pluginSurfaces.of(this.surfaceExtensions),
       linkClicks,
@@ -195,6 +241,7 @@ export class MarkdownEditor {
         ...defaultKeymap,
         ...historyKeymap,
         ...searchKeymap,
+        ...foldKeymap,
         indentWithTab,
       ]),
       EditorView.updateListener.of((update) => {
@@ -253,6 +300,30 @@ export class MarkdownEditor {
       document.documentElement.style.setProperty("--list-ch", `${width}px`);
   }
 
+  private gutterExtension(): Extension {
+    return [
+      this.options.lineNumbers ? lineNumbers() : [],
+      this.options.folding
+        ? foldGutter({
+            markerDOM: (open) => {
+              const marker = document.createElement("span");
+              marker.className = `cm-fold-marker${open ? "" : " is-folded"}`;
+              marker.title = open ? t("Einklappen") : t("Ausklappen");
+              marker.append(icon("chevron-down", 14));
+              return marker;
+            },
+          })
+        : [],
+    ];
+  }
+
+  private modeExtension(): Extension {
+    return [
+      renderedFacet.of(this.options.livePreview),
+      propertiesFacet.of(this.options.properties),
+    ];
+  }
+
   private attributeExtension(): Extension {
     return EditorView.contentAttributes.of({
       "aria-label": t("Markdown-Editor"),
@@ -266,11 +337,13 @@ export class MarkdownEditor {
     return EditorState.create({
       doc: text,
       extensions: [
+        // Vim must see keys before every other keymap.
+        this.vimMode.of(this.vimEnabled()),
         this.base,
         this.editable.of(EditorView.editable.of(this.isEditable)),
         this.pluginExtensions.of(this.pluginList),
-        this.mode.of(renderedFacet.of(this.options.livePreview)),
-        this.gutter.of(this.options.lineNumbers ? lineNumbers() : []),
+        this.mode.of(this.modeExtension()),
+        this.gutter.of(this.gutterExtension()),
         this.attributes.of(this.attributeExtension()),
         this.pairing.of(this.options.autoPair ? closeBrackets() : []),
       ],
@@ -284,10 +357,11 @@ export class MarkdownEditor {
         this.editable.reconfigure(EditorView.editable.of(this.isEditable)),
         this.pluginExtensions.reconfigure(this.pluginList),
         this.pluginSurfaces.reconfigure(this.surfaceExtensions),
-        this.mode.reconfigure(renderedFacet.of(this.options.livePreview)),
-        this.gutter.reconfigure(this.options.lineNumbers ? lineNumbers() : []),
+        this.mode.reconfigure(this.modeExtension()),
+        this.gutter.reconfigure(this.gutterExtension()),
         this.attributes.reconfigure(this.attributeExtension()),
         this.pairing.reconfigure(this.options.autoPair ? closeBrackets() : []),
+        this.vimMode.reconfigure(this.vimEnabled()),
         setInlineTitle.of(this.title),
         refreshPluginBlocks.of(null),
       ],
@@ -332,7 +406,35 @@ export class MarkdownEditor {
 
   configure(options: Partial<EditorOptions>): void {
     this.options = { ...this.options, ...options };
+    if (this.options.vim && !this.vimExtension) void this.loadVim();
     this.sync();
+  }
+
+  private vimEnabled(): Extension {
+    return this.options.vim && this.vimExtension
+      ? Prec.highest(this.vimExtension)
+      : [];
+  }
+
+  /** Loads the Vim keybindings in their own chunk, only for people who use them. */
+  private loadVim(): Promise<void> {
+    this.vimLoading ??= import("@replit/codemirror-vim")
+      .then(({ vim, Vim }) => {
+        // `:w` saves like Ctrl+S.
+        Vim.defineEx("write", "w", () => this.host.save());
+        this.vimExtension = vim({ status: true });
+        this.sync();
+      })
+      .catch((error) => {
+        this.vimLoading = null;
+        console.error(t("Vim-Modus konnte nicht geladen werden"), error);
+      });
+    return this.vimLoading;
+  }
+
+  /** Resolves once the Vim keybindings are active (tests and settings). */
+  async vimReady(): Promise<void> {
+    if (this.options.vim) await this.loadVim();
   }
 
   setTitle(title: string | null): void {

@@ -50,8 +50,13 @@ export interface Backend {
   ): Promise<void>;
   choose(): Promise<VaultInfo | null>;
   export(path: string, text: string): Promise<boolean>;
-  /** Backups of notes and canvases (previous versions and deleted files), newest first. */
-  backups(vaultId?: string): Promise<BackupEntry[]>;
+  /**
+   * Backups of notes and canvases (previous versions and deleted files),
+   * newest first; `all` adds those of attachments, for cleaning up.
+   */
+  backups(vaultId?: string, all?: boolean): Promise<BackupEntry[]>;
+  /** Permanently deletes backups from `backups()`; other paths are refused. */
+  removeBackups(locations: string[], vaultId?: string): Promise<number>;
   /** Text of one backup from `backups()`; other paths are refused. */
   readBackup(location: string, vaultId?: string): Promise<string>;
 }
@@ -256,14 +261,29 @@ export class BrowserBackend implements Backend {
     localStorage.setItem(this.key, JSON.stringify(files));
   }
 
-  async backups(): Promise<BackupEntry[]> {
+  async backups(_vaultId?: string, all = false): Promise<BackupEntry[]> {
     const encoder = new TextEncoder();
     const files = this.current();
     return sortBackups(
       Object.keys(files)
         .map((key) => parseBackup(key, encoder.encode(files[key]).length))
-        .filter((backup): backup is BackupEntry => !!backup && isDocumentBackup(backup)),
+        .filter(
+          (backup): backup is BackupEntry =>
+            !!backup && (all || isDocumentBackup(backup)),
+        ),
     );
+  }
+
+  async removeBackups(locations: string[]): Promise<number> {
+    const files = this.files();
+    for (const location of locations) {
+      if (!parseBackup(location)) throw new Error(t("Sicherung nicht gefunden."));
+      if (!Object.hasOwn(files, location))
+        throw new Error(t("Sicherung nicht gefunden."));
+      delete files[location];
+    }
+    localStorage.setItem(this.key, JSON.stringify(files));
+    return locations.length;
   }
 
   async readBackup(location: string): Promise<string> {
@@ -281,8 +301,9 @@ export class BrowserBackend implements Backend {
   }
 
   async export(path: string, text: string): Promise<boolean> {
+    const type = /\.html?$/i.test(path) ? "text/html" : "text/markdown";
     const url = URL.createObjectURL(
-      new Blob([text], { type: "text/markdown;charset=utf-8" }),
+      new Blob([text], { type: `${type};charset=utf-8` }),
     );
     const link = document.createElement("a");
     link.href = url;
@@ -374,8 +395,11 @@ class NativeBackend implements Backend {
   export(name: string, text: string): Promise<boolean> {
     return invoke("export_note", { name, text });
   }
-  backups(vaultId = this.vaultId): Promise<BackupEntry[]> {
-    return invoke("backup_list", { vaultId });
+  backups(vaultId = this.vaultId, all = false): Promise<BackupEntry[]> {
+    return invoke("backup_list", { vaultId, all });
+  }
+  removeBackups(locations: string[], vaultId = this.vaultId): Promise<number> {
+    return invoke("backup_remove", { locations, vaultId });
   }
   readBackup(location: string, vaultId = this.vaultId): Promise<string> {
     return invoke("backup_read", { location, vaultId });

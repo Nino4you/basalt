@@ -1,0 +1,27 @@
+<p>Basalt is a calm place for connected thoughts. Your notes are plain Markdown files in a folder you choose. No account, no cloud, nothing leaves your device unless you sync the folder yourself.</p>
+
+<p><b>Writing</b></p>
+<ul>
+<li>Live preview editor: Markdown fades away while you write; math (KaTeX), Mermaid diagrams and tables render right in the note.</li>
+<li>Properties for the frontmatter, footnotes, callouts, folding of headings and lists.</li>
+<li>Completion for [[wiki links]], headings, blocks, aliases and #tags.</li>
+<li>Paste or drop pictures and files; they are stored as attachments next to your notes.</li>
+</ul>
+
+<p><b>Organizing</b></p>
+<ul>
+<li>Backlinks, unlinked mentions, outline, tags and full-text search with search and replace.</li>
+<li>Graph view, canvas (JSON Canvas), daily notes and templates.</li>
+<li>Links are updated when you rename or move a note.</li>
+</ul>
+
+<p><b>Safe by design</b></p>
+<ul>
+<li>Saves never overwrite blindly; every earlier version and every deleted file can be restored.</li>
+<li>Conflict copies from Syncthing, Nextcloud or Dropbox are found and can be compared.</li>
+</ul>
+
+<p><b>Plugins and themes</b></p>
+<p>Basalt implements the Obsidian plugin API for selected community plugins and loads themes and CSS snippets from your vault. Plugins only run after you enable each one.</p>
+
+<p>Basalt is an independent project and not affiliated with Obsidian. It is a preview: please keep a copy of important notes.</p>

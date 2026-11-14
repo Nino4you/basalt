@@ -20,6 +20,12 @@ backslash in an inactive cell; the source is preserved. The browser tests, inclu
 layouts and synthetic composition events, do not replace testing with a real Android keyboard or
 the native Linux/Android runtime.
 
+Frontmatter shows as editable properties (text, list, number, checkbox, date) unless the
+setting is off or the YAML does not parse; the cursor inside the block shows the YAML again.
+Edits go through the `yaml` document model, so comments, key order and flow lists stay. Pasted
+or dropped files are stored like `FileManager.getAvailablePathForAttachment` names them,
+following the attachment folder setting.
+
 ### Excalidraw 2.29.2: full browser life cycle verified
 
 Checked on 2026-11-11/12 with the unmodified official

@@ -52,6 +52,8 @@ export interface CompatibilityOptions {
   resources?: PluginResourceHost | null;
   /** Whether `FileManager.renameFile` rewrites links; off unless given. */
   updateLinks?: () => boolean;
+  /** The attachment folder setting (see `attachmentFolder`); "./" if not given. */
+  attachmentFolder?: () => string;
 }
 
 /** Internal app bridge, not an external plugin loader or a global `window.app`. */
@@ -128,7 +130,11 @@ export class CompatibilitySession {
       this.configVault,
       resources,
     );
-    this.fileManager = new FileManager(this.vault, options.updateLinks);
+    this.fileManager = new FileManager(
+      this.vault,
+      options.updateLinks,
+      options.attachmentFolder,
+    );
     this.metadataCache = new MetadataCache(this.vault);
     this.embedRegistry = new EmbedRegistry(this.metadataCache);
     const view = new MarkdownView(options.editor, options.container);

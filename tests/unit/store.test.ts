@@ -54,6 +54,7 @@ it("does not discard edits made during an in-flight save", async () => {
     export: (p, t) => real.export(p, t),
     backups: () => real.backups(),
     readBackup: (location) => real.readBackup(location),
+    removeBackups: (locations) => real.removeBackups(locations),
     save: async (p, t, e) => {
       started();
       await gate;
@@ -103,6 +104,7 @@ it("pins asynchronous reads and saves to the original vault identity", async () 
     export: (p, t) => real.export(p, t),
     backups: () => real.backups(),
     readBackup: (location) => real.readBackup(location),
+    removeBackups: (locations) => real.removeBackups(locations),
     read: async (path, vaultId) => {
       if (vaultId !== selected) throw new Error("vault changed");
       return real.read(path);
@@ -271,6 +273,7 @@ it("backs up foreign content always and its own autosaves every few minutes", as
     export: (p, t) => real.export(p, t),
     backups: () => real.backups(),
     readBackup: (location) => real.readBackup(location),
+    removeBackups: (locations) => real.removeBackups(locations),
     save: (path, text, expected, vaultId, backup = true) => {
       calls.push(backup);
       return real.save(path, text, expected, vaultId, backup);

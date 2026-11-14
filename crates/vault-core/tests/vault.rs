@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use vault_core::{
     Backup, BackupKind, BinaryVaultStorage, DirectoryVault, EntryKind, MetadataVaultStorage,
-    VaultPath, VaultStorage, list_backups, read_backup, search,
+    VaultPath, VaultStorage, list_backups, read_backup, remove_backup, search,
 };
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
@@ -602,4 +602,64 @@ fn unbacked_saves_keep_the_conflict_check_but_skip_the_history() {
     assert_eq!(vault.read_text(&note).unwrap(), "two");
     vault.save_text(&note, "three", "two").unwrap();
     assert_eq!(list_backups(&vault).unwrap().len(), 1);
+}
+
+#[test]
+fn removing_backups_deletes_only_backups_and_tidies_empty_folders() {
+    let fixture = Fixture::new();
+    let vault = fixture.vault();
+    fs::create_dir(fixture.0.join("Notes")).unwrap();
+    let note = path("Notes/a.md");
+    vault.create_text(&note, "one").unwrap();
+    vault.save_text(&note, "two", "one").unwrap();
+    vault.save_text(&note, "three", "two").unwrap();
+    let doomed = path("Notes/gone.md");
+    vault.create_text(&doomed, "bye").unwrap();
+    vault.remove_file(&doomed, b"bye").unwrap();
+
+    for refused in [
+        "Notes/a.md",
+        ".basalt/other/x.md",
+        ".basalt/history/.hidden/1-0.md",
+    ] {
+        let error = remove_backup(&vault, &path(refused)).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput, "{refused}");
+    }
+    assert_eq!(vault.read_text(&note).unwrap(), "three");
+
+    let backups = list_backups(&vault).unwrap();
+    assert_eq!(backups.len(), 3);
+    for backup in &backups {
+        remove_backup(&vault, &backup.location).unwrap();
+    }
+    assert!(list_backups(&vault).unwrap().is_empty());
+    assert_eq!(vault.read_text(&note).unwrap(), "three");
+    // Empty per-file and per-deletion folders go; the backup roots stay.
+    assert!(!fixture.0.join(".basalt/history/Notes").exists());
+    assert!(fixture.0.join(".basalt/history").is_dir());
+    assert_eq!(
+        fs::read_dir(fixture.0.join(".basalt/trash"))
+            .unwrap()
+            .count(),
+        0
+    );
+    let error = remove_backup(&vault, &backups[0].location).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::NotFound);
+}
+
+#[cfg(unix)]
+#[test]
+fn removing_backups_refuses_symlinked_folders() {
+    let fixture = Fixture::new();
+    fs::create_dir_all(fixture.0.join("Notes/a.md")).unwrap();
+    fs::write(fixture.0.join("Notes/a.md/1-0.md"), "content").unwrap();
+    fs::create_dir_all(fixture.0.join(".basalt/history")).unwrap();
+    std::os::unix::fs::symlink(
+        fixture.0.join("Notes/a.md"),
+        fixture.0.join(".basalt/history/a.md"),
+    )
+    .unwrap();
+    let error = remove_backup(&fixture.vault(), &path(".basalt/history/a.md/1-0.md")).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+    assert!(fixture.0.join("Notes/a.md/1-0.md").exists());
 }

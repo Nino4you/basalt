@@ -1,5 +1,6 @@
 import { getLocale, languages, t } from "../i18n";
 import { backend, native } from "../backend";
+import { APP_VERSION } from "../version";
 import {
   basename,
   clear,
@@ -10,7 +11,19 @@ import {
   iconButton,
   trackSliderFill,
 } from "../ui/dom";
-import { Modal } from "../ui/modal";
+import { confirmAction, Modal } from "../ui/modal";
+import {
+  listSnippets,
+  listThemes,
+  SNIPPET_FOLDER,
+  THEME_FOLDER,
+  type Appearance,
+} from "./vault-styles";
+import {
+  cleanBackups,
+  formatBytes,
+  type CleanupResult,
+} from "./backup-cleanup";
 import { notify } from "../ui/notice";
 import { eventHotkey, isAssignable, type Command } from "./commands";
 import { formatDate } from "../dates";
@@ -213,6 +226,213 @@ function textField(
   return input;
 }
 
+/** Retention of `.basalt/history` and `.basalt/trash`, with manual cleanup. */
+function backupSettings(app: App, content: HTMLElement): void {
+  const settings = app.settings;
+  heading(content, t("Sicherungen"));
+  content.append(
+    h("p", {
+      class: "setting-item-description settings-paragraph",
+      text: t("Vor jeder Änderung und jedem Löschen sichert Basalt die Datei in .basalt/history/ und .basalt/trash/ im Vault."),
+    }),
+  );
+  const days = (count: number) =>
+    count ? t("{count} Tage", { count }) : t("Unbegrenzt");
+  dropdown(
+    row(
+      content,
+      t("Sicherungen aufbewahren"),
+      t("Ältere Versionen und gelöschte Dateien werden einmal am Tag entfernt."),
+    ),
+    t("Sicherungen aufbewahren"),
+    [7, 30, 90, 180, 365, 0].map(
+      (count) => [String(count), days(count)] as [string, string],
+    ),
+    String(settings.get("backupMaxAgeDays")),
+    (value) => settings.set("backupMaxAgeDays", Number(value)),
+  );
+  dropdown(
+    row(
+      content,
+      t("Versionen pro Datei"),
+      t("Nur die neuesten Versionen jeder Datei bleiben erhalten."),
+    ),
+    t("Versionen pro Datei"),
+    [0, 10, 25, 50, 100].map(
+      (count) =>
+        [String(count), count ? String(count) : t("Unbegrenzt")] as [
+          string,
+          string,
+        ],
+    ),
+    String(settings.get("backupMaxVersions")),
+    (value) => settings.set("backupMaxVersions", Number(value)),
+  );
+  const usage = row(content, t("Belegter Platz"), t("Wird berechnet …"));
+  const description = usage.el.querySelector(".setting-item-description")!;
+  const vaultId = app.vault?.id;
+  const refresh = async () => {
+    if (!vaultId) return;
+    const backups = await backend.backups(vaultId, true);
+    const size = (kind: string) =>
+      backups
+        .filter((backup) => backup.kind === kind)
+        .reduce((sum, backup) => sum + backup.size, 0);
+    description.textContent = t(
+      "{versions} Versionen ({versionSize}), {deleted} gelöschte Dateien ({deletedSize})",
+      {
+        versions: backups.filter((backup) => backup.kind === "version").length,
+        versionSize: formatBytes(size("version"), getLocale()),
+        deleted: backups.filter((backup) => backup.kind === "deleted").length,
+        deletedSize: formatBytes(size("deleted"), getLocale()),
+      },
+    );
+  };
+  const failed = (error: unknown) => {
+    description.textContent = "";
+    app.report(error);
+  };
+  void refresh().catch(failed);
+  const report = (result: CleanupResult) =>
+    notify(
+      result.removed
+        ? t("{removed} Sicherungen entfernt, {size} frei.", {
+            removed: result.removed,
+            size: formatBytes(result.freed, getLocale()),
+          })
+        : t("Nichts zu entfernen."),
+    );
+  usage.control.append(
+    h("button", {
+      text: t("Jetzt aufräumen"),
+      attrs: { type: "button" },
+      on: {
+        click: () => {
+          if (!vaultId) return;
+          const policy = {
+            maxAgeDays: settings.get("backupMaxAgeDays"),
+            maxVersions: settings.get("backupMaxVersions"),
+          };
+          void cleanBackups(backend, vaultId, { policy })
+            .then(report)
+            .then(refresh)
+            .catch(failed);
+        },
+      },
+    }),
+    h("button", {
+      class: "mod-warning",
+      text: t("Papierkorb leeren"),
+      attrs: { type: "button" },
+      on: {
+        click: () => {
+          if (!vaultId) return;
+          confirmAction({
+            title: t("Papierkorb leeren"),
+            text: t("Alle gelöschten Dateien in .basalt/trash/ endgültig entfernen? Das kann nicht rückgängig gemacht werden."),
+            confirm: t("Endgültig löschen"),
+            warning: true,
+            run: async () => {
+              report(await cleanBackups(backend, vaultId, { emptyTrash: true }));
+              await refresh();
+            },
+            onError: (error) => app.report(error),
+          });
+        },
+      },
+    }),
+  );
+}
+
+/** Themes and CSS snippets from Basalt/Config (Obsidian's .obsidian folder). */
+function vaultStyleSettings(app: App, content: HTMLElement): void {
+  const section = h("div", "vault-style-settings");
+  content.append(section);
+  const render = () => {
+    section.replaceChildren();
+    const session = app.compatibility;
+    heading(section, t("Themes und CSS-Snippets"));
+    if (!session) {
+      section.append(
+        h("p", {
+          class: "setting-item-description settings-paragraph",
+          text: t("Themes und CSS-Snippets aus dem Vault gibt es nur in der nativen App."),
+        }),
+      );
+      return;
+    }
+    const vault = session.configVault;
+    const appearance = app.appearance;
+    const save = (next: Appearance) =>
+      void app.setAppearance(next).then(render, (error) => {
+        app.report(error);
+        render();
+      });
+    const themes = listThemes(vault);
+    dropdown(
+      row(
+        section,
+        t("Theme"),
+        t("Ordner mit theme.css unter {folder}/.", { folder: THEME_FOLDER }),
+      ),
+      t("Theme"),
+      [
+        ["", t("Basalt (Standard)")],
+        ...themes.map((name) => [name, name] as [string, string]),
+        ...(appearance.cssTheme && !themes.includes(appearance.cssTheme)
+          ? [[appearance.cssTheme, t("{name} (fehlt)", { name: appearance.cssTheme })] as [string, string]]
+          : []),
+      ],
+      appearance.cssTheme,
+      (cssTheme) => save({ ...appearance, cssTheme }),
+    );
+    const snippets = listSnippets(vault);
+    const actions = row(
+      section,
+      t("CSS-Snippets"),
+      t("CSS-Dateien unter {folder}/ ändern das Aussehen. Sie werden nach dem Theme geladen.", {
+        folder: SNIPPET_FOLDER,
+      }),
+    );
+    actions.control.append(
+      h(
+        "button",
+        {
+          class: "clickable-icon",
+          label: t("Neu laden"),
+          attrs: { type: "button" },
+          on: {
+            click: () =>
+              void session.configVault
+                .refresh()
+                .then(() => app.applyVaultStyles())
+                .then(render, (error) => app.report(error)),
+          },
+        },
+        icon("refresh-cw", 16),
+      ),
+    );
+    if (!snippets.length)
+      section.append(
+        h("p", { class: "pane-empty", text: t("Keine Snippets gefunden.") }),
+      );
+    for (const name of snippets)
+      toggle(
+        row(section, name),
+        t("Snippet {name}", { name }),
+        appearance.enabledCssSnippets.includes(name),
+        (enabled) =>
+          save({
+            ...appearance,
+            enabledCssSnippets: enabled
+              ? [...appearance.enabledCssSnippets, name]
+              : appearance.enabledCssSnippets.filter((entry) => entry !== name),
+          }),
+      );
+  };
+  render();
+}
+
 type CoreTab =
   "general" | "editor" | "files" | "appearance" | "hotkeys" | "plugins";
 /** Core pages, or `plugin:<id>:<index>` for a community plugin's setting tab. */
@@ -329,8 +549,56 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         ),
       );
       heading(content, t("App"));
-      row(content, t("Aktuelle Version"), t("Entwicklungsversion")).control.append(
-        h("span", { class: "setting-value", text: "0.2.0" }),
+      const version = row(
+        content,
+        t("Aktuelle Version"),
+        app.availableUpdate
+          ? t("Basalt {version} ist verfügbar.", { version: app.availableUpdate.version })
+          : "",
+      );
+      version.control.append(
+        h("span", { class: "setting-value", text: APP_VERSION }),
+      );
+      const showUpdate = () => {
+        const update = app.availableUpdate;
+        version.control.querySelector(".mod-update")?.remove();
+        if (!update) return;
+        version.control.append(
+          h("button", {
+            class: "mod-cta mod-update",
+            text: t("Herunterladen"),
+            attrs: { type: "button" },
+            on: { click: () => app.openExternal(update.url) },
+          }),
+        );
+      };
+      showUpdate();
+      const checks = row(
+        content,
+        t("Automatisch nach Updates suchen"),
+        t("Fragt einmal am Tag bei GitHub nach einer neuen Version. Dabei wird nichts über dich oder deine Notizen gesendet. Installiert wird nie automatisch."),
+      );
+      checks.control.append(
+        h("button", {
+          text: t("Jetzt prüfen"),
+          attrs: { type: "button" },
+          on: {
+            click: (event) => {
+              const button = event.currentTarget as HTMLButtonElement;
+              button.disabled = true;
+              void app
+                .checkForUpdates(true)
+                .then(showUpdate, (error) => app.report(error))
+                .finally(() => (button.disabled = false));
+            },
+          },
+        }),
+      );
+      toggle(
+        checks,
+        t("Automatisch nach Updates suchen"),
+        settings.get("updateCheck"),
+        set("updateCheck"),
       );
       row(
         content,
@@ -447,12 +715,42 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         settings.get("lineNumbers"),
         set("lineNumbers"),
       );
+      toggle(
+        row(
+          content,
+          t("Eigenschaften im Dokument"),
+          t("Zeigt das Frontmatter in der Live-Vorschau als bearbeitbare Felder statt als YAML."),
+        ),
+        t("Eigenschaften im Dokument"),
+        settings.get("propertiesInDocument"),
+        set("propertiesInDocument"),
+      );
+      toggle(
+        row(
+          content,
+          t("Einklappen"),
+          t("Pfeile am Rand klappen Abschnitte unter Überschriften, Listen und Blöcke ein."),
+        ),
+        t("Einklappen"),
+        settings.get("folding"),
+        set("folding"),
+      );
       heading(content, t("Verhalten"));
       toggle(
         row(content, t("Rechtschreibprüfung"), t("Nutzt die Prüfung des Systems.")),
         t("Rechtschreibprüfung"),
         settings.get("spellcheck"),
         set("spellcheck"),
+      );
+      toggle(
+        row(
+          content,
+          t("Vim-Tastenbelegung"),
+          t("Bearbeiten mit Vim-Befehlen; :w speichert."),
+        ),
+        t("Vim-Tastenbelegung"),
+        settings.get("vimMode"),
+        set("vimMode"),
       );
       toggle(
         row(
@@ -490,6 +788,17 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         t("Interne Links automatisch aktualisieren"),
         settings.get("updateLinks"),
         set("updateLinks"),
+      );
+      textField(
+        row(
+          content,
+          t("Speicherort für neue Anhänge"),
+          t("Für eingefügte und hineingezogene Dateien. „/“ ist der Vault-Stammordner, „./“ der Ordner der Notiz, „./Anhänge“ ein Unterordner daneben, sonst ein Ordner im Vault."),
+        ),
+        t("Speicherort für neue Anhänge"),
+        settings.get("attachmentFolder"),
+        (value) => settings.set("attachmentFolder", value || "/"),
+        "/",
       );
       heading(content, t("Vorlagen"));
       textField(
@@ -555,6 +864,7 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         settings.get("dailyTemplate"),
         set("dailyTemplate"),
       );
+      backupSettings(app, content);
       heading(content, t("Archivierte Entwürfe"));
       content.append(
         h("p", {
@@ -660,6 +970,7 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         settings.set("fontSize", Number(slider.value));
       });
       size.control.append(value, slider);
+      vaultStyleSettings(app, content);
       heading(content, t("Oberfläche"));
       toggle(
         row(

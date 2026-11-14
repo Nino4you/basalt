@@ -43,7 +43,13 @@ Obsidian vaults and selected Obsidian plugins.
 - Completion for `[[wiki links]]` (including `#headings`, `#^blocks` and note aliases) and
   `#tags`, page previews when hovering links, templates from a folder you choose (with title
   and Moment.js date placeholders), and a source mode.
-- Reading view with callouts, properties, note embeds and syntax highlighting.
+- Frontmatter as editable properties (text, lists, numbers, checkboxes, dates), footnotes
+  (`[^1]` and `^[inline]`), and folding of headings, lists and blocks.
+- Paste or drop pictures and files into a note: they are stored in the attachment folder you
+  choose and linked with `![[…]]`.
+- Optional Vim key bindings (`:w` saves).
+- Reading view with callouts, properties, footnotes, note embeds and syntax highlighting.
+- Print a note or save it as PDF (Linux), or export it as one self-contained HTML file.
 - PDFs, images, audio and video open in their own tabs; PDFs are rendered locally.
 
 **Organizing**
@@ -51,14 +57,18 @@ Obsidian vaults and selected Obsidian plugins.
 - File tree with folders, bookmarks, drag & drop and safe renaming that carries open tabs,
   bookmarks and unsaved changes along; links to a renamed or moved note are updated.
 - Backlinks with context, unlinked mentions that become links with one click, outgoing links,
-  tags, outline and full-text search (`tag:`, `path:`, `file:`, exclusion with `-`).
+  tags, outline and full-text search (`tag:`, `path:`, `file:`, exclusion with `-`) with
+  search and replace across the vault.
 - Daily notes with their own folder, date format (Moment.js style) and template, and commands
   to step to the previous or next one.
 - Graph view for the whole vault and as a local graph of the active note, with group colors.
 - Canvas in the open JSON Canvas format (`.canvas`) with text, note, link and group cards.
 - File recovery: every earlier version of a note or canvas and every deleted file can be
   compared with the current content and restored (command palette → "Open file recovery", or
-  "Version history" in the file menu).
+  "Version history" in the file menu). Old backups are cleaned up after a period you choose.
+- Works with folder sync tools: changes from Syncthing, Nextcloud, Dropbox or Git show up, and
+  their conflict copies are found and can be compared and resolved (see
+  [docs/sync.md](docs/sync.md)).
 
 **Workspace**
 
@@ -66,8 +76,9 @@ Obsidian vaults and selected Obsidian plugins.
   the layout is saved per vault.
 - Quick switcher (Ctrl+O), command palette (Ctrl+P), full keyboard navigation and hotkeys you
   can change in the settings.
-- Light and dark theme with an accent color; a dedicated phone layout with drawers, a bottom
-  navigation bar and a formatting toolbar.
+- Light and dark theme with an accent color, plus Obsidian-style themes and CSS snippets from
+  the vault (`Basalt/Config/themes`, `Basalt/Config/snippets`); a dedicated phone layout with
+  drawers, a bottom navigation bar and a formatting toolbar.
 
 <p align="center">
   <img src="screenshots/02-mobile-dark.png" width="300" alt="Basalt on a phone: reading view with bottom navigation bar" />
@@ -100,11 +111,13 @@ data in the browser, not in real files.
 Basalt is a **preview (0.2)** and not yet a complete replacement for Obsidian. The core is
 stable and tested, but some things are still missing:
 
-- no automatic updates and no built-in sync,
+- no built-in sync (use a folder sync tool, see [docs/sync.md](docs/sync.md)) and no automatic
+  installation of updates (Settings → General can check for new releases),
 - plugin compatibility only for selected plugins (see below),
-- backups in `.basalt/history/` and `.basalt/trash/` are never cleaned up automatically yet,
-  and backups of attachments have to be restored by hand,
-- no Play Store or distribution packages yet, only direct downloads.
+- backups of attachments have to be restored by hand (old backups are kept until you set a
+  retention period in Settings → Files and links → Backups),
+- not in F-Droid or Google Play yet, only direct downloads (the store listing is prepared, see
+  [docs/distribution.md](docs/distribution.md)).
 
 Make a copy of any important vault before opening it for the first time.
 

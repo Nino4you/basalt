@@ -1,6 +1,9 @@
 import { getLocale, plural, t } from "../i18n";
 import { basename, clear, debounce, dirname, h, icon } from "../ui/dom";
+import { confirmAction } from "../ui/modal";
+import { notify } from "../ui/notice";
 import type { App } from "./app";
+import { replaceableTerm, replaceTerm } from "./search-replace";
 import { parseQuery, searchNote, type SearchResult } from "./vault-index";
 
 const MAX_FILES = 200;
@@ -16,6 +19,13 @@ export class SearchView {
   private results: SearchResult[] = [];
   private readonly collapsed = new Set<string>();
   private readonly schedule = debounce(() => this.execute(), 140);
+  private readonly replaceToggle: HTMLButtonElement;
+  private readonly replaceRow: HTMLElement;
+  private readonly replaceInput: HTMLInputElement;
+  private readonly matchCaseButton: HTMLButtonElement;
+  private readonly replaceAllButton: HTMLButtonElement;
+  private matchCase = false;
+  private replacing = false;
 
   constructor(
     private readonly app: App,
@@ -44,6 +54,71 @@ export class SearchView {
     );
     this.infoEl = h("div", "search-results-info");
     this.resultsEl = h("div", "search-result-container");
+    this.replaceToggle = h(
+      "button",
+      {
+        class: "clickable-icon search-replace-toggle",
+        label: t("Ersetzen"),
+        attrs: { type: "button", "aria-pressed": "false" },
+        on: { click: () => this.toggleReplace() },
+      },
+      icon("replace", 16),
+    );
+    this.replaceInput = h("input", {
+      class: "search-input",
+      label: t("Ersetzen durch"),
+      attrs: {
+        type: "text",
+        placeholder: t("Ersetzen durch …"),
+        autocomplete: "off",
+        spellcheck: "false",
+      },
+    });
+    this.replaceInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        this.replaceIn(this.results.map((result) => result.path));
+      }
+    });
+    this.matchCaseButton = h(
+      "button",
+      {
+        class: "clickable-icon search-match-case",
+        label: t("Groß-/Kleinschreibung beachten"),
+        attrs: { type: "button", "aria-pressed": "false" },
+        on: {
+          click: () => {
+            this.matchCase = !this.matchCase;
+            this.matchCaseButton.setAttribute(
+              "aria-pressed",
+              String(this.matchCase),
+            );
+            this.matchCaseButton.classList.toggle("is-active", this.matchCase);
+          },
+        },
+      },
+      icon("case-sensitive", 16),
+    );
+    this.replaceAllButton = h("button", {
+      class: "search-replace-all",
+      text: t("Alle ersetzen"),
+      attrs: { type: "button" },
+      on: {
+        click: () => this.replaceIn(this.results.map((result) => result.path)),
+      },
+    });
+    this.replaceRow = h(
+      "div",
+      { class: "search-row search-replace-row", attrs: { hidden: true } },
+      h(
+        "div",
+        "search-input-container",
+        icon("corner-down-right", 14),
+        this.replaceInput,
+      ),
+      this.matchCaseButton,
+      this.replaceAllButton,
+    );
     container.append(
       h(
         "div",
@@ -55,7 +130,9 @@ export class SearchView {
           this.input,
           this.clearButton,
         ),
+        this.replaceToggle,
       ),
+      this.replaceRow,
       this.infoEl,
       this.resultsEl,
     );
@@ -122,6 +199,100 @@ export class SearchView {
     this.schedule.cancel();
     this.execute();
     this.focus();
+  }
+
+  private toggleReplace(open = this.replaceRow.hidden): void {
+    this.replaceRow.hidden = !open;
+    this.replaceToggle.setAttribute("aria-pressed", String(open));
+    this.replaceToggle.classList.toggle("is-active", open);
+    this.container.classList.toggle("is-replacing", open);
+    if (open) this.replaceInput.focus();
+  }
+
+  /**
+   * Replaces the query's single term in `paths`, counted on the current
+   * text. Several files ask first; each changed file is backed up and saved
+   * like an edit, and one that fails stays unchanged.
+   */
+  private replaceIn(paths: string[]): void {
+    if (this.replacing) return;
+    const term = replaceableTerm(this.input.value.trim());
+    if (!term) {
+      notify(
+        t(
+          "Ersetzen braucht genau einen Suchbegriff, zum Beispiel ein Wort oder eine „Wortfolge“.",
+        ),
+        true,
+      );
+      return;
+    }
+    const replacement = this.replaceInput.value;
+    const matchCase = this.matchCase;
+    let count = 0;
+    const targets: string[] = [];
+    for (const path of paths) {
+      const found = replaceTerm(
+        this.app.index.content(path) ?? "",
+        term,
+        replacement,
+        matchCase,
+      ).count;
+      if (!found) continue;
+      count += found;
+      targets.push(path);
+    }
+    if (!count) {
+      notify(t("Keine Treffer zum Ersetzen."));
+      return;
+    }
+    const run = async () => {
+      this.replacing = true;
+      try {
+        const { updated, failed } = await this.app.rewriteNotes(
+          targets,
+          (text) => {
+            const result = replaceTerm(text, term, replacement, matchCase);
+            return result.count ? result.text : null;
+          },
+        );
+        if (updated.length)
+          notify(
+            plural(updated.length, {
+              one: "In {count} Datei ersetzt.",
+              other: "In {count} Dateien ersetzt.",
+            }),
+          );
+        if (failed.length)
+          notify(
+            t("{files} konnten nicht geändert werden und sind unverändert.", {
+              files: failed.map((path) => `„${basename(path)}“`).join(", "),
+            }),
+            true,
+          );
+      } finally {
+        this.replacing = false;
+        this.execute();
+      }
+    };
+    if (targets.length === 1 && paths.length === 1) {
+      void run().catch((error) => this.app.report(error));
+      return;
+    }
+    confirmAction({
+      title: t("Alle ersetzen"),
+      text: t(
+        "„{term}“ {occurrences}-mal in {files} Dateien durch „{replacement}“ ersetzen? Jede geänderte Datei wird vorher gesichert.",
+        {
+          term,
+          occurrences: count,
+          files: targets.length,
+          replacement,
+        },
+      ),
+      confirm: t("Ersetzen"),
+      run,
+      onError: (error) => this.app.report(error),
+    });
   }
 
   private resultItems(): HTMLElement[] {
@@ -239,6 +410,17 @@ export class SearchView {
                 text: String(result.matches.length),
               })
             : null,
+          result.matches.length
+            ? h(
+                "button",
+                {
+                  class: "clickable-icon search-result-replace",
+                  label: t("In dieser Datei ersetzen"),
+                  attrs: { type: "button", tabindex: "-1" },
+                },
+                icon("replace", 14),
+              )
+            : null,
         ),
       );
       if (!closed && result.matches.length)
@@ -249,7 +431,9 @@ export class SearchView {
       fragment.append(
         h("div", {
           class: "search-results-more",
-          text: t("{count} weitere Dateien – verfeinere die Suche.", { count: results.length - MAX_FILES }),
+          text: t("{count} weitere Dateien – verfeinere die Suche.", {
+            count: results.length - MAX_FILES,
+          }),
         }),
       );
     this.resultsEl.replaceChildren(fragment);
@@ -287,6 +471,10 @@ export class SearchView {
     const file = target.closest<HTMLElement>(".search-result");
     const path = file?.dataset.path;
     if (!file || !path) return;
+    if (target.closest(".search-result-replace")) {
+      this.replaceIn([path]);
+      return;
+    }
     if (target.closest(".collapse-icon")) {
       const result = this.results.find((entry) => entry.path === path);
       const closed = file.classList.toggle("is-collapsed");

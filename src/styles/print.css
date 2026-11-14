@@ -1,0 +1,58 @@
+/* Printing a note (src/app/print-export.ts): only #print-root reaches paper. */
+#print-root {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: 760px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media print {
+  @page {
+    margin: 18mm 16mm;
+  }
+  html,
+  body.is-printing {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  body.is-printing > :not(#print-root) {
+    display: none !important;
+  }
+  body.is-printing #print-root {
+    position: static;
+    width: auto;
+    padding: 0;
+    overflow: visible;
+    visibility: visible;
+    color: #222;
+    background: #fff;
+    font-size: 11pt;
+    /* Checked boxes, callouts and code backgrounds carry meaning. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  #print-root pre,
+  #print-root table,
+  #print-root img,
+  #print-root svg,
+  #print-root .callout,
+  #print-root .math-block,
+  #print-root .katex-display {
+    break-inside: avoid;
+  }
+  #print-root h1,
+  #print-root h2,
+  #print-root h3,
+  #print-root h4 {
+    break-after: avoid;
+  }
+  #print-root a {
+    color: inherit;
+  }
+  #print-root pre {
+    white-space: pre-wrap;
+  }
+}

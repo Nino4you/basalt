@@ -108,3 +108,35 @@ export function newBackupId(now = Date.now()): string {
   sequence += 1;
   return `${now}${String(sequence % 1_000_000).padStart(6, "0")}-0-${sequence}`;
 }
+
+const DAY = 24 * 60 * 60 * 1000;
+
+/** How long backups are kept; 0 means without limit. */
+export interface RetentionPolicy {
+  /** Backups older than this many days go, versions and trash alike. */
+  maxAgeDays: number;
+  /** Per file, only this many of the newest versions stay. */
+  maxVersions: number;
+}
+
+/**
+ * Backups a policy no longer keeps. Backups whose id carries no time are
+ * never removed by age. Deleted files count only by age, never by number.
+ */
+export function expiredBackups(
+  backups: BackupEntry[],
+  policy: RetentionPolicy,
+  now = Date.now(),
+): BackupEntry[] {
+  const cutoff = policy.maxAgeDays > 0 ? now - policy.maxAgeDays * DAY : 0;
+  const versions = new Map<string, number>();
+  return sortBackups([...backups]).filter((backup) => {
+    let expired = backup.time > 0 && backup.time < cutoff;
+    if (backup.kind === "version") {
+      const count = (versions.get(backup.path) ?? 0) + 1;
+      versions.set(backup.path, count);
+      if (policy.maxVersions > 0 && count > policy.maxVersions) expired = true;
+    }
+    return expired;
+  });
+}

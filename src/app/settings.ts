@@ -30,6 +30,20 @@ export interface Settings {
   dailyTemplate: string;
   /** Folder with templates; "" means any folder called `_templates`. */
   templateFolder: string;
+  /** Where pasted and dropped files go, see `attachmentFolder`. */
+  attachmentFolder: string;
+  /** Backups older than this many days are deleted; 0 keeps them. */
+  backupMaxAgeDays: number;
+  /** Versions kept per file; 0 keeps all. */
+  backupMaxVersions: number;
+  /** Live preview shows frontmatter as editable properties instead of YAML. */
+  propertiesInDocument: boolean;
+  /** Fold arrows for headings, lists and blocks. */
+  folding: boolean;
+  /** Ask GitHub once a day whether a newer Basalt release exists. */
+  updateCheck: boolean;
+  /** Vim keybindings in the editor. */
+  vimMode: boolean;
 }
 
 export const DEFAULT_ACCENT = "#8a5cf5";
@@ -53,6 +67,14 @@ export const defaults: Settings = {
   dailyFormat: "YYYY-MM-DD",
   dailyTemplate: "",
   templateFolder: "",
+  attachmentFolder: "/",
+  // Off by default: deleting backups is an explicit choice.
+  backupMaxAgeDays: 0,
+  backupMaxVersions: 0,
+  propertiesInDocument: true,
+  folding: true,
+  updateCheck: false,
+  vimMode: false,
 };
 
 const KEY = "basalt-settings";

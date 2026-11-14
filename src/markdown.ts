@@ -136,6 +136,134 @@ parser.use({
   ],
 });
 
+/**
+ * Footnotes as Obsidian writes them: `[^id]` references, `[^id]: text`
+ * definitions (continued by indented lines) and `^[inline]` notes. They are
+ * numbered in the order they are first referenced and listed at the end.
+ */
+class Footnotes {
+  /** Definition ids, known once the lexer has run. */
+  readonly ids = new Set<string>();
+  private readonly numbers = new Map<string, number>();
+  private readonly html = new Map<number, string>();
+  private count = 0;
+
+  number(id: string | null): number {
+    if (id === null) return ++this.count;
+    let number = this.numbers.get(id);
+    if (!number) this.numbers.set(id, (number = ++this.count));
+    return number;
+  }
+
+  define(id: string, html: string): void {
+    // A definition nobody references still gets listed, after the others.
+    this.html.set(this.number(id), html);
+  }
+
+  defineInline(number: number, html: string): void {
+    this.html.set(number, html);
+  }
+
+  section(): string {
+    if (!this.html.size) return "";
+    const items = [...this.html]
+      .sort(([a], [b]) => a - b)
+      .map(([number, html]) => {
+        const back = ` <a href="#" class="footnote-backref" data-footnote-back="${number}" aria-label="${escapeHtml(t("Zurück zum Text"))}">↩︎</a>`;
+        // The arrow ends the last paragraph instead of starting a line.
+        const body = html.trimEnd();
+        const content = body.endsWith("</p>")
+          ? `${body.slice(0, -4)}${back}</p>`
+          : body + back;
+        return `<li data-footnote="${number}">${content}</li>`;
+      })
+      .join("");
+    return `<section class="footnotes"><hr><ol>${items}</ol></section>`;
+  }
+}
+
+let footnotes: Footnotes | null = null;
+
+const FOOTNOTE_DEF =
+  /^\[\^([^\]\s]+)\]:[ \t]?([^\n]*(?:\n(?:[ \t]{2,}|\t)[^\n]*)*)(?:\n|$)/;
+
+parser.use({
+  extensions: [
+    {
+      name: "footnoteDef",
+      level: "block",
+      start(source: string) {
+        return /^\[\^[^\]\s]+\]:/m.exec(source)?.index;
+      },
+      tokenizer(source: string) {
+        const match = FOOTNOTE_DEF.exec(source);
+        if (!match) return;
+        footnotes?.ids.add(match[1]);
+        const text = match[2].replace(/\n(?:[ \t]{2,}|\t)/g, "\n").trim();
+        const token = {
+          type: "footnoteDef",
+          raw: match[0],
+          id: match[1],
+          tokens: [],
+        };
+        this.lexer.blockTokens(text, token.tokens);
+        return token;
+      },
+      renderer(token) {
+        footnotes?.define(
+          token.id as string,
+          this.parser.parse(token.tokens ?? []),
+        );
+        return "";
+      },
+    },
+    {
+      name: "footnoteRef",
+      level: "inline",
+      start(source: string) {
+        const at = source.search(/\[\^|\^\[/);
+        return at < 0 ? undefined : at;
+      },
+      tokenizer(source: string) {
+        const ref = /^\[\^([^\]\s]+)\]/.exec(source);
+        if (ref)
+          return { type: "footnoteRef", raw: ref[0], id: ref[1], tokens: [] };
+        const inline = /^\^\[((?:[^[\]\n]|\[[^\]\n]*\])+)\]/.exec(source);
+        if (!inline) return;
+        return {
+          type: "footnoteRef",
+          raw: inline[0],
+          id: null,
+          tokens: this.lexer.inlineTokens(inline[1]),
+        };
+      },
+      renderer(token) {
+        const id = token.id as string | null;
+        if (!footnotes || (id !== null && !footnotes.ids.has(id)))
+          return escapeHtml(token.raw);
+        const number = footnotes.number(id);
+        if (id === null)
+          footnotes.defineInline(
+            number,
+            `<p>${this.parser.parseInline(token.tokens ?? [])}</p>`,
+          );
+        return `<sup class="footnote-ref"><a href="#" class="footnote-link" data-footnote-ref="${number}">${number}</a></sup>`;
+      },
+    },
+  ],
+});
+
+/** Markdown to HTML with footnotes collected at the end. */
+function parseWithFootnotes(body: string): string {
+  const outer = footnotes;
+  footnotes = new Footnotes();
+  try {
+    return (parser.parse(body) as string) + footnotes.section();
+  } finally {
+    footnotes = outer;
+  }
+}
+
 export interface Property {
   key: string;
   values: string[];
@@ -201,7 +329,7 @@ function renderProperties(properties: Property[]): string {
       return `<div class="metadata-property"><div class="metadata-property-key">${escapeHtml(property.key)}</div><div class="metadata-property-value">${values}</div></div>`;
     })
     .join("");
-  return `<div class="metadata-container"><div class="metadata-properties-heading">Eigenschaften</div>${rows}</div>`;
+  return `<div class="metadata-container"><div class="metadata-properties-heading">${escapeHtml(t("Eigenschaften"))}</div>${rows}</div>`;
 }
 
 const CALLOUT = /^\[!([\w-]+)\]([+-]?)[ \t]*/;
@@ -311,7 +439,7 @@ function renderTags(root: DocumentFragment): void {
 
 export function renderMarkdown(source: string): string {
   const { body, properties } = splitFrontmatter(source);
-  const safe = DOMPurify.sanitize(parser.parse(body) as string, {
+  const safe = DOMPurify.sanitize(parseWithFootnotes(body), {
     FORBID_TAGS: [
       "style",
       "iframe",
@@ -345,10 +473,21 @@ export function renderMarkdown(source: string): string {
   }
   renderCallouts(template.content);
   renderTags(template.content);
+  // Hovering a footnote number shows its text.
+  for (const link of template.content.querySelectorAll<HTMLElement>(
+    "a[data-footnote-ref]",
+  )) {
+    const note = template.content.querySelector(
+      `li[data-footnote="${link.dataset.footnoteRef}"]`,
+    );
+    if (note) link.title = (note.textContent ?? "").replace(/↩︎$/, "").trim();
+  }
   for (const link of template.content.querySelectorAll("a[href]"))
     if (
       !link.classList.contains("internal-link") &&
-      !link.classList.contains("tag")
+      !link.classList.contains("tag") &&
+      !link.classList.contains("footnote-link") &&
+      !link.classList.contains("footnote-backref")
     )
       link.classList.add("external-link");
   return (properties ? renderProperties(properties) : "") + template.innerHTML;

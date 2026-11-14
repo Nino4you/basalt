@@ -489,6 +489,11 @@ export function buildShell(root: HTMLElement) {
     id: "backlink-count",
     attrs: { type: "button" },
   });
+  const syncConflicts = h("button", {
+    class: "status-bar-item mod-clickable mod-warning",
+    id: "sync-conflicts",
+    attrs: { type: "button", hidden: true },
+  });
   const wordCountEl = h("div", {
     class: "status-bar-item",
     id: "word-count",
@@ -500,7 +505,9 @@ export function buildShell(root: HTMLElement) {
     environment,
     pluginStatus,
     saveStatus,
+    syncConflicts,
     backlinkCount,
+    syncConflicts,
     wordCountEl,
     charCount,
   );

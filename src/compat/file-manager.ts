@@ -2,6 +2,7 @@ import { Document, parseDocument } from "yaml";
 import { LinkUpdate } from "../app/link-update";
 import { scanNote } from "../app/vault-index";
 import { canvasIndexText } from "../canvas/model";
+import { attachmentFolder, availablePath } from "../attachments";
 import { getFrontMatterInfo } from "./frontmatter";
 import type { TFile, TFolder } from "./files";
 import type { Vault } from "./vault";
@@ -23,6 +24,8 @@ export class FileManager {
     private readonly vault: Vault,
     /** The user's "Automatically update internal links" preference. */
     private readonly updateLinks: () => boolean = () => false,
+    /** The user's attachment folder setting, see `attachmentFolder`. */
+    private readonly attachmentSetting: () => string = () => "./",
   ) {}
 
   getNewFileParent(sourcePath: string): TFolder {
@@ -35,16 +38,20 @@ export class FileManager {
     filename: string,
     sourcePath = "",
   ): Promise<string> {
-    const folder = folderPath(sourcePath);
+    const folder = attachmentFolder(this.attachmentSetting(), sourcePath);
+    // Like Obsidian, the configured folder exists once the path is handed out.
+    const parts = folder ? folder.split("/") : [];
+    for (let i = 1; i <= parts.length; i++) {
+      const path = parts.slice(0, i).join("/");
+      if (!this.vault.getAbstractFileByPath(path))
+        await this.vault.createFolder(path);
+    }
     const safe = filename.replace(/[\\/:]/g, "-");
-    const dot = safe.lastIndexOf(".");
-    const stem = dot > 0 ? safe.slice(0, dot) : safe;
-    const extension = dot > 0 ? safe.slice(dot) : "";
-    let candidate = `${folder === "/" ? "" : `${folder}/`}${safe}`;
-    let index = 1;
-    while (this.vault.getAbstractFileByPath(candidate))
-      candidate = `${folder === "/" ? "" : `${folder}/`}${stem} ${index++}${extension}`;
-    return candidate;
+    return availablePath(
+      folder,
+      safe,
+      (candidate) => !!this.vault.getAbstractFileByPath(candidate),
+    );
   }
 
   generateMarkdownLink(

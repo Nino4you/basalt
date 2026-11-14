@@ -20,6 +20,10 @@ will get a response once the report has been reviewed.
   did not write itself in this session, such as the version loaded from disk or an external
   change, is always backed up before it is replaced, and so is everything a restore or a link
   update replaces. Android (SAF) still backs up every save.
+- Backups are deleted permanently only by the retention setting (once a day, only when the user
+  sets a retention period; off by default) or by "Empty trash" after a confirmation. The `backup_remove`
+  command (`vault_core::remove_backup`) accepts backup locations only, refuses symlinked
+  folders below `.basalt` and never touches vault content.
 - On Linux, a save first writes a separate file and replaces the target by rename.
   Uncoordinated external writers can still write between the check and the rename: there is no
   compare-and-swap that is guaranteed across file systems.
@@ -56,6 +60,9 @@ will get a response once the report has been reviewed.
   allowed, request and response bodies are capped at 64 MiB, and TLS certificates are verified
   against the bundled webpki roots. Plugins already had network access; only the browser's
   cross-origin restriction goes away.
+- The update check is off by default. Turned on (or with "Check now" in Settings → General) it
+  makes one request to `api.github.com/repos/Nino4you/basalt/releases/latest`, at most once a
+  day, and only links to the release page on `github.com`; nothing is downloaded or installed.
 - The plugin catalog (Settings → Community plugins) downloads the community plugin list and
   download counts from `raw.githubusercontent.com/obsidianmd/obsidian-releases`, and plugin
   releases from `github.com/<owner>/<repo>/releases/latest/download/`, through the same
@@ -68,6 +75,11 @@ will get a response once the report has been reviewed.
   through the plugin config view, with the usual version checks and backups, and never enables
   the plugin. `basalt-source.json` there records the repository for update checks. Uninstalling
   deletes the plugin's files (backed up to `.basalt/trash/`); the empty folder stays.
+- Themes (`Basalt/Config/themes/<name>/theme.css`) and CSS snippets (`Basalt/Config/snippets/`)
+  load only when chosen in the settings (stored in `Basalt/Config/appearance.json`, like
+  Obsidian). They are plain `<style>` elements: CSS runs no code, and the CSP above still limits
+  what `url()` can load (no remote images or fonts). A theme can still make text unreadable;
+  choosing "Basalt (default)" removes it.
 - Plugin paths under `.obsidian/plugins/<id>` map to `Basalt/Plugins/<id>`. Like `.obsidian` in
   Obsidian, `Basalt/Plugins` is not vault content for plugins: it is missing from `getFiles()`
   and vault events and is reachable only through the adapter and the loader. This keeps sync

@@ -7,7 +7,29 @@ import {
   validateNotePath,
   type VaultInfo,
 } from "../backend";
-import { attachmentKind } from "../attachments";
+import { attachmentKind, attachmentLink } from "../attachments";
+import { importAttachments } from "./attachment-import";
+import { autoCleanBackups } from "./backup-cleanup";
+import {
+  readAppearance,
+  VaultStyles,
+  writeAppearance,
+  type Appearance,
+} from "./vault-styles";
+import { addProperty } from "../editor/properties";
+import { insertFootnote } from "../editor/footnotes";
+import { exportHtml, printNote } from "./print-export";
+import { checkForUpdate, updateCheckDue, type ReleaseInfo } from "./update-check";
+import { hostRequest } from "./plugin-install";
+import { APP_VERSION } from "../version";
+import {
+  ConflictWatcher,
+  conflictSummary,
+  findConflicts,
+  openSyncConflicts,
+  type Conflict,
+} from "./sync-conflicts";
+import { foldAll, toggleFold, unfoldAll } from "@codemirror/language";
 import { emptyCanvas } from "../canvas/model";
 import { CanvasView } from "../canvas/view";
 import { TFile, TFolder } from "../compat/files";
@@ -192,6 +214,11 @@ export class App {
   vault: VaultInfo | null = null;
   store: NoteStore | null = null;
   compatibility: CompatibilitySession | null = null;
+  /** Theme and CSS snippets of the open vault (native only). */
+  readonly vaultStyles = new VaultStyles();
+  appearance: Appearance = { cssTheme: "", enabledCssSnippets: [] };
+  /** A newer release found by the update check, if any. */
+  availableUpdate: ReleaseInfo | null = null;
   /** Editor groups; the focused one hosts the live editor and views. */
   groups: Group[] = [];
   group!: Group;
@@ -228,7 +255,11 @@ export class App {
   private mobilePanel: PanelId | null = null;
 
   private readonly saveWorkspace = debounce(() => this.writeWorkspace(), 250);
-  private readonly emitIndex = debounce(() => this.emit("index"), 120);
+  private readonly emitIndex = debounce(() => {
+    this.emit("index");
+    this.checkSyncConflicts();
+  }, 120);
+  private readonly conflictWatcher = new ConflictWatcher();
   private readonly docEdited = debounce(() => this.flushDoc(), 200);
   /** Notes saved since the plugin vault last looked at them. */
   private readonly savedPaths = new Set<string>();
@@ -297,6 +328,16 @@ export class App {
       pluginContext: () =>
         this.compatibility
           ? { sourcePath: this.activePath ?? "", app: this.compatibility }
+          : null,
+      attachFiles: (files, pasted) =>
+        importAttachments(this.compatibility?.vault ?? null, files, {
+          sourcePath: this.activePath ?? "",
+          folderSetting: this.settings.get("attachmentFolder"),
+          pasted,
+        }),
+      linkTo: (path) =>
+        this.vault?.files.includes(path)
+          ? attachmentLink(path, this.vault.files)
           : null,
     });
     this.applyEditorSettings();
@@ -433,6 +474,8 @@ export class App {
         requestAnimationFrame(() => root.classList.remove("is-starting")),
       );
     }
+    // Opt-in; a failed check (offline, rate limit) is not worth a notice.
+    void this.checkForUpdates().catch((error) => console.warn(error));
   }
 
   private async loadVault(next: VaultInfo): Promise<void> {
@@ -454,6 +497,9 @@ export class App {
     const previous = this.compatibility;
     this.editor.releasePluginBlocks();
     this.compatibility = null;
+    this.vaultStyles.clear();
+    this.appearance = { cssTheme: "", enabledCssSnippets: [] };
+    this.conflictWatcher.reset();
     // The old session must have released the shared editor before a new one binds it.
     if (previous) await previous.dispose().catch((error) => this.report(error));
     if (epoch !== this.epoch) return;
@@ -479,6 +525,11 @@ export class App {
       if (epoch !== this.epoch) return;
     }
     void this.indexFiles();
+    // Old backups go once a day; a failure only costs disk space.
+    void autoCleanBackups(backend, next.id, {
+      maxAgeDays: this.settings.get("backupMaxAgeDays"),
+      maxVersions: this.settings.get("backupMaxVersions"),
+    }).catch((error) => console.error(error));
   }
 
   /** Whether every saved tab is empty or a Markdown note or canvas that exists. */
@@ -577,6 +628,7 @@ export class App {
         statusBarEl: this.shell.pluginStatus,
         requestUrl: nativeRequestUrl(),
         updateLinks: () => this.settings.get("updateLinks"),
+        attachmentFolder: () => this.settings.get("attachmentFolder"),
       });
       if (this.vault !== next) {
         await session.dispose().catch((error) => this.report(error));
@@ -594,6 +646,7 @@ export class App {
         );
       }
       this.bindPluginWorkspace(session);
+      void this.applyVaultStyles().catch((error) => this.report(error));
       this.syncVisibleFiles();
       this.editor.refreshPluginBlocks();
       // The note was rendered before the plugins existed; refresh that view
@@ -617,6 +670,108 @@ export class App {
     } catch (error) {
       this.report(error);
     }
+  }
+
+  /**
+   * Asks GitHub for a newer release. `manual` checks right away and reports
+   * the result; otherwise only when enabled and due, quietly unless found.
+   */
+  async checkForUpdates(manual = false): Promise<ReleaseInfo | null> {
+    if (!manual && (!this.settings.get("updateCheck") || !updateCheckDue()))
+      return null;
+    const update = await checkForUpdate(hostRequest, APP_VERSION);
+    this.availableUpdate = update;
+    if (update)
+      notify(
+        t("Basalt {version} ist verfügbar. Einstellungen → Allgemein führt zum Download.", {
+          version: update.version,
+        }),
+      );
+    else if (manual)
+      notify(t("Basalt ist aktuell ({version}).", { version: APP_VERSION }));
+    return update;
+  }
+
+  /** Sync conflict copies and notes with merge markers in this vault. */
+  syncConflicts(): Conflict[] {
+    this.checkSyncConflicts();
+    return this.conflictWatcher.conflicts;
+  }
+
+  private checkSyncConflicts(): void {
+    const conflicts = findConflicts(
+      this.index.files,
+      (path) => this.index.content(path),
+      this.conflictWatcher.markers,
+    );
+    const fresh = this.conflictWatcher.update(conflicts);
+    const button = document.getElementById("sync-conflicts");
+    if (button) {
+      button.textContent = conflictSummary(conflicts);
+      button.hidden = !conflicts.length;
+    }
+    if (fresh.length)
+      notify(
+        t("Sync-Konflikt gefunden: {files}. Befehl „Sync-Konflikte anzeigen“ hilft beim Lösen.", {
+          files: fresh.map((conflict) => `„${basename(conflict.path)}“`).join(", "),
+        }),
+        true,
+      );
+  }
+
+  /** The current text of a note or canvas, unsaved edits included. */
+  async readNote(path: string): Promise<string> {
+    const store = this.store;
+    if (!store) throw new Error(t("Kein Vault geöffnet."));
+    return (await store.load(path)).text;
+  }
+
+  /**
+   * Replaces `original` with the text of its conflict copy (backed up and
+   * version-checked like any restore), then moves the copy to the trash.
+   */
+  async adoptConflictCopy(copy: string, original: string): Promise<void> {
+    const text = await this.readNote(copy);
+    const { failed } = await this.rewriteNotes([original], () => text);
+    if (failed.length)
+      throw new Error(
+        t("„{name}“ konnte nicht geändert werden und ist unverändert.", {
+          name: basename(original),
+        }),
+      );
+    await this.trashFile(copy);
+  }
+
+  /** Moves a note or canvas to the vault trash without asking. */
+  async trashFile(path: string): Promise<void> {
+    const store = this.store;
+    if (!store) throw new Error(t("Kein Vault geöffnet."));
+    await this.deleteFile(path, store);
+  }
+
+  /** Reads appearance.json and applies the vault's theme and snippets. */
+  async applyVaultStyles(): Promise<void> {
+    const session = this.compatibility;
+    if (!session) return;
+    const appearance = await readAppearance(session.configVault);
+    if (session !== this.compatibility) return;
+    this.appearance = appearance;
+    const failed = await this.vaultStyles.apply(session.configVault, appearance);
+    if (failed.length)
+      notify(
+        t("CSS konnte nicht geladen werden: {names}", { names: failed.join(", ") }),
+        true,
+      );
+  }
+
+  /** Saves a new theme/snippet choice to appearance.json and applies it. */
+  async setAppearance(next: Appearance): Promise<void> {
+    const session = this.compatibility;
+    if (!session) return;
+    await writeAppearance(session.configVault, next);
+    if (session !== this.compatibility) return;
+    this.appearance = next;
+    await this.vaultStyles.apply(session.configVault, next);
   }
 
   /** Plugin navigation and explorer navigation share the same real views/leaves. */
@@ -1921,6 +2076,36 @@ export class App {
   }
 
   /**
+   * Rewrites notes one by one through the store, like a link update: each
+   * replaced text is backed up and saved version-checked, and a failed note
+   * stays unchanged. `rewrite` returns null to leave a note alone.
+   */
+  async rewriteNotes(
+    paths: string[],
+    rewrite: (text: string, path: string) => string | null,
+  ): Promise<{ updated: string[]; failed: string[] }> {
+    const store = this.store;
+    const updated: string[] = [];
+    const failed: string[] = [];
+    if (!store) return { updated, failed };
+    for (const path of paths) {
+      try {
+        const note = await store.load(path);
+        if (store !== this.store) break;
+        const next = rewrite(note.text, path);
+        if (next === null || next === note.text) continue;
+        await this.replaceText(note, next);
+        this.index.setContent(path, next);
+        updated.push(path);
+      } catch (error) {
+        failed.push(path);
+        console.warn(error);
+      }
+    }
+    return { updated, failed };
+  }
+
+  /**
    * Creates a deleted document again. It is never written over an existing
    * file: a taken name gets a "(restored)" copy instead. Returns the path.
    */
@@ -2700,6 +2885,9 @@ export class App {
       lineNumbers: this.settings.get("lineNumbers"),
       spellcheck: this.settings.get("spellcheck"),
       autoPair: this.settings.get("autoPair"),
+      properties: this.settings.get("propertiesInDocument"),
+      folding: this.settings.get("folding"),
+      vim: this.settings.get("vimMode"),
     };
   }
 
@@ -3731,6 +3919,23 @@ export class App {
                 onClick: () => this.commands.run("save"),
               }
             : null,
+          note && this.vault?.platform !== "android"
+            ? {
+                title: t("Drucken oder als PDF speichern"),
+                icon: "printer",
+                hotkey: this.commands.hotkeyOf("print-note")
+                  ? formatHotkey(this.commands.hotkeyOf("print-note")!)
+                  : undefined,
+                onClick: () => this.commands.run("print-note"),
+              }
+            : null,
+          note
+            ? {
+                title: t("Als HTML exportieren"),
+                icon: "file-code",
+                onClick: () => this.commands.run("export-html"),
+              }
+            : null,
           "separator",
           {
             title: t("Rückverweise anzeigen"),
@@ -3754,6 +3959,9 @@ export class App {
     shell.backlinkCount.addEventListener("click", () =>
       this.showPanel("backlinks"),
     );
+    document
+      .getElementById("sync-conflicts")!
+      .addEventListener("click", () => openSyncConflicts(this));
     document
       .getElementById("export-draft")!
       .addEventListener("click", () => this.exportNote());
@@ -3786,6 +3994,15 @@ export class App {
         [...this.store.notes.values()].some((note) => note.text !== note.saved)
       )
         event.preventDefault();
+    });
+    // Switching back to the window does not change visibility on desktops.
+    window.addEventListener("focus", () => {
+      if (
+        this.compatibility &&
+        this.vault?.platform !== "android" &&
+        Date.now() - this.lastFullRefresh > 5000
+      )
+        void this.refreshCompatibility().catch((error) => this.report(error));
     });
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) {
@@ -4144,11 +4361,91 @@ export class App {
       run: () => void this.adjacentDailyNote(1),
     });
     add({
+      id: "add-property",
+      name: t("Eigenschaft hinzufügen"),
+      hotkey: "Mod+;",
+      icon: "list-plus",
+      when: () => hasNote() && !this.active.reading,
+      run: () => {
+        this.editor.focus();
+        addProperty(this.editor.view);
+      },
+    });
+    const fold = (command: (view: EditorView) => boolean) => () => {
+      this.editor.focus();
+      command(this.editor.view);
+    };
+    add({
+      id: "toggle-fold",
+      name: t("Einklappen umschalten"),
+      icon: "chevrons-down-up",
+      when: () => hasNote() && !this.active.reading,
+      run: fold(toggleFold),
+    });
+    add({
+      id: "fold-all",
+      name: t("Alle Überschriften und Listen einklappen"),
+      icon: "chevrons-down-up",
+      when: () => hasNote() && !this.active.reading,
+      run: fold(foldAll),
+    });
+    add({
+      id: "unfold-all",
+      name: t("Alle Überschriften und Listen ausklappen"),
+      icon: "chevrons-up-down",
+      when: () => hasNote() && !this.active.reading,
+      run: fold(unfoldAll),
+    });
+    add({
+      id: "insert-footnote",
+      name: t("Fußnote einfügen"),
+      icon: "footprints",
+      when: () => hasNote() && !this.active.reading,
+      run: () => {
+        this.editor.focus();
+        insertFootnote(this.editor.view);
+      },
+    });
+    add({
       id: "insert-template",
       name: t("Vorlage einfügen"),
       icon: "file-plus",
       when: hasNote,
       run: () => this.insertTemplate(),
+    });
+    add({
+      id: "sync-conflicts",
+      name: t("Sync-Konflikte anzeigen"),
+      icon: "triangle-alert",
+      run: () => openSyncConflicts(this),
+    });
+    add({
+      id: "print-note",
+      name: t("Drucken oder als PDF speichern"),
+      hotkey: "Mod+Shift+P",
+      icon: "printer",
+      // Android's WebView has no print dialog; HTML export works there.
+      when: () => hasNote() && this.vault?.platform !== "android",
+      run: () => {
+        const note = this.activeNote;
+        if (note)
+          void printNote(this, note.path, note.text).catch((error) =>
+            this.report(error),
+          );
+      },
+    });
+    add({
+      id: "export-html",
+      name: t("Aktuelle Notiz als HTML exportieren"),
+      icon: "file-code",
+      when: hasNote,
+      run: () => {
+        const note = this.activeNote;
+        if (note)
+          void exportHtml(this, note.path, note.text).catch((error) =>
+            this.report(error),
+          );
+      },
     });
     add({
       id: "export-note",

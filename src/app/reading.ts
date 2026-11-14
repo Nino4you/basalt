@@ -412,6 +412,20 @@ export class ReadingView {
     const link = target.closest<HTMLAnchorElement>("a");
     if (!link) return;
     event.preventDefault();
+    const footnote = link.dataset.footnoteRef ?? link.dataset.footnoteBack;
+    if (footnote) {
+      // Footnotes of an embedded note stay within that embed.
+      const scope = link.closest(".markdown-embed") ?? this.el;
+      const goal = scope.querySelector<HTMLElement>(
+        link.dataset.footnoteRef
+          ? `li[data-footnote="${footnote}"]`
+          : `a[data-footnote-ref="${footnote}"]`,
+      );
+      goal?.scrollIntoView({ block: "center", behavior: "smooth" });
+      goal?.classList.add("is-flashing");
+      setTimeout(() => goal?.classList.remove("is-flashing"), 1200);
+      return;
+    }
     const newTab = event.ctrlKey || event.metaKey || event.button === 1;
     if (link.dataset.tag) this.app.searchFor(`tag:#${link.dataset.tag}`);
     else if (link.dataset.note !== undefined) {
