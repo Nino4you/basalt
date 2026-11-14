@@ -162,7 +162,9 @@ Settings → Community plugins can browse the Obsidian community catalog, instal
 GitHub release of a catalog plugin or any repository, install from local files, check for updates
 and uninstall (`src/compat/plugin-catalog.ts`, `src/app/plugin-install.ts`). Only the plugins
 listed in `VERIFIED_PLUGINS` there are marked as checked, with the version above; keep that list
-in sync with this document. Being installable says nothing about compatibility.
+in sync with this document. The mark needs the catalog's own repository: a fork or another
+repository with the same plugin id is untested, and the install dialog marks only the checked
+version itself. Being installable says nothing about compatibility.
 
 `FileManager.renameFile` moves the file and, when "Automatically update internal links" is on,
 rewrites links to it in notes and canvases exactly like a rename in the app: only links whose

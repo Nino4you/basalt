@@ -609,6 +609,7 @@ export const en = {
   "Installiert: {version}": "Installed: {version}",
   "Katalog wird geladen …": "Loading the catalog …",
   "Mit Basalt geprüft (Version {version})": "Checked with Basalt (version {version})",
+  "Mit Basalt geprüft wurde nur Version {version}, nicht diese.": "Only version {version} was checked with Basalt, not this one.",
   "Nach Updates suchen": "Check for updates",
   "Nicht mit Basalt geprüft: kann funktionieren, teilweise funktionieren oder sichtbar scheitern.": "Not checked with Basalt: it may work, partly work or fail visibly.",
   "Plugin aktualisieren": "Update plugin",

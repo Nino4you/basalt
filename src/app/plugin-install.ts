@@ -11,6 +11,7 @@ import {
   searchCatalog,
   uninstallPlugin,
   validatePluginFiles,
+  verifiedVersion,
   type CatalogEntry,
   type PluginFiles,
 } from "../compat/plugin-catalog";
@@ -48,7 +49,22 @@ export function pluginCatalog(): Promise<CatalogEntry[]> {
 const formatCount = (value: number) =>
   new Intl.NumberFormat(getLocale(), { notation: "compact" }).format(value);
 
-function trustBadge(entry: { verified: string | null }): HTMLElement {
+/**
+ * "Checked" for a catalog entry, or, with `version`, only when exactly that
+ * version was checked: another release of a checked plugin is untested.
+ */
+function trustBadge(
+  entry: { verified: string | null },
+  version?: string,
+): HTMLElement {
+  if (entry.verified && version !== undefined && version !== entry.verified)
+    return h("span", {
+      class: "plugin-badge",
+      text: t("Ungeprüft"),
+      title: t("Mit Basalt geprüft wurde nur Version {version}, nicht diese.", {
+        version: entry.verified,
+      }),
+    });
   return entry.verified
     ? h(
         "span",
@@ -112,7 +128,7 @@ function confirmInstall(
         "div",
         "plugin-confirm-head",
         h("strong", { text: manifest.name }),
-        trustBadge({ verified }),
+        trustBadge({ verified }, manifest.version),
       ),
       h("p", {
         class: "modal-description",
@@ -555,7 +571,7 @@ export function promptGithubInstall(app: App, changed: () => void): void {
           (item) => item.id === files.manifest.id,
         );
         modal.close();
-        if (await install(app, files, { repo }, entry?.verified ?? null))
+        if (await install(app, files, { repo }, verifiedVersion(entry, repo)))
           changed();
       } catch (reason) {
         error.textContent = errorMessage(reason);
@@ -646,7 +662,8 @@ export async function updatePlugin(
   const entry = (await pluginCatalog().catch(() => [])).find(
     (item) => item.id === id,
   );
-  if (await install(app, files, { repo }, entry?.verified ?? null)) changed();
+  if (await install(app, files, { repo }, verifiedVersion(entry, repo)))
+    changed();
 }
 
 /** Asks, stops the plugin and removes its files (they go to the vault trash). */

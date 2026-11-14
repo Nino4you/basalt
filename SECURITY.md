@@ -74,8 +74,11 @@ will get a response once the report has been reviewed.
   `requestUrl` path (Rust in the app, `fetch` in the browser demo). Nothing is downloaded until
   the settings page is used, and nothing updates automatically. Basalt does not verify release
   signatures or review plugin code: the catalog marks the few plugins checked with Basalt and
-  calls the rest untested. Before writing anything, the app validates the manifest (and its id
-  against the catalog entry) and the loader's size limits, and asks for confirmation with a
+  calls the rest untested. The "Checked" mark applies only to the catalog's own repository and to
+  the exact version that was checked: a fork or any other repository whose manifest reuses a
+  checked plugin's id, and every other release, count as untested. Before writing anything, the
+  app validates the manifest (for catalog installs and updates, also that its id matches the
+  expected one) and the loader's size limits, and asks for confirmation with a
   warning that plugins are not sandboxed. Installing writes only into `Basalt/Plugins/<id>/`
   through the plugin config view, with the usual version checks and backups, and never enables
   the plugin. `basalt-source.json` there records the repository for update checks. Uninstalling
