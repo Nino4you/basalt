@@ -46,6 +46,21 @@ The script never overwrites existing keys and refuses a target folder inside the
 Afterwards, back up the printed folder (it contains the keystore, the OpenPGP keyring with its
 revocation certificate and `FINGERPRINTS.txt`) and continue with step 4.
 
+### Existing keys for a new repository
+
+When the repository moves or the secrets are lost, store the **existing** keys again instead of
+creating new ones: a new Android key means installed apps can no longer update, and a new OpenPGP
+key no longer matches the fingerprints in the README. From a checkout of the repository:
+
+```sh
+tools/setup_release_signing.sh --reuse         # reads ~/basalt-release-keys
+BASALT_REPO=owner/name tools/setup_release_signing.sh --reuse /path/to/keys   # other repository or folder
+```
+
+It asks for the keystore password and the GPG passphrase once, checks both against the keys,
+compares both fingerprints with the README and stops before storing anything if one of them
+differs. Then it creates the environment `release` and sets the six secrets as above.
+
 ### Manually
 
 Run all commands locally on a trusted machine, **not** inside the repository folder (`*.jks` is
