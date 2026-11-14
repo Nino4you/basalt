@@ -27,12 +27,7 @@ import {
   stringifyYaml,
 } from "./frontmatter";
 import { Plugin } from "./plugin";
-import {
-  MarkdownView,
-  Workspace,
-  WorkspaceLeaf,
-  WorkspaceSplit,
-} from "./workspace";
+import { MarkdownView, Workspace, WorkspaceLeaf, WorkspaceSplit } from "./workspace";
 
 export interface DomElementInfo {
   cls?: string | string[];
@@ -98,11 +93,7 @@ declare global {
     on(
       name: string,
       selector: string,
-      callback: (
-        this: HTMLElement,
-        event: Event,
-        delegateTarget: HTMLElement,
-      ) => unknown,
+      callback: (this: HTMLElement, event: Event, delegateTarget: HTMLElement) => unknown,
       options?: boolean | AddEventListenerOptions,
     ): void;
     on(
@@ -113,11 +104,7 @@ declare global {
     off(
       name: string,
       selector: string,
-      callback: (
-        this: HTMLElement,
-        event: Event,
-        delegateTarget: HTMLElement,
-      ) => unknown,
+      callback: (this: HTMLElement, event: Event, delegateTarget: HTMLElement) => unknown,
       options?: boolean | AddEventListenerOptions,
     ): void;
     off(
@@ -127,26 +114,8 @@ declare global {
     ): void;
   }
   interface Document {
-    on(
-      name: string,
-      selector: string,
-      callback: (
-        this: Document,
-        event: Event,
-        delegateTarget: HTMLElement,
-      ) => unknown,
-      options?: boolean | AddEventListenerOptions,
-    ): void;
-    off(
-      name: string,
-      selector: string,
-      callback: (
-        this: Document,
-        event: Event,
-        delegateTarget: HTMLElement,
-      ) => unknown,
-      options?: boolean | AddEventListenerOptions,
-    ): void;
+    on(name: string, selector: string, callback: (this: Document, event: Event, delegateTarget: HTMLElement) => unknown, options?: boolean | AddEventListenerOptions): void;
+    off(name: string, selector: string, callback: (this: Document, event: Event, delegateTarget: HTMLElement) => unknown, options?: boolean | AddEventListenerOptions): void;
   }
   interface DocumentFragment {
     createEl<K extends keyof HTMLElementTagNameMap>(
@@ -390,9 +359,7 @@ export function installDomCompat(): void {
     }
     if (options.cls) {
       const classes = Array.isArray(options.cls) ? options.cls : [options.cls];
-      element.classList.add(
-        ...classes.flatMap((value) => value.split(/\s+/)).filter(Boolean),
-      );
+      element.classList.add(...classes.flatMap((value) => value.split(/\s+/)).filter(Boolean));
     }
     if (options.text !== undefined) element.textContent = options.text;
     if (options.title !== undefined) element.title = options.title;
@@ -446,13 +413,10 @@ export function installDomCompat(): void {
     this.textContent = text;
   };
   prototype.addClass = function (this: HTMLElement, ...classes: string[]) {
-    this.classList.add(
-      ...classes.flatMap((value) => value.split(/\s+/)).filter(Boolean),
-    );
+    this.classList.add(...classes.flatMap((value) => value.split(/\s+/)).filter(Boolean));
   };
   prototype.removeClass = function (this: HTMLElement, ...classes: string[]) {
-    for (const value of classes)
-      this.classList.remove(...value.split(/\s+/).filter(Boolean));
+    for (const value of classes) this.classList.remove(...value.split(/\s+/).filter(Boolean));
   };
   prototype.toggleClass = function (
     this: HTMLElement,
@@ -594,24 +558,15 @@ function installDomHelpers(): void {
   const node = Node.prototype as unknown as Record<string, unknown>;
   const element = Element.prototype as unknown as Record<string, unknown>;
   const html = HTMLElement.prototype as unknown as Record<string, unknown>;
-  const method = (
-    target: Record<string, unknown>,
-    name: string,
-    value: unknown,
-  ) => {
+  const method = (target: Record<string, unknown>, name: string, value: unknown) => {
     if (!(name in target)) target[name] = value;
   };
-  method(node, "detach", function (this: Node) {
-    this.parentNode?.removeChild(this);
-  });
+  method(node, "detach", function (this: Node) { this.parentNode?.removeChild(this); });
   method(node, "empty", function (this: Node) {
     while (this.firstChild) this.removeChild(this.firstChild);
   });
-  method(node, "insertAfter", function <
-    T extends Node,
-  >(this: Node, child: T, after: Node | null): T {
-    if (after) (after as ChildNode).after(child);
-    else (this as ParentNode).prepend(child);
+  method(node, "insertAfter", function <T extends Node>(this: Node, child: T, after: Node | null): T {
+    if (after) (after as ChildNode).after(child); else (this as ParentNode).prepend(child);
     return child;
   });
   method(node, "indexOf", function (this: Node, other: Node): number {
@@ -621,133 +576,54 @@ function installDomHelpers(): void {
     (this as ParentNode).replaceChildren(...children);
   });
   method(node, "appendText", function (this: Node, text: string) {
-    this.appendChild(
-      this.ownerDocument?.createTextNode(text) ?? document.createTextNode(text),
-    );
+    this.appendChild(this.ownerDocument?.createTextNode(text) ?? document.createTextNode(text));
   });
-  method(
-    node,
-    "instanceOf",
-    function (this: Node, type: new (...args: never[]) => unknown) {
-      return this instanceof type;
-    },
-  );
+  method(node, "instanceOf", function (this: Node, type: new (...args: never[]) => unknown) {
+    return this instanceof type;
+  });
   for (const [name, read] of [
-    [
-      "doc",
-      function (this: Node) {
-        return this.ownerDocument ?? document;
-      },
-    ],
-    [
-      "win",
-      function (this: Node) {
-        return this.ownerDocument?.defaultView ?? window;
-      },
-    ],
-    [
-      "constructorWin",
-      function (this: Node) {
-        return this.ownerDocument?.defaultView ?? window;
-      },
-    ],
+    ["doc", function (this: Node) { return this.ownerDocument ?? document; }],
+    ["win", function (this: Node) { return this.ownerDocument?.defaultView ?? window; }],
+    ["constructorWin", function (this: Node) { return this.ownerDocument?.defaultView ?? window; }],
   ] as const) {
     if (!(name in node))
       Object.defineProperty(node, name, { configurable: true, get: read });
   }
-  method(element, "getText", function (this: Element) {
-    return this.textContent ?? "";
+  method(element, "getText", function (this: Element) { return this.textContent ?? ""; });
+  method(element, "setText", function (this: Element, value: string | DocumentFragment) {
+    if (typeof value === "string") this.textContent = value;
+    else this.replaceChildren(value);
   });
-  method(
-    element,
-    "setText",
-    function (this: Element, value: string | DocumentFragment) {
-      if (typeof value === "string") this.textContent = value;
-      else this.replaceChildren(value);
-    },
-  );
-  method(element, "addClass", function (this: Element, ...classes: string[]) {
-    this.classList.add(...classes);
+  method(element, "addClass", function (this: Element, ...classes: string[]) { this.classList.add(...classes); });
+  method(element, "addClasses", function (this: Element, classes: string[]) { this.classList.add(...classes); });
+  method(element, "removeClass", function (this: Element, ...classes: string[]) { this.classList.remove(...classes); });
+  method(element, "removeClasses", function (this: Element, classes: string[]) { this.classList.remove(...classes); });
+  method(element, "toggleClass", function (this: Element, classes: string | string[], value?: boolean) {
+    for (const cls of Array.isArray(classes) ? classes : [classes]) this.classList.toggle(cls, value);
   });
-  method(element, "addClasses", function (this: Element, classes: string[]) {
-    this.classList.add(...classes);
+  method(element, "hasClass", function (this: Element, cls: string) { return this.classList.contains(cls); });
+  method(element, "setAttr", function (this: Element, name: string, value: string | number | boolean | null) {
+    if (value === null) this.removeAttribute(name); else this.setAttribute(name, String(value));
   });
-  method(
-    element,
-    "removeClass",
-    function (this: Element, ...classes: string[]) {
-      this.classList.remove(...classes);
-    },
-  );
-  method(element, "removeClasses", function (this: Element, classes: string[]) {
-    this.classList.remove(...classes);
+  method(element, "setAttrs", function (this: Element, attrs: Record<string, string | number | boolean | null>) {
+    for (const [name, value] of Object.entries(attrs)) {
+      if (value === null) this.removeAttribute(name); else this.setAttribute(name, String(value));
+    }
   });
-  method(
-    element,
-    "toggleClass",
-    function (this: Element, classes: string | string[], value?: boolean) {
-      for (const cls of Array.isArray(classes) ? classes : [classes])
-        this.classList.toggle(cls, value);
-    },
-  );
-  method(element, "hasClass", function (this: Element, cls: string) {
-    return this.classList.contains(cls);
+  method(element, "getAttr", function (this: Element, name: string) { return this.getAttribute(name); });
+  method(element, "matchParent", function (this: Element, selector: string, lastParent?: Element): Element | null {
+    let current: Element | null = this;
+    while (current) {
+      if (current.matches(selector)) return current;
+      if (current === lastParent) return null;
+      current = current.parentElement;
+    }
+    return null;
   });
-  method(
-    element,
-    "setAttr",
-    function (
-      this: Element,
-      name: string,
-      value: string | number | boolean | null,
-    ) {
-      if (value === null) this.removeAttribute(name);
-      else this.setAttribute(name, String(value));
-    },
-  );
-  method(
-    element,
-    "setAttrs",
-    function (
-      this: Element,
-      attrs: Record<string, string | number | boolean | null>,
-    ) {
-      for (const [name, value] of Object.entries(attrs)) {
-        if (value === null) this.removeAttribute(name);
-        else this.setAttribute(name, String(value));
-      }
-    },
-  );
-  method(element, "getAttr", function (this: Element, name: string) {
-    return this.getAttribute(name);
+  method(element, "getCssPropertyValue", function (this: Element, property: string, pseudo?: string) {
+    return getComputedStyle(this, pseudo).getPropertyValue(property);
   });
-  method(
-    element,
-    "matchParent",
-    function (
-      this: Element,
-      selector: string,
-      lastParent?: Element,
-    ): Element | null {
-      let current: Element | null = this;
-      while (current) {
-        if (current.matches(selector)) return current;
-        if (current === lastParent) return null;
-        current = current.parentElement;
-      }
-      return null;
-    },
-  );
-  method(
-    element,
-    "getCssPropertyValue",
-    function (this: Element, property: string, pseudo?: string) {
-      return getComputedStyle(this, pseudo).getPropertyValue(property);
-    },
-  );
-  method(element, "isActiveElement", function (this: Element) {
-    return this.ownerDocument.activeElement === this;
-  });
+  method(element, "isActiveElement", function (this: Element) { return this.ownerDocument.activeElement === this; });
   method(html, "hide", function (this: HTMLElement) {
     if (this.style.display !== "none") {
       this.dataset.basaltDisplay = this.style.display;
@@ -758,55 +634,24 @@ function installDomHelpers(): void {
     this.style.display = this.dataset.basaltDisplay ?? "";
     delete this.dataset.basaltDisplay;
   });
-  method(html, "toggle", function (this: HTMLElement, show: boolean) {
-    show ? this.show() : this.hide();
-  });
-  method(
-    html,
-    "toggleVisibility",
-    function (this: HTMLElement, visible: boolean) {
-      this.style.visibility = visible ? "" : "hidden";
-    },
-  );
+  method(html, "toggle", function (this: HTMLElement, show: boolean) { show ? this.show() : this.hide(); });
+  method(html, "toggleVisibility", function (this: HTMLElement, visible: boolean) { this.style.visibility = visible ? "" : "hidden"; });
   method(html, "isShown", function (this: HTMLElement) {
-    return (
-      this.isConnected &&
-      !!(this.offsetWidth || this.offsetHeight || this.getClientRects().length)
-    );
+    return this.isConnected && !!(this.offsetWidth || this.offsetHeight || this.getClientRects().length);
   });
-  method(
-    html,
-    "setCssStyles",
-    function (this: HTMLElement, styles: Partial<CSSStyleDeclaration>) {
-      Object.assign(this.style, styles);
-    },
-  );
-  method(
-    html,
-    "setCssProps",
-    function (this: HTMLElement, props: Record<string, string>) {
-      for (const [name, value] of Object.entries(props))
-        this.style.setProperty(name, value);
-    },
-  );
-  for (const [name, size] of [
-    ["innerWidth", "Width"],
-    ["innerHeight", "Height"],
-  ] as const) {
+  method(html, "setCssStyles", function (this: HTMLElement, styles: Partial<CSSStyleDeclaration>) { Object.assign(this.style, styles); });
+  method(html, "setCssProps", function (this: HTMLElement, props: Record<string, string>) {
+    for (const [name, value] of Object.entries(props)) this.style.setProperty(name, value);
+  });
+  for (const [name, size] of [["innerWidth", "Width"], ["innerHeight", "Height"]] as const) {
     if (!(name in html))
       Object.defineProperty(html, name, {
         configurable: true,
         get(this: HTMLElement) {
           const style = getComputedStyle(this);
-          return (
-            (this as unknown as Record<string, number>)[`client${size}`] -
-            parseFloat(
-              style[`padding${size === "Width" ? "Left" : "Top"}`] || "0",
-            ) -
-            parseFloat(
-              style[`padding${size === "Width" ? "Right" : "Bottom"}`] || "0",
-            )
-          );
+          return (this as unknown as Record<string, number>)[`client${size}`] -
+            parseFloat(style[`padding${size === "Width" ? "Left" : "Top"}`] || "0") -
+            parseFloat(style[`padding${size === "Width" ? "Right" : "Bottom"}`] || "0");
         },
       });
   }
@@ -976,21 +821,12 @@ export class Scope {
 
   handle(event: KeyboardEvent): boolean {
     for (const binding of this.keys) {
-      if (binding.key !== null && event.key.toLowerCase() !== binding.key)
-        continue;
+      if (binding.key !== null && event.key.toLowerCase() !== binding.key) continue;
       if (binding.modifiers !== null) {
         const modifiers = new Set(binding.modifiers);
-        if (modifiers.delete("Mod"))
-          modifiers.add(
-            /Mac|iPhone|iPad/.test(navigator.platform) ? "Meta" : "Ctrl",
-          );
-        if (
-          event.ctrlKey !== modifiers.has("Ctrl") ||
-          event.metaKey !== modifiers.has("Meta") ||
-          event.shiftKey !== modifiers.has("Shift") ||
-          event.altKey !== modifiers.has("Alt")
-        )
-          continue;
+        if (modifiers.delete("Mod")) modifiers.add(/Mac|iPhone|iPad/.test(navigator.platform) ? "Meta" : "Ctrl");
+        if (event.ctrlKey !== modifiers.has("Ctrl") || event.metaKey !== modifiers.has("Meta") ||
+          event.shiftKey !== modifiers.has("Shift") || event.altKey !== modifiers.has("Alt")) continue;
       }
       return binding.func(event) !== true;
     }
@@ -998,10 +834,7 @@ export class Scope {
   }
 
   unregister(handler?: KeymapHandler): void {
-    if (handler) {
-      this.keys = this.keys.filter((value) => value !== handler);
-      return;
-    }
+    if (handler) { this.keys = this.keys.filter(value => value !== handler); return; }
     while (this.cleanups.length) this.cleanups.pop()!();
     this.keys = [];
   }
@@ -1099,10 +932,7 @@ export class BaseComponent {
 export abstract class ValueComponent<T> extends BaseComponent {
   abstract getValue(): T;
   abstract setValue(value: T): this;
-  registerOptionListener(
-    listeners: Record<string, (value?: T) => T>,
-    key: string,
-  ): this {
+  registerOptionListener(listeners: Record<string, (value?: T) => T>, key: string): this {
     listeners[key] = (value) => {
       if (value !== undefined) this.setValue(value);
       return this.getValue();
@@ -1406,26 +1236,16 @@ export class Setting {
 
 export abstract class PopoverSuggest<T> {
   readonly scope: Scope;
-  protected readonly suggestEl = element(
-    "div",
-    "suggestion-container basalt-input-suggest",
-  );
-  constructor(
-    readonly app: object,
-    scope?: Scope,
-  ) {
+  protected readonly suggestEl = element("div", "suggestion-container basalt-input-suggest");
+  constructor(readonly app: object, scope?: Scope) {
     this.scope = scope ?? new Scope();
     this.suggestEl.setAttribute("role", "listbox");
   }
   open(): void {
     if (!this.suggestEl.isConnected) document.body.append(this.suggestEl);
   }
-  close(): void {
-    this.suggestEl.remove();
-  }
-  onHistoryBack(): void {
-    this.close();
-  }
+  close(): void { this.suggestEl.remove(); }
+  onHistoryBack(): void { this.close(); }
   abstract renderSuggestion(value: T, el: HTMLElement): void;
   abstract selectSuggestion(value: T, event: MouseEvent | KeyboardEvent): void;
 }
@@ -1450,9 +1270,7 @@ export abstract class EditorSuggest<T> extends PopoverSuggest<T> {
     // Obsidian's editor-suggest scope exposes an Escape handler plugins may replace.
     this.scope.register([], "Escape", () => false);
   }
-  setInstructions(
-    instructions: Array<{ command: string; purpose: string }>,
-  ): void {
+  setInstructions(instructions: Array<{ command: string; purpose: string }>): void {
     this.suggestEl.querySelector(".suggestion-instructions")?.remove();
     const footer = element("div", "suggestion-instructions");
     for (const item of instructions) {
@@ -1462,15 +1280,8 @@ export abstract class EditorSuggest<T> extends PopoverSuggest<T> {
     }
     this.suggestEl.append(footer);
   }
-  override close(): void {
-    this.context = null;
-    super.close();
-  }
-  abstract onTrigger(
-    cursor: EditorPosition,
-    editor: Editor,
-    file: TFile | null,
-  ): EditorSuggestTriggerInfo | null;
+  override close(): void { this.context = null; super.close(); }
+  abstract onTrigger(cursor: EditorPosition, editor: Editor, file: TFile | null): EditorSuggestTriggerInfo | null;
   abstract getSuggestions(context: EditorSuggestContext): T[] | Promise<T[]>;
 }
 
@@ -1481,10 +1292,7 @@ export abstract class AbstractInputSuggest<T> extends PopoverSuggest<T> {
   private selected = 0;
   private select?: (value: T, event: MouseEvent | KeyboardEvent) => unknown;
 
-  constructor(
-    app: object,
-    private readonly textInputEl: HTMLInputElement | HTMLDivElement,
-  ) {
+  constructor(app: object, private readonly textInputEl: HTMLInputElement | HTMLDivElement) {
     super(app);
     textInputEl.addEventListener("input", () => void this.refresh());
     textInputEl.addEventListener("focus", () => void this.refresh());
@@ -1492,21 +1300,11 @@ export abstract class AbstractInputSuggest<T> extends PopoverSuggest<T> {
     textInputEl.addEventListener("keydown", (event) => {
       if (!(event instanceof KeyboardEvent)) return;
       if (!this.suggestEl.isConnected) return;
-      if (this.scope.handle(event)) {
+      if (this.scope.handle(event)) { event.preventDefault(); return; }
+      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); this.close(); }
+      else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
-        return;
-      }
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        this.close();
-      } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-        event.preventDefault();
-        this.selected =
-          (this.selected +
-            (event.key === "ArrowDown" ? 1 : -1) +
-            this.suggestions.length) %
-          this.suggestions.length;
+        this.selected = (this.selected + (event.key === "ArrowDown" ? 1 : -1) + this.suggestions.length) % this.suggestions.length;
         this.markSelected();
       } else if (event.key === "Enter" && this.suggestions.length) {
         event.preventDefault();
@@ -1515,19 +1313,14 @@ export abstract class AbstractInputSuggest<T> extends PopoverSuggest<T> {
     });
   }
   setValue(value: string): void {
-    if (this.textInputEl instanceof HTMLInputElement)
-      this.textInputEl.value = value;
+    if (this.textInputEl instanceof HTMLInputElement) this.textInputEl.value = value;
     else this.textInputEl.textContent = value;
   }
   getValue(): string {
-    return this.textInputEl instanceof HTMLInputElement
-      ? this.textInputEl.value
-      : (this.textInputEl.textContent ?? "");
+    return this.textInputEl instanceof HTMLInputElement ? this.textInputEl.value : this.textInputEl.textContent ?? "";
   }
   protected abstract getSuggestions(query: string): T[] | Promise<T[]>;
-  onSelect(
-    callback: (value: T, event: MouseEvent | KeyboardEvent) => unknown,
-  ): this {
+  onSelect(callback: (value: T, event: MouseEvent | KeyboardEvent) => unknown): this {
     this.select = callback;
     return this;
   }
@@ -1542,10 +1335,7 @@ export abstract class AbstractInputSuggest<T> extends PopoverSuggest<T> {
   override open(): void {
     const box = this.textInputEl.getBoundingClientRect();
     Object.assign(this.suggestEl.style, {
-      position: "fixed",
-      left: `${box.left}px`,
-      top: `${box.bottom}px`,
-      minWidth: `${box.width}px`,
+      position: "fixed", left: `${box.left}px`, top: `${box.bottom}px`, minWidth: `${box.width}px`,
     });
     super.open();
   }
@@ -1559,23 +1349,17 @@ export abstract class AbstractInputSuggest<T> extends PopoverSuggest<T> {
     const generation = ++this.generation;
     try {
       const values = await this.getSuggestions(this.getValue());
-      if (generation !== this.generation || !this.textInputEl.isConnected)
-        return;
+      if (generation !== this.generation || !this.textInputEl.isConnected) return;
       this.suggestions = this.limit > 0 ? values.slice(0, this.limit) : values;
       this.selected = 0;
       this.suggestEl.replaceChildren();
-      if (!this.suggestions.length) {
-        this.close();
-        return;
-      }
+      if (!this.suggestions.length) { this.close(); return; }
       for (const value of this.suggestions) {
         const item = element("div", "suggestion-item");
         item.setAttribute("role", "option");
         this.renderSuggestion(value, item);
         item.addEventListener("mousedown", (event) => event.preventDefault());
-        item.addEventListener("click", (event) =>
-          this.selectSuggestion(value, event),
-        );
+        item.addEventListener("click", (event) => this.selectSuggestion(value, event));
         this.suggestEl.append(item);
       }
       this.markSelected();
@@ -1600,23 +1384,14 @@ export abstract class SuggestModal<T> extends Modal {
     this.inputEl.type = "text";
     this.inputEl.className = "prompt-input";
     this.resultContainerEl = element("div", "prompt-results");
-    this.contentEl.append(
-      this.inputEl,
-      this.resultContainerEl,
-      this.instructionsEl,
-    );
+    this.contentEl.append(this.inputEl, this.resultContainerEl, this.instructionsEl);
   }
 
-  setInstructions(
-    instructions: Array<{ command: string; purpose: string }>,
-  ): void {
+  setInstructions(instructions: Array<{ command: string; purpose: string }>): void {
     this.instructionsEl.replaceChildren();
     for (const instruction of instructions) {
       const item = element("div", "prompt-instruction");
-      item.append(
-        element("span", "prompt-instruction-command", instruction.command),
-        element("span", undefined, instruction.purpose),
-      );
+      item.append(element("span", "prompt-instruction-command", instruction.command), element("span", undefined, instruction.purpose));
       this.instructionsEl.append(item);
     }
   }
@@ -1891,11 +1666,7 @@ export class ItemView extends View {
     this.actionsEl = element("div", "view-actions");
     this.containerEl.prepend(this.actionsEl);
   }
-  addAction(
-    icon: string,
-    title: string,
-    callback: (event: MouseEvent) => unknown,
-  ): HTMLElement {
+  addAction(icon: string, title: string, callback: (event: MouseEvent) => unknown): HTMLElement {
     const button = element("button", "clickable-icon");
     button.title = title;
     button.setAttribute("type", "button");
