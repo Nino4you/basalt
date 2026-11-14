@@ -895,6 +895,60 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         settings.get("dailyTemplate"),
         set("dailyTemplate"),
       );
+      heading(content, t("Eindeutige Notizen"));
+      textField(
+        row(
+          content,
+          t("Ordner für eindeutige Notizen"),
+          t("Für „Neue eindeutige Notiz erstellen“ (Zettelkasten). Leer lassen für den Vault-Stammordner."),
+        ),
+        t("Ordner für eindeutige Notizen"),
+        settings.get("uniqueFolder"),
+        set("uniqueFolder"),
+        "Zettelkasten",
+      );
+      const uniqueRow = row(
+        content,
+        t("Format der Kennung"),
+        t("Moment.js-Format aus Datum und Uhrzeit. Ist der Name vergeben, rückt er minutenweise weiter."),
+      );
+      const uniqueExample = h("div", { class: "setting-item-description" });
+      uniqueRow.el.querySelector(".setting-item-info")!.append(uniqueExample);
+      const showUniqueExample = (pattern: string) => {
+        uniqueExample.textContent = t("Beispiel: {name}", {
+          name: formatDate(new Date(), pattern || "YYYYMMDDHHmm", getLocale()),
+        });
+      };
+      const uniqueInput = textField(
+        uniqueRow,
+        t("Format der Kennung"),
+        settings.get("uniqueFormat"),
+        (value) => settings.set("uniqueFormat", value || "YYYYMMDDHHmm"),
+        "YYYYMMDDHHmm",
+      );
+      uniqueInput.addEventListener("input", () =>
+        showUniqueExample(uniqueInput.value.trim()),
+      );
+      showUniqueExample(settings.get("uniqueFormat"));
+      dropdown(
+        row(
+          content,
+          t("Vorlage für eindeutige Notizen"),
+          t("Eine Notiz aus dem Vorlagenordner. {date} und {title} werden ersetzt.", {
+            date: "{{date}}",
+            title: "{{title}}",
+          }),
+        ),
+        t("Vorlage für eindeutige Notizen"),
+        [
+          ["", t("Keine Vorlage")],
+          ...templatePaths(app.index.files, settings.get("templateFolder")).map(
+            (path) => [path, path] as [string, string],
+          ),
+        ],
+        settings.get("uniqueTemplate"),
+        set("uniqueTemplate"),
+      );
       backupSettings(app, content);
       heading(content, t("Archivierte Entwürfe"));
       content.append(

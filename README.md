@@ -61,6 +61,10 @@ Obsidian vaults and selected Obsidian plugins.
   search and replace across the vault.
 - Daily notes with their own folder, date format (Moment.js style) and template, and commands
   to step to the previous or next one.
+- Small core tools: open a random note, create unique notes named after a timestamp
+  (Zettelkasten, with folder, format and template), merge a note into another (properties
+  combined, links redirected, the source goes to the trash) and extract a selection into a new
+  linked note.
 - Graph view for the whole vault and as a local graph of the active note, with group colors.
 - Canvas in the open JSON Canvas format (`.canvas`) with text, note, link and group cards.
 - File recovery: every earlier version of a note or canvas and every deleted file can be
