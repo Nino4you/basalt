@@ -117,14 +117,21 @@ export function nativeRequestUrl(
     const body = bodyBytes(param.body);
     if (body && body.byteLength > MAX_VAULT_BINARY_BYTES)
       throw new Error("requestUrl body exceeds the 64 MiB limit");
-    const result = (await run("plugin_request_url", {
-      request: {
-        url: param.url,
-        method: (param.method ?? "GET").toUpperCase(),
-        headers: requestHeaders(param),
-        body: body ? bytesToBase64(body) : null,
-      },
-    })) as { status?: unknown; headers?: unknown; body?: unknown } | null;
+    let result: { status?: unknown; headers?: unknown; body?: unknown } | null;
+    try {
+      result = (await run("plugin_request_url", {
+        request: {
+          url: param.url,
+          method: (param.method ?? "GET").toUpperCase(),
+          headers: requestHeaders(param),
+          body: body ? bytesToBase64(body) : null,
+        },
+      })) as typeof result;
+    } catch (error) {
+      // Commands reject with a plain string; plugins read `error.message`,
+      // as they would for Obsidian's own requestUrl.
+      throw error instanceof Error ? error : new Error(String(error));
+    }
     if (
       !result ||
       typeof result.status !== "number" ||

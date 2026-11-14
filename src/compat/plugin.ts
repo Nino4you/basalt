@@ -180,10 +180,22 @@ interface Entry {
 }
 
 /** Host-managed registry, isolated from the main app until the rest of the Obsidian API exists. */
+/**
+ * Loads and unloads installed bundles by id, for plugins that reload
+ * themselves (or others) through `app.plugins.enablePlugin`/`disablePlugin`.
+ */
+export interface PluginToggleHost {
+  enable(id: string): Promise<unknown>;
+  disable(id: string): Promise<void>;
+  /** Persists the current enabled set (the `...AndSave` variants). */
+  save(): void;
+}
+
 export class PluginRegistry {
   readonly plugins: Record<string, Plugin> = Object.create(null);
   readonly enabledPlugins = new Set<string>();
   private readonly entries = new Map<string, Entry>();
+  private toggleHost: PluginToggleHost | null = null;
 
   constructor(
     private readonly app: object,
@@ -236,6 +248,46 @@ export class PluginRegistry {
     // Hosts still receive the rejected activation promise; ignoring it cannot cause an unhandled rejection.
     void entry.activated.catch(() => {});
     return entry.activated;
+  }
+
+  setToggleHost(host: PluginToggleHost): void {
+    this.toggleHost = host;
+  }
+
+  private host(): PluginToggleHost {
+    if (!this.toggleHost)
+      throw new Error("Plugins cannot be enabled or disabled here");
+    return this.toggleHost;
+  }
+
+  getPlugin(id: string): Plugin | null {
+    return this.plugins[id] ?? null;
+  }
+
+  /**
+   * Obsidian's `app.plugins.enablePlugin`: loads an installed bundle for this
+   * session (re-reading its files, so updated code takes effect). Unlike
+   * Obsidian, a failure rejects instead of resolving `false`, so it stays
+   * visible to the caller.
+   */
+  async enablePlugin(id: string): Promise<boolean> {
+    await this.host().enable(id);
+    return true;
+  }
+
+  disablePlugin(id: string): Promise<void> {
+    return this.host().disable(id);
+  }
+
+  async enablePluginAndSave(id: string): Promise<boolean> {
+    await this.enablePlugin(id);
+    this.host().save();
+    return true;
+  }
+
+  async disablePluginAndSave(id: string): Promise<void> {
+    await this.disablePlugin(id);
+    this.host().save();
   }
 
   disable(id: string): Promise<void> {

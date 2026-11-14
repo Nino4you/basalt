@@ -635,6 +635,14 @@ export class App {
         requestUrl: nativeRequestUrl(),
         updateLinks: () => this.settings.get("updateLinks"),
         attachmentFolder: () => this.settings.get("attachmentFolder"),
+        pluginUi: {
+          release: () => this.releasePluginUi(),
+          refresh: (id, error) => {
+            if (error === undefined) this.pluginErrors.delete(id);
+            else this.pluginErrors.set(id, errorMessage(error));
+            this.refreshPluginUi();
+          },
+        },
       });
       if (this.vault !== next) {
         await session.dispose().catch((error) => this.report(error));

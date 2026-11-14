@@ -1,0 +1,1 @@
+Fixes for plugins: plugins that update themselves can reload without restarting the app, and failed plugin network requests show the actual reason.
