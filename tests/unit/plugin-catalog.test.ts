@@ -14,6 +14,7 @@ import {
   STATS_URL,
   uninstallPlugin,
   validatePluginFiles,
+  verifiedVersion,
 } from "../../src/compat/plugin-catalog";
 import type { RequestUrl } from "../../src/compat/request";
 import { ScopedVaultPort } from "../../src/compat/scoped-port";
@@ -274,4 +275,29 @@ it("installs through the plugin config view the app uses", async () => {
   expect(config.getFileByPath("Basalt/Plugins/scoped/main.js")).not.toBeNull();
   // Plugin code stays out of the vault content plugins and sync see.
   expect(content.getFileByPath("Basalt/Plugins/scoped/main.js")).toBeNull();
+});
+
+describe("verifiedVersion", () => {
+  const entry = {
+    repo: "zsviczian/obsidian-excalidraw-plugin",
+    verified: "2.29.2",
+  };
+
+  it("vouches only for the catalog's own repository", () => {
+    expect(verifiedVersion(entry, entry.repo)).toBe("2.29.2");
+    expect(verifiedVersion(entry, "ZSViczian/Obsidian-Excalidraw-Plugin")).toBe(
+      "2.29.2",
+    );
+  });
+
+  it("treats forks and other repositories with the same id as untested", () => {
+    expect(
+      verifiedVersion(entry, "someone/obsidian-excalidraw-plugin"),
+    ).toBeNull();
+    expect(verifiedVersion(entry, null)).toBeNull();
+    expect(verifiedVersion(undefined, entry.repo)).toBeNull();
+    expect(
+      verifiedVersion({ ...entry, verified: null }, entry.repo),
+    ).toBeNull();
+  });
 });
