@@ -19,6 +19,9 @@ import {
 import { addProperty } from "../editor/properties";
 import { insertFootnote } from "../editor/footnotes";
 import { exportHtml, printNote } from "./print-export";
+import { checkForUpdate, updateCheckDue, type ReleaseInfo } from "./update-check";
+import { hostRequest } from "./plugin-install";
+import { APP_VERSION } from "../version";
 import {
   ConflictWatcher,
   conflictSummary,
@@ -214,6 +217,8 @@ export class App {
   /** Theme and CSS snippets of the open vault (native only). */
   readonly vaultStyles = new VaultStyles();
   appearance: Appearance = { cssTheme: "", enabledCssSnippets: [] };
+  /** A newer release found by the update check, if any. */
+  availableUpdate: ReleaseInfo | null = null;
   /** Editor groups; the focused one hosts the live editor and views. */
   groups: Group[] = [];
   group!: Group;
@@ -469,6 +474,8 @@ export class App {
         requestAnimationFrame(() => root.classList.remove("is-starting")),
       );
     }
+    // Opt-in; a failed check (offline, rate limit) is not worth a notice.
+    void this.checkForUpdates().catch((error) => console.warn(error));
   }
 
   private async loadVault(next: VaultInfo): Promise<void> {
@@ -663,6 +670,26 @@ export class App {
     } catch (error) {
       this.report(error);
     }
+  }
+
+  /**
+   * Asks GitHub for a newer release. `manual` checks right away and reports
+   * the result; otherwise only when enabled and due, quietly unless found.
+   */
+  async checkForUpdates(manual = false): Promise<ReleaseInfo | null> {
+    if (!manual && (!this.settings.get("updateCheck") || !updateCheckDue()))
+      return null;
+    const update = await checkForUpdate(hostRequest, APP_VERSION);
+    this.availableUpdate = update;
+    if (update)
+      notify(
+        t("Basalt {version} ist verfügbar. Einstellungen → Allgemein führt zum Download.", {
+          version: update.version,
+        }),
+      );
+    else if (manual)
+      notify(t("Basalt ist aktuell ({version}).", { version: APP_VERSION }));
+    return update;
   }
 
   /** Sync conflict copies and notes with merge markers in this vault. */

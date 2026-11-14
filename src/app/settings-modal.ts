@@ -1,5 +1,6 @@
 import { getLocale, languages, t } from "../i18n";
 import { backend, native } from "../backend";
+import { APP_VERSION } from "../version";
 import {
   basename,
   clear,
@@ -548,8 +549,56 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         ),
       );
       heading(content, t("App"));
-      row(content, t("Aktuelle Version"), t("Entwicklungsversion")).control.append(
-        h("span", { class: "setting-value", text: "0.2.0" }),
+      const version = row(
+        content,
+        t("Aktuelle Version"),
+        app.availableUpdate
+          ? t("Basalt {version} ist verfügbar.", { version: app.availableUpdate.version })
+          : "",
+      );
+      version.control.append(
+        h("span", { class: "setting-value", text: APP_VERSION }),
+      );
+      const showUpdate = () => {
+        const update = app.availableUpdate;
+        version.control.querySelector(".mod-update")?.remove();
+        if (!update) return;
+        version.control.append(
+          h("button", {
+            class: "mod-cta mod-update",
+            text: t("Herunterladen"),
+            attrs: { type: "button" },
+            on: { click: () => app.openExternal(update.url) },
+          }),
+        );
+      };
+      showUpdate();
+      const checks = row(
+        content,
+        t("Automatisch nach Updates suchen"),
+        t("Fragt einmal am Tag bei GitHub nach einer neuen Version. Dabei wird nichts über dich oder deine Notizen gesendet. Installiert wird nie automatisch."),
+      );
+      checks.control.append(
+        h("button", {
+          text: t("Jetzt prüfen"),
+          attrs: { type: "button" },
+          on: {
+            click: (event) => {
+              const button = event.currentTarget as HTMLButtonElement;
+              button.disabled = true;
+              void app
+                .checkForUpdates(true)
+                .then(showUpdate, (error) => app.report(error))
+                .finally(() => (button.disabled = false));
+            },
+          },
+        }),
+      );
+      toggle(
+        checks,
+        t("Automatisch nach Updates suchen"),
+        settings.get("updateCheck"),
+        set("updateCheck"),
       );
       row(
         content,

@@ -40,6 +40,8 @@ export interface Settings {
   propertiesInDocument: boolean;
   /** Fold arrows for headings, lists and blocks. */
   folding: boolean;
+  /** Ask GitHub once a day whether a newer Basalt release exists. */
+  updateCheck: boolean;
 }
 
 export const DEFAULT_ACCENT = "#8a5cf5";
@@ -68,6 +70,7 @@ export const defaults: Settings = {
   backupMaxVersions: 0,
   propertiesInDocument: true,
   folding: true,
+  updateCheck: false,
 };
 
 const KEY = "basalt-settings";

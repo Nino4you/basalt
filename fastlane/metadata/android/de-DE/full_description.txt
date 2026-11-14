@@ -1,0 +1,27 @@
+<p>Basalt ist ein ruhiger Ort für vernetzte Gedanken. Deine Notizen sind einfache Markdown-Dateien in einem Ordner deiner Wahl. Kein Konto, keine Cloud: Nichts verlässt dein Gerät, außer du synchronisierst den Ordner selbst.</p>
+
+<p><b>Schreiben</b></p>
+<ul>
+<li>Editor mit Live-Vorschau: Markdown tritt beim Schreiben zurück, Formeln (KaTeX), Mermaid-Diagramme und Tabellen erscheinen direkt in der Notiz.</li>
+<li>Eigenschaften für das Frontmatter, Fußnoten, Callouts, Einklappen von Überschriften und Listen.</li>
+<li>Vorschläge für [[Wiki-Links]], Überschriften, Blöcke, Aliase und #Tags.</li>
+<li>Bilder und Dateien einfügen oder hineinziehen; sie landen als Anhänge neben deinen Notizen.</li>
+</ul>
+
+<p><b>Ordnen</b></p>
+<ul>
+<li>Rückverweise, unverlinkte Erwähnungen, Gliederung, Tags und Volltextsuche mit Suchen und Ersetzen.</li>
+<li>Graphansicht, Canvas (JSON Canvas), Tagesnotizen und Vorlagen.</li>
+<li>Links werden beim Umbenennen oder Verschieben einer Notiz angepasst.</li>
+</ul>
+
+<p><b>Sicher von Grund auf</b></p>
+<ul>
+<li>Speichern überschreibt nie blind; jede frühere Fassung und jede gelöschte Datei lässt sich wiederherstellen.</li>
+<li>Konfliktkopien von Syncthing, Nextcloud oder Dropbox werden erkannt und lassen sich vergleichen.</li>
+</ul>
+
+<p><b>Plugins und Themes</b></p>
+<p>Basalt setzt die Obsidian-Plugin-Schnittstelle für ausgewählte Community-Plugins um und lädt Themes und CSS-Snippets aus deinem Vault. Plugins laufen erst, wenn du jedes einzeln freigibst.</p>
+
+<p>Basalt ist ein unabhängiges Projekt und nicht mit Obsidian verbunden. Es ist eine Vorschau: Bitte bewahre von wichtigen Notizen eine Kopie auf.</p>

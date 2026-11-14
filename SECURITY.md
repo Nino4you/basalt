@@ -60,6 +60,9 @@ will get a response once the report has been reviewed.
   allowed, request and response bodies are capped at 64 MiB, and TLS certificates are verified
   against the bundled webpki roots. Plugins already had network access; only the browser's
   cross-origin restriction goes away.
+- The update check is off by default. Turned on (or with "Check now" in Settings → General) it
+  makes one request to `api.github.com/repos/Nino4you/basalt/releases/latest`, at most once a
+  day, and only links to the release page on `github.com`; nothing is downloaded or installed.
 - The plugin catalog (Settings → Community plugins) downloads the community plugin list and
   download counts from `raw.githubusercontent.com/obsidianmd/obsidian-releases`, and plugin
   releases from `github.com/<owner>/<repo>/releases/latest/download/`, through the same

@@ -25,7 +25,11 @@ import { notify } from "../ui/notice";
 import type { App } from "./app";
 
 /** Catalog and release downloads: through Rust in the app, `fetch` in the demo. */
-const request: RequestUrl = native ? nativeRequestUrl() : fetchRequestUrl;
+/** HTTP for the app itself: Rust in the native app, fetch in the browser demo. */
+export const hostRequest: RequestUrl = native
+  ? nativeRequestUrl()
+  : fetchRequestUrl;
+const request = hostRequest;
 
 /** Rows rendered at once; the catalog has thousands of plugins. */
 const PAGE = 100;
