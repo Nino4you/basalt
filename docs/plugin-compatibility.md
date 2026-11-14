@@ -145,6 +145,11 @@ The loader follows a deliberately narrow but real execution model:
 - `loadData`/`saveData` read and write `Basalt/Plugins/<id>/data.json` as in Obsidian
   (indented, at most 16 MiB). Settings therefore travel with the vault to other devices and into
   backups and survive reinstalling the app. A plugin's saves run in order, so the last call wins.
+  Saves are coalesced: a settings tab that calls `saveData` per keystroke is written once typing
+  pauses for a second (at the latest every five seconds), and an unchanged value is not written at
+  all, so the file history gets one backup per edit instead of one per character. `loadData`
+  always sees the latest saved value; pending saves are written when the app is hidden or
+  closed, on vault switch, and directly while plugins unload.
   An invalid `data.json` is not silently replaced with defaults but reported as an error; if a
   plugin restored at startup fails because of this, the app shows a notice and the error in the
   plugin settings instead of disabling it without comment. The file stays unchanged. Older

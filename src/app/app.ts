@@ -4019,9 +4019,16 @@ export class App {
     );
     window.addEventListener("beforeunload", (event) => {
       this.writeWorkspace();
+      const pluginData = this.compatibility?.hasPendingPluginData() ?? false;
+      void this.compatibility
+        ?.flushPluginData()
+        .catch((error) => this.report(error));
       if (
-        this.store &&
-        [...this.store.notes.values()].some((note) => note.text !== note.saved)
+        pluginData ||
+        (this.store &&
+          [...this.store.notes.values()].some(
+            (note) => note.text !== note.saved,
+          ))
       )
         event.preventDefault();
     });
@@ -4043,6 +4050,9 @@ export class App {
       }
       this.writeWorkspace();
       void this.store?.saveAll().catch((error) => this.report(error));
+      void this.compatibility
+        ?.flushPluginData()
+        .catch((error) => this.report(error));
     });
 
     // Edge swipes open the drawers on touch devices.
