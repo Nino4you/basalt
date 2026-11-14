@@ -9,6 +9,7 @@ import {
 } from "../backend";
 import { attachmentKind, attachmentLink } from "../attachments";
 import { importAttachments } from "./attachment-import";
+import { autoCleanBackups } from "./backup-cleanup";
 import { emptyCanvas } from "../canvas/model";
 import { CanvasView } from "../canvas/view";
 import { TFile, TFolder } from "../compat/files";
@@ -490,6 +491,11 @@ export class App {
       if (epoch !== this.epoch) return;
     }
     void this.indexFiles();
+    // Old backups go once a day; a failure only costs disk space.
+    void autoCleanBackups(backend, next.id, {
+      maxAgeDays: this.settings.get("backupMaxAgeDays"),
+      maxVersions: this.settings.get("backupMaxVersions"),
+    }).catch((error) => console.error(error));
   }
 
   /** Whether every saved tab is empty or a Markdown note or canvas that exists. */

@@ -20,6 +20,10 @@ will get a response once the report has been reviewed.
   did not write itself in this session, such as the version loaded from disk or an external
   change, is always backed up before it is replaced, and so is everything a restore or a link
   update replaces. Android (SAF) still backs up every save.
+- Backups are deleted permanently only by the retention setting (once a day, by default
+  backups older than 90 days) or by "Empty trash" after a confirmation. The `backup_remove`
+  command (`vault_core::remove_backup`) accepts backup locations only, refuses symlinked
+  folders below `.basalt` and never touches vault content.
 - On Linux, a save first writes a separate file and replaces the target by rename.
   Uncoordinated external writers can still write between the check and the rename: there is no
   compare-and-swap that is guaranteed across file systems.

@@ -10,7 +10,12 @@ import {
   iconButton,
   trackSliderFill,
 } from "../ui/dom";
-import { Modal } from "../ui/modal";
+import { confirmAction, Modal } from "../ui/modal";
+import {
+  cleanBackups,
+  formatBytes,
+  type CleanupResult,
+} from "./backup-cleanup";
 import { notify } from "../ui/notice";
 import { eventHotkey, isAssignable, type Command } from "./commands";
 import { formatDate } from "../dates";
@@ -211,6 +216,124 @@ function textField(
   input.addEventListener("change", () => onChange(input.value.trim()));
   target.control.append(input);
   return input;
+}
+
+/** Retention of `.basalt/history` and `.basalt/trash`, with manual cleanup. */
+function backupSettings(app: App, content: HTMLElement): void {
+  const settings = app.settings;
+  heading(content, t("Sicherungen"));
+  content.append(
+    h("p", {
+      class: "setting-item-description settings-paragraph",
+      text: t("Vor jeder Änderung und jedem Löschen sichert Basalt die Datei in .basalt/history/ und .basalt/trash/ im Vault."),
+    }),
+  );
+  const days = (count: number) =>
+    count ? t("{count} Tage", { count }) : t("Unbegrenzt");
+  dropdown(
+    row(
+      content,
+      t("Sicherungen aufbewahren"),
+      t("Ältere Versionen und gelöschte Dateien werden einmal am Tag entfernt."),
+    ),
+    t("Sicherungen aufbewahren"),
+    [7, 30, 90, 180, 365, 0].map(
+      (count) => [String(count), days(count)] as [string, string],
+    ),
+    String(settings.get("backupMaxAgeDays")),
+    (value) => settings.set("backupMaxAgeDays", Number(value)),
+  );
+  dropdown(
+    row(
+      content,
+      t("Versionen pro Datei"),
+      t("Nur die neuesten Versionen jeder Datei bleiben erhalten."),
+    ),
+    t("Versionen pro Datei"),
+    [0, 10, 25, 50, 100].map(
+      (count) =>
+        [String(count), count ? String(count) : t("Unbegrenzt")] as [
+          string,
+          string,
+        ],
+    ),
+    String(settings.get("backupMaxVersions")),
+    (value) => settings.set("backupMaxVersions", Number(value)),
+  );
+  const usage = row(content, t("Belegter Platz"), t("Wird berechnet …"));
+  const description = usage.el.querySelector(".setting-item-description")!;
+  const vaultId = app.vault?.id;
+  const refresh = async () => {
+    if (!vaultId) return;
+    const backups = await backend.backups(vaultId, true);
+    const size = (kind: string) =>
+      backups
+        .filter((backup) => backup.kind === kind)
+        .reduce((sum, backup) => sum + backup.size, 0);
+    description.textContent = t(
+      "{versions} Versionen ({versionSize}), {deleted} gelöschte Dateien ({deletedSize})",
+      {
+        versions: backups.filter((backup) => backup.kind === "version").length,
+        versionSize: formatBytes(size("version"), getLocale()),
+        deleted: backups.filter((backup) => backup.kind === "deleted").length,
+        deletedSize: formatBytes(size("deleted"), getLocale()),
+      },
+    );
+  };
+  const failed = (error: unknown) => {
+    description.textContent = "";
+    app.report(error);
+  };
+  void refresh().catch(failed);
+  const report = (result: CleanupResult) =>
+    notify(
+      result.removed
+        ? t("{removed} Sicherungen entfernt, {size} frei.", {
+            removed: result.removed,
+            size: formatBytes(result.freed, getLocale()),
+          })
+        : t("Nichts zu entfernen."),
+    );
+  usage.control.append(
+    h("button", {
+      text: t("Jetzt aufräumen"),
+      attrs: { type: "button" },
+      on: {
+        click: () => {
+          if (!vaultId) return;
+          const policy = {
+            maxAgeDays: settings.get("backupMaxAgeDays"),
+            maxVersions: settings.get("backupMaxVersions"),
+          };
+          void cleanBackups(backend, vaultId, { policy })
+            .then(report)
+            .then(refresh)
+            .catch(failed);
+        },
+      },
+    }),
+    h("button", {
+      class: "mod-warning",
+      text: t("Papierkorb leeren"),
+      attrs: { type: "button" },
+      on: {
+        click: () => {
+          if (!vaultId) return;
+          confirmAction({
+            title: t("Papierkorb leeren"),
+            text: t("Alle gelöschten Dateien in .basalt/trash/ endgültig entfernen? Das kann nicht rückgängig gemacht werden."),
+            confirm: t("Endgültig löschen"),
+            warning: true,
+            run: async () => {
+              report(await cleanBackups(backend, vaultId, { emptyTrash: true }));
+              await refresh();
+            },
+            onError: (error) => app.report(error),
+          });
+        },
+      },
+    }),
+  );
 }
 
 type CoreTab =
@@ -566,6 +689,7 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         settings.get("dailyTemplate"),
         set("dailyTemplate"),
       );
+      backupSettings(app, content);
       heading(content, t("Archivierte Entwürfe"));
       content.append(
         h("p", {

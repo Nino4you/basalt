@@ -32,6 +32,10 @@ export interface Settings {
   templateFolder: string;
   /** Where pasted and dropped files go, see `attachmentFolder`. */
   attachmentFolder: string;
+  /** Backups older than this many days are deleted; 0 keeps them. */
+  backupMaxAgeDays: number;
+  /** Versions kept per file; 0 keeps all. */
+  backupMaxVersions: number;
 }
 
 export const DEFAULT_ACCENT = "#8a5cf5";
@@ -56,6 +60,8 @@ export const defaults: Settings = {
   dailyTemplate: "",
   templateFolder: "",
   attachmentFolder: "/",
+  backupMaxAgeDays: 90,
+  backupMaxVersions: 0,
 };
 
 const KEY = "basalt-settings";

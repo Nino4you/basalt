@@ -536,13 +536,13 @@ struct BackupInfo {
     size: u64,
 }
 
-/// Backups of notes and canvases, newest first. Attachments are left out: the
-/// note IPC can neither show nor restore them.
-fn document_backups(session: &Session) -> Result<Vec<BackupInfo>> {
+/// Backups newest first. Unless `all` is set, only those of notes and canvases:
+/// the note IPC can neither show nor restore attachments. Cleaning up needs all.
+fn document_backups(session: &Session, all: bool) -> Result<Vec<BackupInfo>> {
     Ok(vault_core::list_backups(&*session.storage)
         .map_err(error)?
         .into_iter()
-        .filter(|backup| backup.original.is_document())
+        .filter(|backup| all || backup.original.is_document())
         .map(|backup| BackupInfo {
             kind: match backup.kind {
                 BackupKind::Version => "version",
@@ -557,9 +557,32 @@ fn document_backups(session: &Session) -> Result<Vec<BackupInfo>> {
 }
 
 #[tauri::command]
-async fn backup_list(vault_id: String, state: State<'_, AppState>) -> Result<Vec<BackupInfo>> {
+async fn backup_list(
+    vault_id: String,
+    all: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<Vec<BackupInfo>> {
     let session = lock_session(&state, &vault_id)?;
-    document_backups(&session)
+    document_backups(&session, all.unwrap_or(false))
+}
+
+/// Permanently deletes backups (old versions and trash entries) and returns how
+/// many were removed. Any location that is not a backup is refused.
+#[tauri::command]
+async fn backup_remove(
+    locations: Vec<String>,
+    vault_id: String,
+    state: State<'_, AppState>,
+) -> Result<usize> {
+    let session = lock_session(&state, &vault_id)?;
+    let locations = locations
+        .iter()
+        .map(|location| VaultPath::parse(location).map_err(error))
+        .collect::<Result<Vec<_>>>()?;
+    for location in &locations {
+        vault_core::remove_backup(&*session.storage, location).map_err(error)?;
+    }
+    Ok(locations.len())
 }
 
 #[tauri::command]
@@ -699,6 +722,7 @@ pub fn run() {
             export_note,
             backup_list,
             backup_read,
+            backup_remove,
             plugin_vault_snapshot,
             plugin_vault_read,
             plugin_vault_read_many,
@@ -891,7 +915,7 @@ mod tests {
         session.storage.save_binary(&drawing, &[2], &[1]).unwrap();
         session.storage.remove_file(&note, b"new").unwrap();
 
-        let backups = document_backups(&session).unwrap();
+        let backups = document_backups(&session, false).unwrap();
         assert_eq!(backups.len(), 2);
         assert!(backups.iter().all(|backup| backup.path == "note.md"));
         let deleted = backups.iter().find(|b| b.kind == "deleted").unwrap();
@@ -902,6 +926,11 @@ mod tests {
         assert_eq!(read(&deleted.location).unwrap(), "new");
         assert_eq!(read(&version.location).unwrap(), "old");
         assert!(read("drawing.ink").is_err());
+
+        // Cleaning up sees the attachment's backup too.
+        let all = document_backups(&session, true).unwrap();
+        assert_eq!(all.len(), 3);
+        assert!(all.iter().any(|backup| backup.path == "drawing.ink"));
     }
 
     #[test]

@@ -417,4 +417,40 @@ impl MetadataVaultStorage for AndroidVault {
             .filter_map(|(path, size)| Some((VaultPath::parse(&path).ok()?, size)))
             .collect())
     }
+
+    fn remove_backup_file(&self, location: &VaultPath) -> io::Result<()> {
+        let path = location.as_str();
+        let root = [HISTORY_DIR, TRASH_DIR]
+            .into_iter()
+            .find(|root| {
+                path.strip_prefix(root)
+                    .is_some_and(|rest| rest.starts_with('/'))
+            })
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "not a backup location"))?;
+        let entry = self.entry_uncached(location)?;
+        if !entry.is_file() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "only backup files can be removed",
+            ));
+        }
+        let api = self.app.android_fs();
+        api.remove_file(entry.uri()).map_err(io_error)?;
+        self.forget_parent(location);
+        // Tidy folders that are empty now; `remove_dir` refuses non-empty ones.
+        let mut folder = saf_cache::split(path).0;
+        while folder.len() > root.len() {
+            let Ok(uri) = self.resolve_dir(folder) else {
+                break;
+            };
+            if api.remove_dir(&uri).is_err() {
+                break;
+            }
+            let parent = saf_cache::split(folder).0;
+            self.docs().forget(folder);
+            self.docs().forget(parent);
+            folder = parent;
+        }
+        Ok(())
+    }
 }

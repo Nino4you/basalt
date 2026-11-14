@@ -116,6 +116,48 @@ export class Modal {
   }
 }
 
+/**
+ * Asks before an action. `run` keeps the dialog open with its buttons
+ * disabled until it settles; an error leaves the dialog open for a retry.
+ */
+export function confirmAction(options: {
+  title: string;
+  text: string;
+  confirm: string;
+  warning?: boolean;
+  run: () => Promise<void>;
+  onError: (error: unknown) => void;
+}): Modal {
+  const modal = new Modal("mod-confirm");
+  modal.setTitle(options.title);
+  const cancel = h("button", {
+    text: t("Abbrechen"),
+    attrs: { type: "button" },
+    on: { click: () => modal.close() },
+  });
+  const submit = h("button", {
+    class: options.warning ? "mod-warning" : "mod-cta",
+    text: options.confirm,
+    attrs: { type: "button" },
+  });
+  submit.addEventListener("click", () => {
+    submit.disabled = cancel.disabled = true;
+    options.run().then(
+      () => modal.close(),
+      (error) => {
+        submit.disabled = cancel.disabled = false;
+        options.onError(error);
+      },
+    );
+  });
+  modal.contentEl.append(
+    h("p", { text: options.text }),
+    h("div", "modal-button-container", cancel, submit),
+  );
+  modal.open();
+  return modal;
+}
+
 export interface Suggestion {
   /** Rendered into `.suggestion-content`. */
   render(parent: HTMLElement): void;

@@ -102,8 +102,8 @@ stable and tested, but some things are still missing:
 
 - no automatic updates and no built-in sync,
 - plugin compatibility only for selected plugins (see below),
-- backups in `.basalt/history/` and `.basalt/trash/` are never cleaned up automatically yet,
-  and backups of attachments have to be restored by hand,
+- backups of attachments have to be restored by hand (old backups are removed after 90 days by
+  default; Settings → Files and links → Backups),
 - no Play Store or distribution packages yet, only direct downloads.
 
 Make a copy of any important vault before opening it for the first time.
