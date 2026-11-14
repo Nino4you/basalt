@@ -72,7 +72,7 @@ jobs:
 
   linux:
     name: Linux x86_64
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -88,7 +88,7 @@ jobs:
       - name: Native dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2t64 xvfb
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2 xvfb
       - run: npm ci
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
       - run: npm run tauri -- build --bundles deb,appimage
@@ -103,6 +103,27 @@ jobs:
           result=$?
           cat /tmp/basalt-startup.log
           test "$result" -eq 124
+      # Built on the oldest supported Ubuntu (glibc 2.35), so the packages
+      # also start on Debian 12 and other older distributions; this checks it.
+      - name: Packages on other distributions
+        run: |
+          set -euo pipefail
+          deb=$(ls src-tauri/target/release/bundle/deb/*.deb)
+          appimage=$(ls src-tauri/target/release/bundle/appimage/*.AppImage)
+          checks=("debian:12 deb $deb" "ubuntu:24.04 deb $deb" "fedora:42 appimage $appimage" "archlinux:latest appimage $appimage")
+          pids=()
+          for i in "${!checks[@]}"; do
+            tools/linux_distro_smoke.sh ${checks[$i]} > "$RUNNER_TEMP/distro-$i.log" 2>&1 &
+            pids+=($!)
+          done
+          failed=0
+          for i in "${!checks[@]}"; do
+            if wait "${pids[$i]}"; then status=ok; else status=FAILED; failed=1; fi
+            echo "::group::${checks[$i]%% *} (${status})"
+            cat "$RUNNER_TEMP/distro-$i.log"
+            echo "::endgroup::"
+          done
+          exit "$failed"
       # Each run's bundles are ~90 MB and the artifact quota is shared: keep
       # them only for main and manual runs, and only for a day.
       - uses: actions/upload-artifact@v4
