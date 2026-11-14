@@ -1,0 +1,1 @@
+Korrekturen für Plugins: Plugins, die sich selbst aktualisieren, laden ohne Neustart der App neu, und fehlgeschlagene Netzwerkanfragen von Plugins zeigen den echten Grund.
