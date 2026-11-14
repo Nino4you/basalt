@@ -144,6 +144,22 @@ export function searchCatalog(
     .map(({ entry }) => entry);
 }
 
+/**
+ * The checked version for a plugin installed from `repo`, or `null`. The
+ * check applies to the catalog's repository only: a fork, or any other
+ * repository whose manifest reuses a checked plugin's id, is untested.
+ * GitHub repository names are case-insensitive.
+ */
+export function verifiedVersion(
+  entry: Pick<CatalogEntry, "repo" | "verified"> | undefined,
+  repo: string | null,
+): string | null {
+  if (!entry?.verified || !repo) return null;
+  return entry.repo.toLowerCase() === repo.toLowerCase()
+    ? entry.verified
+    : null;
+}
+
 /** `owner/name` from what people paste: the short form or a GitHub URL. */
 export function parseRepo(input: string): string | null {
   const value = input
