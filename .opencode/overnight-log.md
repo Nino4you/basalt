@@ -62,6 +62,8 @@
 
 - Ein voller Unit-Lauf zeigte einen sporadischen fehlenden Embed (isoliert zunächst grün). Ursache deterministisch für große Notizen reproduziert: CodeMirror parst zunächst nur einen Teil; nachfolgender Parser-Fortschritt ohne Textänderung aktualisierte weder Plugin-Embeds noch Plugin-Codeblöcke. Zwei Regressionen erst rot, danach beide Dekorationsfelder um den echten Syntaxbaumwechsel ergänzt; 20 passende Tests, volle 661/661 und Build grün. Keine Wartezeit erhöht und kein Fehler versteckt. Die spätere Typecheck-Korrektur betraf ausschließlich die neue synthetische Test-Factory, deren loadFile-Methode der reale Embed-Vertrag verlangt.
 
+- SVG-DOM-Helfer nach offizieller Signatur ergänzt: echte SVG-Namensräume, verschachtelte Formen, Attribute, Klassen, Fragment-/Parent-Einfügung und Callback vor Einfügung. Regression erst rot, danach 23 passende Tests grün. Neuer voller 100er-Lauf: 34 sauber, 15 mit Fehlern, 51 Ladefehler; Dice Roller jetzt ohne Ereignisfehler. Alle 100 Original-Asset-Hashes unverändert, Rohdaten-Zwischenstand 03 gesichert. Ein paralleler Volltest zeigte eine zeitabhängige Sofort-Assertion des bestehenden Embed-Tests; der Host verfolgt dort bereits Syntaxbaum-Fortschritt. Mit vier Unit-Workern und ohne parallelen Browserlauf bestanden alle 662 Tests unverändert; Build ebenfalls grün. Keine Assertion, Frist oder Parser-Grenze verändert.
+
 ### Blockiert / braucht Freigabe
 
 - Eine Lösung, die unrestricted Node/fs/Prozess-/Serverzugriff, globale Installationen, bezahlte APIs oder Veröffentlichung voraussetzt, ist nicht freigegeben. Andere sichere Lücken werden währenddessen weiterbearbeitet.

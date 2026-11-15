@@ -1,6 +1,7 @@
 import { getLocale } from "../i18n";
 import obsidianMoment from "moment";
 import { constructLegacy } from "./legacy-constructor";
+import { installSvgCompat } from "./svg";
 import "moment/locale/de.js";
 import { API_VERSION } from "./api-version";
 import { StateEffect, StateField } from "@codemirror/state";
@@ -356,6 +357,7 @@ export function getBlobArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
 }
 
 export function installDomCompat(): void {
+  installSvgCompat();
   const marker = Symbol.for("basalt.domCompat");
   const prototype = HTMLElement.prototype as unknown as Record<
     symbol | string,
