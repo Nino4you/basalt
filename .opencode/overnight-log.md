@@ -64,6 +64,8 @@
 
 - SVG-DOM-Helfer nach offizieller Signatur ergänzt: echte SVG-Namensräume, verschachtelte Formen, Attribute, Klassen, Fragment-/Parent-Einfügung und Callback vor Einfügung. Regression erst rot, danach 23 passende Tests grün. Neuer voller 100er-Lauf: 34 sauber, 15 mit Fehlern, 51 Ladefehler; Dice Roller jetzt ohne Ereignisfehler. Alle 100 Original-Asset-Hashes unverändert, Rohdaten-Zwischenstand 03 gesichert. Ein paralleler Volltest zeigte eine zeitabhängige Sofort-Assertion des bestehenden Embed-Tests; der Host verfolgt dort bereits Syntaxbaum-Fortschritt. Mit vier Unit-Workern und ohne parallelen Browserlauf bestanden alle 662 Tests unverändert; Build ebenfalls grün. Keine Assertion, Frist oder Parser-Grenze verändert.
 
+- Berichtsauswertung verschärft: bisher wurden reine Netzfehler trotz „ohne Fehler“ als sauber gezählt. Rote Node-Regressionsprüfung reproduziert die falsche Einstufung; nach einer Bedingungsänderung beide Report-Tests grün, fehlende/gescheiterte Ergebnisse weiterhin nicht sauber. Aktuelle 100 Rohresultate neu ausgewertet: unverändert 34/15/51, alle 34 sauberen Plugins tatsächlich mit leerer Fehlerliste. Keine Fehler umklassifiziert oder ausgeblendet; Prüfbefehl und Bedeutung grüner Diagnose-Läufe dokumentiert.
+
 ### Blockiert / braucht Freigabe
 
 - Eine Lösung, die unrestricted Node/fs/Prozess-/Serverzugriff, globale Installationen, bezahlte APIs oder Veröffentlichung voraussetzt, ist nicht freigegeben. Andere sichere Lücken werden währenddessen weiterbearbeitet.

@@ -297,6 +297,10 @@ views, render the first settings tab, disable. It writes `report.md` / `report.j
 of the live API objects against `obsidian.d.ts`. Downloads are cached there and never committed.
 It runs the browser demo only, so it proves neither native IPC nor Android, and "loads cleanly"
 does not mean every feature works.
+"Loads cleanly" requires successful activation and zero recorded errors, including network
+errors. A green Playwright run means the diagnostics were collected, not that every plugin
+passed; check the report counts, missing results and download failures. Report classification
+regressions run with `node --test tools/plugin-survey/report.test.mjs`.
 
 ## Open compatibility stages
 
