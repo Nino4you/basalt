@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { loadIconLibrary } from "../../src/ui/icon-library";
 import {
+  BaseComponent,
   ButtonComponent,
   createFragment,
   createObsidianApi,
@@ -22,6 +23,51 @@ installDomCompat();
 // Plugin hosts load the full Lucide set before activation; do the same here.
 beforeAll(() => loadIconLibrary());
 describe("Obsidian DOM and UI compatibility", () => {
+  it("disables and reenables every tracked control in a setting row", () => {
+    const setting = new Setting(document.createElement("div"))
+      .addText(text => text.setValue("kept"))
+      .addTextArea(text => text.setValue("description"))
+      .addToggle(toggle => toggle.setValue(true))
+      .addButton(button => button.setButtonText("Apply"))
+      .addExtraButton(button => button.setTooltip("More"))
+      .addDropdown(dropdown => dropdown.addOption("one", "One").setValue("one"))
+      .addSlider(slider => slider.setValue(5))
+      .addColorPicker(color => color.setValue("#ffffff"));
+    expect(setting.components).toHaveLength(8);
+    const controls = [...setting.controlEl.querySelectorAll<HTMLInputElement | HTMLButtonElement>("input, textarea, select, button")];
+    expect(controls).toHaveLength(8);
+    for (const disabled of [true, false]) {
+      expect(setting.setDisabled(disabled)).toBe(setting);
+      for (const component of setting.components) {
+        expect(component).toBeInstanceOf(BaseComponent);
+        expect(component.disabled).toBe(disabled);
+      }
+      expect(controls.every(control => control.disabled === disabled)).toBe(true);
+    }
+    expect((controls[0] as HTMLInputElement).value).toBe("kept");
+    expect((controls[2] as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("disables controls added to a disabled setting without affecting another row", () => {
+    const root = document.createElement("div");
+    const setting = new Setting(root).setDisabled(true);
+    const other = new Setting(root).addText(text => text.setValue("other"));
+    setting.addText(text => text.setValue("late")).addButton(button => button.setDisabled(false));
+    expect(setting.components.every(component => component.disabled)).toBe(true);
+    expect(setting.controlEl.querySelector<HTMLInputElement>("input")?.disabled).toBe(true);
+    expect(setting.controlEl.querySelector<HTMLButtonElement>("button")?.disabled).toBe(true);
+    expect(other.controlEl.querySelector<HTMLInputElement>("input")?.disabled).toBe(false);
+  });
+
+  it("preserves a callback's disabled control in an enabled setting", () => {
+    const setting = new Setting(document.createElement("div"))
+      .addText(text => text.setDisabled(true))
+      .addButton(button => button.setDisabled(true));
+    expect(setting.components.every(component => component.disabled)).toBe(true);
+    expect(setting.controlEl.querySelector<HTMLInputElement>("input")?.disabled).toBe(true);
+    expect(setting.controlEl.querySelector<HTMLButtonElement>("button")?.disabled).toBe(true);
+  });
+
   it("sets a button tooltip through the shared accessible tooltip helper", () => {
     const button = new ButtonComponent(document.createElement("div"));
     expect(button.setTooltip("Sync settings", { placement: "left" })).toBe(button);

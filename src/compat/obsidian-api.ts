@@ -1031,9 +1031,10 @@ export class ToggleComponent extends InputComponent<boolean> {
   }
 }
 
-export class ButtonComponent {
+export class ButtonComponent extends BaseComponent {
   readonly buttonEl: HTMLButtonElement;
   constructor(settingEl: HTMLElement) {
+    super();
     this.buttonEl = document.createElement("button");
     this.buttonEl.type = "button";
     this.buttonEl.className = "mod-cta";
@@ -1063,9 +1064,9 @@ export class ButtonComponent {
     setIcon(this.buttonEl, icon);
     return this;
   }
-  setDisabled(value: boolean): this {
+  override setDisabled(value: boolean): this {
     this.buttonEl.disabled = value;
-    return this;
+    return super.setDisabled(value);
   }
   onClick(callback: (event: MouseEvent) => unknown): this {
     this.buttonEl.addEventListener("click", callback);
@@ -1073,9 +1074,10 @@ export class ButtonComponent {
   }
 }
 
-export class ExtraButtonComponent {
+export class ExtraButtonComponent extends BaseComponent {
   readonly extraSettingsEl: HTMLElement;
   constructor(settingEl: HTMLElement) {
+    super();
     this.extraSettingsEl = element("button", "clickable-icon");
     (this.extraSettingsEl as HTMLButtonElement).type = "button";
     settingEl.append(this.extraSettingsEl);
@@ -1088,9 +1090,9 @@ export class ExtraButtonComponent {
     setTooltip(this.extraSettingsEl, value);
     return this;
   }
-  setDisabled(value: boolean): this {
+  override setDisabled(value: boolean): this {
     (this.extraSettingsEl as HTMLButtonElement).disabled = value;
-    return this;
+    return super.setDisabled(value);
   }
   onClick(callback: (event: MouseEvent) => unknown): this {
     this.extraSettingsEl.addEventListener("click", callback);
@@ -1162,6 +1164,8 @@ export class ColorComponent extends InputComponent<string> {
 }
 
 export class Setting {
+  readonly components: BaseComponent[] = [];
+  private disabled = false;
   readonly settingEl: HTMLElement;
   readonly infoEl: HTMLElement;
   readonly nameEl: HTMLElement;
@@ -1189,6 +1193,18 @@ export class Setting {
     this.settingEl.classList.add("setting-item-heading");
     return this;
   }
+  setDisabled(disabled: boolean): this {
+    this.disabled = disabled;
+    this.settingEl.classList.toggle("is-disabled", disabled);
+    for (const component of this.components) component.setDisabled(disabled);
+    return this;
+  }
+  private addComponent<T extends BaseComponent>(component: T, callback: (component: T) => unknown): this {
+    this.components.push(component);
+    callback(component);
+    if (this.disabled) component.setDisabled(true);
+    return this;
+  }
   /** Private host helper used by Excalidraw's export dialog. */
   setVisibility(visible: boolean): this {
     this.settingEl.hidden = !visible;
@@ -1205,46 +1221,38 @@ export class Setting {
   addText(callback: (component: TextComponent) => unknown): this {
     const component = new TextComponent(this.controlEl);
     this.controlEl.append(component.inputEl);
-    callback(component);
-    return this;
+    return this.addComponent(component, callback);
   }
   addTextArea(callback: (component: TextAreaComponent) => unknown): this {
     const component = new TextAreaComponent(this.controlEl);
     this.controlEl.append(component.inputEl);
-    callback(component);
-    return this;
+    return this.addComponent(component, callback);
   }
   addToggle(callback: (component: ToggleComponent) => unknown): this {
     const component = new ToggleComponent(this.controlEl);
     this.controlEl.append(component.inputEl);
-    callback(component);
-    return this;
+    return this.addComponent(component, callback);
   }
   addButton(callback: (component: ButtonComponent) => unknown): this {
-    callback(new ButtonComponent(this.controlEl));
-    return this;
+    return this.addComponent(new ButtonComponent(this.controlEl), callback);
   }
   addExtraButton(callback: (component: ExtraButtonComponent) => unknown): this {
-    callback(new ExtraButtonComponent(this.controlEl));
-    return this;
+    return this.addComponent(new ExtraButtonComponent(this.controlEl), callback);
   }
   addDropdown(callback: (component: DropdownComponent) => unknown): this {
     const component = new DropdownComponent(this.controlEl);
     this.controlEl.append(component.inputEl);
-    callback(component);
-    return this;
+    return this.addComponent(component, callback);
   }
   addSlider(callback: (component: SliderComponent) => unknown): this {
     const component = new SliderComponent(this.controlEl);
     this.controlEl.append(component.inputEl);
-    callback(component);
-    return this;
+    return this.addComponent(component, callback);
   }
   addColorPicker(callback: (component: ColorComponent) => unknown): this {
     const component = new ColorComponent(this.controlEl);
     this.controlEl.append(component.inputEl);
-    callback(component);
-    return this;
+    return this.addComponent(component, callback);
   }
 }
 
