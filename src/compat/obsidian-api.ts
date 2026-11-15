@@ -1,5 +1,6 @@
 import { getLocale } from "../i18n";
 import obsidianMoment from "moment";
+import { constructLegacy } from "./legacy-constructor";
 import "moment/locale/de.js";
 import { API_VERSION } from "./api-version";
 import { StateEffect, StateField } from "@codemirror/state";
@@ -893,6 +894,13 @@ export class Modal {
 }
 
 export class PluginSettingTab {
+  static call(receiver: PluginSettingTab, app: object, plugin: Plugin): PluginSettingTab {
+    return constructLegacy(this, receiver, [app, plugin]);
+  }
+  static apply(receiver: PluginSettingTab, args: ArrayLike<unknown>): PluginSettingTab {
+    return constructLegacy(this, receiver, args);
+  }
+
   readonly containerEl: HTMLElement;
   constructor(
     readonly app: object,
