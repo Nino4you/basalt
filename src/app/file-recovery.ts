@@ -13,7 +13,7 @@ const PAGE = 200;
 type View = "versions" | "deleted";
 
 function basename(path: string): string {
-  return path.slice(path.lastIndexOf("/") + 1).replace(/\.(md|canvas)$/i, "");
+  return path.slice(path.lastIndexOf("/") + 1).replace(/\.(md|canvas|base)$/i, "");
 }
 
 function folder(path: string): string {

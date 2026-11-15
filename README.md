@@ -63,6 +63,9 @@ Obsidian vaults and selected Obsidian plugins.
   to step to the previous or next one.
 - Graph view for the whole vault and as a local graph of the active note, with group colors.
 - Canvas in the open JSON Canvas format (`.canvas`) with text, note, link and group cards.
+- Bases (`.base`): database views over note properties as tables or cards, with filters,
+  formulas, sorting and grouping in the same YAML format as Obsidian Bases (see
+  [docs/bases.md](docs/bases.md)).
 - File recovery: every earlier version of a note or canvas and every deleted file can be
   compared with the current content and restored (command palette → "Open file recovery", or
   "Version history" in the file menu). Old backups are cleaned up after a period you choose.

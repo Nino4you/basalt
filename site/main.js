@@ -29,7 +29,7 @@ const de = {
     "Notizen sind einfaches Markdown in einem Ordner deiner Wahl. Kein Konto, keine Cloud, keine Telemetrie.",
   "p2.title": "Passt zu deinem Vault",
   "p2.text":
-    "Wiki-Links, Tags, Frontmatter, Callouts, Einbettungen und Canvas-Dateien verhalten sich so, wie du es erwartest.",
+    "Wiki-Links, Tags, Frontmatter, Callouts, Einbettungen, Canvas-Dateien und Bases verhalten sich so, wie du es erwartest.",
   "p3.title": "Gebaut für Linux und Android",
   "p3.text":
     "Ein gemeinsamer Rust-Kern, eine native App und eine Oberfläche für Maus, Tastatur, Touch und Stift.",

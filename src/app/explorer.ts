@@ -621,6 +621,11 @@ export class Explorer extends Component {
             icon: "layout-dashboard",
             onClick: () => void this.app.createCanvas(""),
           },
+          {
+            title: t("Neue Base"),
+            icon: "table",
+            onClick: () => void this.app.createBase(""),
+          },
           this.app.compatibility
             ? {
                 title: t("Neuer Ordner"),
@@ -645,6 +650,11 @@ export class Explorer extends Component {
           title: t("Neue Canvas"),
           icon: "layout-dashboard",
           onClick: () => void this.app.createCanvas(folder),
+        },
+        {
+          title: t("Neue Base"),
+          icon: "table",
+          onClick: () => void this.app.createBase(folder),
         },
         this.app.compatibility
           ? {

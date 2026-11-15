@@ -20,7 +20,7 @@ export interface BackupEntry {
 export const HISTORY_DIR = ".basalt/history";
 export const TRASH_DIR = ".basalt/trash";
 
-const DOCUMENT = /\.(md|canvas)$/i;
+const DOCUMENT = /\.(md|canvas|base)$/i;
 
 /** Recognizes a backup location; anything else, such as hidden originals, is `null`. */
 export function parseBackup(location: string, size = 0): BackupEntry | null {
