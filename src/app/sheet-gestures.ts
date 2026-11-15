@@ -126,6 +126,11 @@ export function installSheetGestures(app: App, shell: Shell): void {
     "touchmove",
     (event) => {
       if (!drag) return;
+      // Icons being reordered in the dock own the finger.
+      if (document.body.classList.contains("is-dock-reordering")) {
+        drag = null;
+        return;
+      }
       const touch = event.touches[0];
       const dx = touch.clientX - drag.startX;
       const dy = touch.clientY - drag.startY;

@@ -2,9 +2,9 @@ import { expect, it } from "vitest";
 import {
   applyDockOrder,
   DEFAULT_DOCK_ORDER,
-  moveItem,
   normalizeDockOrder,
   PLUGINS,
+  readDockOrder,
   SPACER,
 } from "../../src/app/dock-order";
 
@@ -25,12 +25,7 @@ it("repairs stored orders", () => {
   ]);
 });
 
-it("moves one place at a time and stops at the ends", () => {
-  expect(moveItem(["a", "b", "c"], "b", -1)).toEqual(["b", "a", "c"]);
-  expect(moveItem(["a", "b", "c"], "c", 1)).toEqual(["a", "b", "c"]);
-});
-
-it("puts the buttons in order, split by the spacer, and hides some", () => {
+it("applies an order across both groups and reads it back", () => {
   const ribbon = document.createElement("nav");
   ribbon.innerHTML = `
     <div class="side-dock-actions">
@@ -44,37 +39,16 @@ it("puts the buttons in order, split by the spacer, and hides some", () => {
       <button data-command="toggle-theme"></button>
       <button data-command="settings"></button>
     </div>`;
-  applyDockOrder(
-    ribbon,
-    [
-      "settings",
-      "open-graph",
-      SPACER,
-      "quick-switcher",
-      "daily-note",
-      "command-palette",
-      PLUGINS,
-      "toggle-theme",
-    ],
-    ["daily-note", "settings"],
-  );
-  const names = (selector: string) =>
-    [...ribbon.querySelector(selector)!.children].map(
-      (el) => (el as HTMLElement).dataset.command ?? "plugins",
-    );
-  expect(names(".side-dock-actions")).toEqual(["settings", "open-graph"]);
-  expect(names(".side-dock-settings")).toEqual([
+  const order = [
+    "settings",
+    "open-graph",
+    SPACER,
     "quick-switcher",
     "daily-note",
     "command-palette",
-    "plugins",
+    PLUGINS,
     "toggle-theme",
-  ]);
-  expect(
-    ribbon.querySelector<HTMLElement>('[data-command="daily-note"]')!.hidden,
-  ).toBe(true);
-  // Settings can never be hidden.
-  expect(
-    ribbon.querySelector<HTMLElement>('[data-command="settings"]')!.hidden,
-  ).toBe(false);
+  ];
+  applyDockOrder(ribbon, order);
+  expect(readDockOrder(ribbon)).toEqual(order);
 });

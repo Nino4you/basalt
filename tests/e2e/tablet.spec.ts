@@ -289,65 +289,140 @@ test("the dock can float at the bottom instead", async ({ page }) => {
     .toBeLessThanOrEqual(1194 - 48);
 });
 
-/** What a long press on the dock sends: a positioned context menu event. */
-async function longPressDock(page: Page) {
-  await page.evaluate(() =>
-    document.querySelector(".workspace-ribbon")!.dispatchEvent(
-      new MouseEvent("contextmenu", {
-        bubbles: true,
-        cancelable: true,
-        clientX: 38,
-        clientY: 300,
-      }),
-    ),
-  );
+/** Long press on an icon, drag it to (x, y) and let go, like a finger. */
+async function longPressDrag(
+  page: Page,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [from],
+  });
+  await page.waitForTimeout(450);
+  for (let i = 1; i <= 10; i++) {
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [
+        {
+          x: from.x + ((to.x - from.x) * i) / 10,
+          y: from.y + ((to.y - from.y) * i) / 10,
+        },
+      ],
+    });
+    await page.waitForTimeout(16);
+  }
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
 }
 
-test("the dock's order can be changed", async ({ page }) => {
-  await open(page, 1280, 800);
-  // A long press on the dock leads to its settings.
-  await longPressDock(page);
-  await page.getByRole("menuitem", { name: "Leiste anpassen …" }).click();
-  const settings = page.getByRole("dialog");
-  await expect(settings.locator("#dock-order")).toBeVisible();
-
-  // Views: search first.
-  await settings.getByRole("button", { name: "Suche nach oben" }).click();
-  await expect(page.locator(".rail-item").first()).toHaveAttribute(
-    "aria-label",
-    "Suche",
+const dockOrder = (page: Page) =>
+  page.evaluate(() =>
+    [
+      ...document.querySelectorAll(
+        ".workspace-ribbon .rail-item, .side-dock-actions > [data-command], .side-dock-settings > [data-command]",
+      ),
+    ].map((el) => el.getAttribute("aria-label")),
   );
-  // Actions: the graph hidden, settings moved above the gap.
-  await settings
-    .getByRole("switch", { name: "Graphansicht öffnen anzeigen" })
-    .click();
-  await expect(rail(page, "Graphansicht öffnen")).toBeHidden();
-  for (let i = 0; i < 5; i++)
-    await settings
-      .getByRole("button", { name: "Einstellungen nach oben" })
-      .click();
+
+const centre = async (page: Page, name: string) => {
+  const box = await rail(page, name).boundingBox();
+  return { x: box!.x + box!.width / 2, y: box!.y + box!.height / 2 };
+};
+
+test("dock icons are reordered by long press and drag", async ({ page }) => {
+  await open(page, 1280, 800);
+  // A view moves up among the views; the tap does not open it.
+  const files = await centre(page, "Dateien");
+  await longPressDrag(page, await centre(page, "Lesezeichen"), {
+    x: files.x,
+    y: files.y - 20,
+  });
+  await expect
+    .poll(() => dockOrder(page))
+    .toEqual([
+      "Lesezeichen",
+      "Dateien",
+      "Suche",
+      "Schnellauswahl öffnen",
+      "Heutige Tagesnotiz öffnen",
+      "Befehlspalette öffnen",
+      "Graphansicht öffnen",
+      "Farbschema wechseln",
+      "Einstellungen",
+    ]);
+  await expect(workspace(page)).not.toHaveClass(/is-left-open/);
+
+  // An action moves from the end of the dock up to the others.
+  const graph = await centre(page, "Graphansicht öffnen");
+  await longPressDrag(page, await centre(page, "Einstellungen"), {
+    x: graph.x,
+    y: graph.y + 10,
+  });
+  await expect
+    .poll(() => dockOrder(page))
+    .toEqual([
+      "Lesezeichen",
+      "Dateien",
+      "Suche",
+      "Schnellauswahl öffnen",
+      "Heutige Tagesnotiz öffnen",
+      "Befehlspalette öffnen",
+      "Graphansicht öffnen",
+      "Einstellungen",
+      "Farbschema wechseln",
+    ]);
   await expect(
     page
       .locator(".side-dock-actions")
       .getByRole("button", { name: "Einstellungen" }),
-  ).toBeVisible();
+  ).toHaveCount(1);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // The order survives a restart, and the default comes back on request.
+  // The order is kept.
   await page.reload();
-  await expect(page.locator(".rail-item").first()).toHaveAttribute(
-    "aria-label",
-    "Suche",
-  );
-  await expect(rail(page, "Graphansicht öffnen")).toBeHidden();
-  await longPressDock(page);
-  await page.getByRole("menuitem", { name: "Leiste anpassen …" }).click();
-  await page
-    .locator("#dock-order")
-    .getByRole("button", { name: "Standard wiederherstellen" })
-    .click();
-  await expect(page.locator(".rail-item").first()).toHaveAttribute(
-    "aria-label",
-    "Dateien",
-  );
-  await expect(rail(page, "Graphansicht öffnen")).toBeVisible();
+  await expect.poll(() => dockOrder(page)).toContain("Lesezeichen");
+  expect((await dockOrder(page))[0]).toBe("Lesezeichen");
+  expect((await dockOrder(page)).at(-2)).toBe("Einstellungen");
+
+  // A quick swipe over the dock is no reorder.
+  const first = await centre(page, "Lesezeichen");
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [first],
+  });
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [{ x: first.x, y: first.y + 120 }],
+  });
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  expect((await dockOrder(page))[0]).toBe("Lesezeichen");
+});
+
+test("the bottom dock is reordered sideways", async ({ page }) => {
+  await page.addInitScript(() => {
+    const settings = JSON.parse(
+      localStorage.getItem("basalt-settings") ?? "{}",
+    );
+    localStorage.setItem(
+      "basalt-settings",
+      JSON.stringify({ ...settings, tabletDock: "bottom" }),
+    );
+  });
+  await open(page, 1280, 800);
+  const bookmarks = await centre(page, "Lesezeichen");
+  await longPressDrag(page, await centre(page, "Dateien"), {
+    x: bookmarks.x + 20,
+    y: bookmarks.y,
+  });
+  await expect
+    .poll(async () => (await dockOrder(page)).slice(0, 3))
+    .toEqual(["Suche", "Lesezeichen", "Dateien"]);
 });

@@ -204,9 +204,10 @@ No UI framework: DOM is built with the `h()` / `icon()` helpers in `src/ui/dom.t
   desktop. Tablets turn the ribbon into a floating dock of icons (`App.renderRail`,
   `tablet.css`), at the left or, with the `tabletDock` setting, at the bottom
   (`body.is-dock-bottom`, `App.railWidth` is then 0; the left card then opens above its dock
-  icon, `App.anchorLeftCard`, and is pulled down by its header to close). The order of the
-  dock's (and desktop ribbon's) actions, with a spacer between top and end, lives in the
-  `dockOrder`/`dockHidden` settings (`dock-order.ts`); its views follow the left dock area. Their sidebars float as cards (`App.floating`, both may be open; no backdrop,
+  icon, `App.anchorLeftCard`, and is pulled down by its header to close). Dock (and desktop
+  ribbon) icons are reordered by dragging (`dock-reorder.ts`: mouse at once, touch after a long
+  press); the actions' order is the `dockOrder` setting (`dock-order.ts`), the views follow the
+  left dock area. Their sidebars float as cards (`App.floating`, both may be open; no backdrop,
   an outside tap closes them) unless pinned (`layout.leftPinned`/`rightPinned`), and a pinned
   one docks only while the note keeps `NOTE_MIN_WIDTH` (`sidebarSheets` in `src/ui/device.ts`).
   `src/app/sheet-gestures.ts` makes cards follow the finger. Phones keep the one-at-a-time

@@ -1,5 +1,3 @@
-import { t } from "../i18n";
-
 /** Divides the actions at the top (or left) of the dock from those at its end. */
 export const SPACER = "|";
 /** All plugin ribbon icons, kept together as one entry. */
@@ -16,32 +14,6 @@ export const DEFAULT_DOCK_ORDER = [
   "toggle-theme",
   "settings",
 ];
-
-/** Without these the app could not be reached or set up again. */
-export const ALWAYS_SHOWN = new Set([SPACER, "settings"]);
-
-export function dockItemLabel(id: string): string {
-  switch (id) {
-    case "quick-switcher":
-      return t("Schnellauswahl öffnen");
-    case "daily-note":
-      return t("Heutige Tagesnotiz öffnen");
-    case "command-palette":
-      return t("Befehlspalette öffnen");
-    case "open-graph":
-      return t("Graphansicht öffnen");
-    case PLUGINS:
-      return t("Plugin-Symbole");
-    case "toggle-theme":
-      return t("Farbschema wechseln");
-    case "settings":
-      return t("Einstellungen");
-    case SPACER:
-      return t("Abstand: was darunter steht, sitzt am Ende der Leiste");
-    default:
-      return id;
-  }
-}
 
 /**
  * A stored order made usable: unknown entries go, missing ones come back at
@@ -66,43 +38,40 @@ export function normalizeDockOrder(stored: unknown): string[] {
   return order;
 }
 
-/** Moves `id` one place up (-1) or down (+1); the list is returned as a copy. */
-export function moveItem<T>(list: readonly T[], item: T, delta: -1 | 1): T[] {
-  const result = [...list];
-  const index = result.indexOf(item);
-  const target = index + delta;
-  if (index < 0 || target < 0 || target >= result.length) return result;
-  [result[index], result[target]] = [result[target], result[index]];
-  return result;
+/** The dock id of an action element: its command, or PLUGINS. */
+export function dockItemId(el: Element): string | null {
+  if (el.classList.contains("side-dock-plugins")) return PLUGINS;
+  return (el as HTMLElement).dataset.command ?? null;
 }
 
 /**
  * Puts the dock's action buttons in `order`: those before the spacer into
- * the upper group, the rest into the end group; hidden ones are hidden.
+ * the upper group, the rest into the end group.
  */
 export function applyDockOrder(
   ribbon: HTMLElement,
   order: readonly string[],
-  hidden: readonly string[],
 ): void {
   const upper = ribbon.querySelector<HTMLElement>(".side-dock-actions");
   const end = ribbon.querySelector<HTMLElement>(".side-dock-settings");
   if (!upper || !end) return;
-  const element = (id: string) =>
-    id === PLUGINS
-      ? ribbon.querySelector<HTMLElement>(".side-dock-plugins")
-      : ribbon.querySelector<HTMLElement>(
-          `.side-dock-actions > [data-command="${id}"], .side-dock-settings > [data-command="${id}"]`,
-        );
+  const items = new Map<string, HTMLElement>();
+  for (const el of [...upper.children, ...end.children]) {
+    const id = dockItemId(el);
+    if (id) items.set(id, el as HTMLElement);
+  }
   let target = upper;
   for (const id of order) {
-    if (id === SPACER) {
-      target = end;
-      continue;
-    }
-    const el = element(id);
-    if (!el) continue;
-    target.append(el);
-    el.hidden = hidden.includes(id) && !ALWAYS_SHOWN.has(id);
+    if (id === SPACER) target = end;
+    else if (items.has(id)) target.append(items.get(id)!);
   }
+}
+
+/** The order the action buttons are in now, as `applyDockOrder` takes it. */
+export function readDockOrder(ribbon: HTMLElement): string[] {
+  const ids = (selector: string) =>
+    [...(ribbon.querySelector(selector)?.children ?? [])]
+      .map(dockItemId)
+      .filter((id): id is string => !!id);
+  return [...ids(".side-dock-actions"), SPACER, ...ids(".side-dock-settings")];
 }

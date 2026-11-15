@@ -49,8 +49,6 @@ export interface Settings {
   tabletDock: "left" | "bottom";
   /** Order of the dock's (ribbon's) actions, see dock-order.ts. */
   dockOrder: string[];
-  /** Dock actions the user hid. */
-  dockHidden: string[];
 }
 
 export const DEFAULT_ACCENT = "#8a5cf5";
@@ -84,7 +82,6 @@ export const defaults: Settings = {
   vimMode: false,
   tabletDock: "left",
   dockOrder: DEFAULT_DOCK_ORDER,
-  dockHidden: [],
 };
 
 const KEY = "basalt-settings";
