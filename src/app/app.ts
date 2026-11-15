@@ -3557,6 +3557,7 @@ export class App {
     this.shell.bottomSplit.inert = !bottomOpen;
     this.shell.leftBottomSplit.inert = !leftOpen || mobile;
     this.renderDock();
+    this.anchorLeftCard();
     try {
       if (!this.popout)
         localStorage.setItem(LAYOUT_KEY, JSON.stringify(this.layout));
@@ -3709,9 +3710,42 @@ export class App {
     return this.touch.matches && !this.isMobile;
   }
 
+  /** The tablet dock floats at the bottom (Settings → Appearance). */
+  get dockAtBottom(): boolean {
+    return this.isTablet && this.settings.get("tabletDock") === "bottom";
+  }
+
   /** Width the tablet dock takes from the note: none when it floats at the bottom. */
   get railWidth(): number {
-    return this.settings.get("tabletDock") === "bottom" ? 0 : RAIL_WIDTH;
+    return this.dockAtBottom ? 0 : RAIL_WIDTH;
+  }
+
+  /**
+   * With the dock at the bottom, the left card opens above the icon of its
+   * view, with a pointer to it, so it reads as coming out of the dock.
+   */
+  private anchorLeftCard(): void {
+    const split = this.shell.leftSplit;
+    if (!this.dockAtBottom) {
+      split.style.removeProperty("--card-left");
+      split.style.removeProperty("--card-arrow");
+      return;
+    }
+    const active = this.shownDock.left.active as DockPanelId | null;
+    const button =
+      (active && this.railButtons.get(active)) ?? this.shell.ribbon;
+    const rect = button.getBoundingClientRect();
+    const anchor = rect.left + rect.width / 2;
+    const gap = 10;
+    const width = Math.min(440, window.innerWidth - 2 * gap);
+    const left = Math.max(
+      gap,
+      Math.min(window.innerWidth - width - gap, anchor - width / 2),
+    );
+    // The card is placed inside the workspace, which may start after an inset.
+    const origin = this.shell.workspace.getBoundingClientRect().left;
+    split.style.setProperty("--card-left", `${left - origin}px`);
+    split.style.setProperty("--card-arrow", `${anchor - left}px`);
   }
 
   /** Tablet sidebars that float as cards right now (not pinned beside the note). */

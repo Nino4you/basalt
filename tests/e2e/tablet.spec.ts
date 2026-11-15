@@ -226,14 +226,52 @@ test("the dock can float at the bottom instead", async ({ page }) => {
   const note = await page.locator(".workspace-main-column").boundingBox();
   expect(note!.x).toBeLessThan(10);
 
-  await rail(page, "Dateien").tap();
-  const card = await page.locator("#left-split").boundingBox();
-  expect(card!.y + card!.height).toBeLessThan(dock!.y);
-  await rail(page, "Dateien").tap();
-  await expect(workspace(page)).not.toHaveClass(/is-left-open/);
-  // Without a rail the card comes out of the screen edge.
-  await drag(page, 4, 380, true);
+  // The card grows out of the dock, above the icon that opened it.
+  await rail(page, "Suche").tap();
   await expect(workspace(page)).toHaveClass(/is-left-open/);
+  await expect
+    .poll(async () => {
+      const card = await page.locator("#left-split").boundingBox();
+      return card!.y + card!.height;
+    })
+    .toBeLessThan(dock!.y);
+  const icon = await rail(page, "Suche").boundingBox();
+  const card = await page.locator("#left-split").boundingBox();
+  const centre = icon!.x + icon!.width / 2;
+  expect(centre).toBeGreaterThan(card!.x);
+  expect(centre).toBeLessThan(card!.x + card!.width);
+
+  // Pulled down by its header, it goes back into the dock.
+  const header = await page.locator(".sheet-header.mod-left").boundingBox();
+  await page.evaluate(
+    async ({ x, y }) => {
+      const target = document.elementFromPoint(x, y)!;
+      const fire = (type: string, at: number) => {
+        const point = new Touch({
+          identifier: 1,
+          target,
+          clientX: x,
+          clientY: at,
+        });
+        target.dispatchEvent(
+          new TouchEvent(type, {
+            touches: type === "touchend" ? [] : [point],
+            changedTouches: [point],
+            bubbles: true,
+          }),
+        );
+      };
+      fire("touchstart", y);
+      for (let i = 1; i <= 8; i++) {
+        await new Promise((done) => setTimeout(done, 16));
+        fire("touchmove", y + i * 60);
+      }
+      await new Promise((done) => setTimeout(done, 200));
+      fire("touchend", y + 480);
+    },
+    { x: header!.x + header!.width / 2, y: header!.y + 20 },
+  );
+  await expect(workspace(page)).not.toHaveClass(/is-left-open/);
 
   // And it stays clear of Android's navigation bar.
   await page.evaluate(() =>

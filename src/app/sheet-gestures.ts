@@ -21,12 +21,15 @@ interface Drag {
   el: HTMLElement;
   startX: number;
   startY: number;
-  /** null until the gesture is known to be horizontal (true) or not. */
+  /** Sideways cards move along x; the card above the bottom dock along y. */
+  axis: "x" | "y";
+  /** null until the gesture is known to run along the axis (true) or not. */
   horizontal: boolean | null;
   /** How far the card travels between closed and open. */
   distance: number;
   offset: number;
   lastX: number;
+  lastY: number;
   lastTime: number;
   /** px/ms towards opening; positive opens. */
   velocity: number;
@@ -34,7 +37,8 @@ interface Drag {
 
 /**
  * Tablet sidebar cards follow the finger: drag one out of the rail (left)
- * or the screen edge (right), or drag an open card back. On release the
+ * or the screen edge (right), or drag an open card back; the card above a
+ * bottom dock is pulled down by its header. On release the
  * speed decides, otherwise whether it is more than half open. A tap beside
  * an open card closes it and still reaches what it was aimed at.
  */
@@ -55,6 +59,9 @@ export function installSheetGestures(app: App, shell: Shell): void {
       const floats = app.floatingSides;
       let side: Side | null = null;
       let opening = false;
+      // Above the bottom dock the left card moves down, by its header only:
+      // the list inside it scrolls vertically.
+      const popup = app.dockAtBottom;
       for (const candidate of ["left", "right"] as const)
         if (
           floats[candidate] &&
@@ -62,9 +69,20 @@ export function installSheetGestures(app: App, shell: Shell): void {
           split(candidate).contains(target)
         )
           side = candidate;
+      if (
+        side === "left" &&
+        popup &&
+        !(target instanceof Element && target.closest(".sheet-header"))
+      )
+        return;
       if (!side) {
         opening = true;
-        if (floats.left && !visible("left") && touch.clientX < app.railWidth + 20)
+        if (
+          floats.left &&
+          !popup &&
+          !visible("left") &&
+          touch.clientX < app.railWidth + 20
+        )
           side = "left";
         else if (
           floats.right &&
@@ -76,19 +94,27 @@ export function installSheetGestures(app: App, shell: Shell): void {
       if (!side) return;
       const el = split(side);
       const rect = el.getBoundingClientRect();
-      // The closed card sits beyond the rail (left) or the screen edge.
+      const axis = side === "left" && popup ? "y" : "x";
+      // The closed card sits beyond the rail (left), the screen edge, or
+      // (above the bottom dock) down where it disappears.
       const distance =
-        side === "left" ? rect.width + app.railWidth + 16 : rect.width + 16;
+        axis === "y"
+          ? rect.height
+          : side === "left"
+            ? rect.width + app.railWidth + 16
+            : rect.width + 16;
       drag = {
         side,
         opening,
         el,
         startX: touch.clientX,
         startY: touch.clientY,
+        axis,
         horizontal: null,
         distance,
         offset: 0,
         lastX: touch.clientX,
+        lastY: touch.clientY,
         lastTime: event.timeStamp,
         velocity: 0,
       };
@@ -103,9 +129,11 @@ export function installSheetGestures(app: App, shell: Shell): void {
       const touch = event.touches[0];
       const dx = touch.clientX - drag.startX;
       const dy = touch.clientY - drag.startY;
+      const along = drag.axis === "x" ? dx : dy;
+      const across = drag.axis === "x" ? dy : dx;
       if (drag.horizontal === null) {
         if (Math.abs(dx) < SLOP && Math.abs(dy) < SLOP) return;
-        drag.horizontal = Math.abs(dx) > Math.abs(dy) * 1.2;
+        drag.horizontal = Math.abs(along) > Math.abs(across) * 1.2;
         if (!drag.horizontal) {
           drag = null;
           return;
@@ -113,6 +141,16 @@ export function installSheetGestures(app: App, shell: Shell): void {
         drag.el.classList.add("is-dragging");
       }
       const { side, opening, distance } = drag;
+      const elapsed = Math.max(1, event.timeStamp - drag.lastTime);
+      if (drag.axis === "y") {
+        // Only downwards, towards the dock.
+        drag.offset = Math.max(0, Math.min(distance, dy));
+        drag.el.style.transform = `translateY(${drag.offset}px)`;
+        drag.velocity = -(touch.clientY - drag.lastY) / elapsed;
+        drag.lastY = touch.clientY;
+        drag.lastTime = event.timeStamp;
+        return;
+      }
       // Offset from the open position: negative is towards the left.
       const raw =
         side === "left"
@@ -123,7 +161,6 @@ export function installSheetGestures(app: App, shell: Shell): void {
           ? Math.min(0, Math.max(-distance, raw))
           : Math.max(0, Math.min(distance, raw));
       drag.el.style.transform = `translateX(${drag.offset}px)`;
-      const elapsed = Math.max(1, event.timeStamp - drag.lastTime);
       const step = (touch.clientX - drag.lastX) / elapsed;
       drag.velocity = side === "left" ? step : -step;
       drag.lastX = touch.clientX;

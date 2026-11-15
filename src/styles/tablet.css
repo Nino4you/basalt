@@ -315,10 +315,78 @@ body.is-tablet .workspace.is-right-sheet.is-right-open .mod-right-split {
     transform 320ms var(--card-ease),
     box-shadow 320ms var(--card-ease);
 }
-/* Cards end above the bottom dock. */
-body.is-tablet.is-dock-bottom .workspace.is-left-sheet .mod-left-split,
+/* The right card ends above the bottom dock. */
 body.is-tablet.is-dock-bottom .workspace.is-right-sheet .mod-right-split {
   bottom: calc(var(--dock-height) + 14px + var(--card-gap));
+}
+/*
+ * With the dock at the bottom, the left card grows out of it: above the
+ * icon of its view (--card-left/--card-arrow, set by App.anchorLeftCard),
+ * with a pointer to that icon, rising from below. It is dragged down to
+ * close (sheet-gestures.ts).
+ */
+body.is-tablet.is-dock-bottom .workspace.is-left-sheet .mod-left-split {
+  top: auto;
+  left: var(--card-left, var(--card-gap));
+  bottom: calc(var(--dock-height) + 14px + 14px);
+  width: min(440px, calc(100vw - 2 * var(--card-gap))) !important;
+  height: min(70vh, 680px);
+  overflow: visible;
+  opacity: 0;
+  transform: translateY(28px) scale(0.94);
+  transform-origin: var(--card-arrow, 50%) 100%;
+  transition:
+    transform 300ms var(--card-ease),
+    opacity 180ms var(--ease),
+    box-shadow 300ms var(--card-ease),
+    visibility 0s linear 300ms;
+}
+body.is-tablet.is-dock-bottom
+  .workspace.is-left-sheet.is-left-open
+  .mod-left-split {
+  opacity: 1;
+  transform: none;
+  transition:
+    transform 300ms var(--card-ease),
+    opacity 120ms var(--ease),
+    box-shadow 300ms var(--card-ease);
+}
+/* The card clips its contents; the pointer below it stays outside. */
+body.is-tablet.is-dock-bottom
+  .workspace.is-left-sheet
+  .mod-left-split
+  .workspace-split-inner {
+  overflow: hidden;
+  border-radius: var(--card-radius);
+}
+body.is-tablet.is-dock-bottom .workspace.is-left-sheet .mod-left-split::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  left: calc(var(--card-arrow, 50%) - 8px);
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--background-modifier-border);
+  border-width: 0 1px 1px 0;
+  background: var(--background-secondary);
+  transform: rotate(45deg);
+}
+/* A grip on the header: drag the card down to put it back into the dock. */
+body.is-tablet.is-dock-bottom .mod-left-split .sheet-header.mod-left::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--background-modifier-border-hover, var(--text-faint));
+  opacity: 0.6;
+  transform: translateX(-50%);
+}
+body.is-tablet.is-dock-bottom .mod-left-split .sheet-header.mod-left {
+  position: relative;
+  padding-top: 8px;
 }
 /* Pinned sidebars are cards too, in the flow beside the note. */
 body.is-tablet .workspace.is-left-open:not(.is-left-sheet) .mod-left-split,
