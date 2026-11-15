@@ -70,6 +70,8 @@
 
 - Die bereits installierte CodeMirror-Lint-Laufzeit ist jetzt ein explizit gepinnter Host-Baustein (`6.9.7`) und liegt in derselben Plugin-Modultabelle wie State/View. Fehlender Export erst rot reproduziert; echte Diagnose-Effekte, echte `EditorState`-Anwendung und Host-Identität geprüft. 665/665 Unit-Tests mit vier Workern, Produktionsbuild und `npm audit --omit=dev` (0 Befunde) grün. Keine zweite CodeMirror-Instanz und keine neue Netzwerk-/Systemberechtigung.
 
+- Auf ausdrückliche Freigabe: Branch gepusht und Draft-PR #25 gegen `next` geöffnet (kein Merge, kein Release). PR-CI läuft; die PR-Beschreibung nennt 34/100 sauber, die verbleibenden Familien und die Grenzen der Browser-Diagnose. Keine privaten Pfade, E-Mails oder Fremd-Bundles veröffentlicht.
+
 ### Blockiert / braucht Freigabe
 
 - Eine Lösung, die unrestricted Node/fs/Prozess-/Serverzugriff, globale Installationen, bezahlte APIs oder Veröffentlichung voraussetzt, ist nicht freigegeben. Andere sichere Lücken werden währenddessen weiterbearbeitet.
