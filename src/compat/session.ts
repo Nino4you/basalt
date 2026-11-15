@@ -11,6 +11,7 @@ import {
   createObsidianApi,
   editorInfoEffect,
   editorInfoField,
+  editorLivePreviewField,
   Scope,
 } from "./obsidian-api";
 import type { RequestUrl } from "./request";
@@ -210,7 +211,7 @@ export class CompatibilitySession {
         modules: editorModules,
       },
     });
-    this.editorInfoCleanup = options.extensions.register(editorInfoField);
+    this.editorInfoCleanup = options.extensions.register([editorInfoField, editorLivePreviewField]);
     const ui = options.pluginUi;
     this.plugins.setToggleHost({
       enable: async (id) => {

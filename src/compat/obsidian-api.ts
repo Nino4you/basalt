@@ -3,6 +3,7 @@ import obsidianMoment from "moment";
 import "moment/locale/de.js";
 import { API_VERSION } from "./api-version";
 import { StateEffect, StateField } from "@codemirror/state";
+import { renderedFacet } from "../editor/live-preview";
 import DOMPurify from "dompurify";
 import {
   fetchRequestUrl,
@@ -157,6 +158,11 @@ export const editorInfoField = StateField.define<EditorInfo | null>({
       if (effect.is(editorInfoEffect)) value = effect.value;
     return value;
   },
+});
+
+export const editorLivePreviewField = StateField.define<boolean>({
+  create: (state) => state.facet(renderedFacet),
+  update: (_value, transaction) => transaction.state.facet(renderedFacet),
 });
 
 export type { RequestUrlParam, RequestUrlResponse } from "./request";
@@ -1965,6 +1971,7 @@ export function createObsidianApi(
       throw new Error("PDF.js is not bundled in Basalt yet");
     },
     editorInfoField,
+    editorLivePreviewField,
     MarkdownRenderer: {
       render: async (
         _app: object,

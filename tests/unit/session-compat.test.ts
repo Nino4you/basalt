@@ -1,9 +1,10 @@
-import { Compartment, EditorState, Facet } from "@codemirror/state";
+import { Compartment, EditorState, Facet, StateEffect, type StateField } from "@codemirror/state";
 import { expect, it, beforeEach, vi } from "vitest";
 import { CompatibilitySession } from "../../src/compat/session";
 import { Editor } from "../../src/compat/editor-adapter";
 import { EditorExtensionRegistry } from "../../src/compat/editor-extensions";
-import { editorInfoField } from "../../src/compat/obsidian-api";
+import { createObsidianApi, editorInfoField } from "../../src/compat/obsidian-api";
+import { renderedFacet } from "../../src/editor/live-preview";
 import { Plugin } from "../../src/compat/plugin";
 import type { VaultStoragePort } from "../../src/compat/storage-port";
 
@@ -197,6 +198,30 @@ it("publishes the active file through editorInfoField for sync plugins", async (
   session.setActivePath(null);
   expect(session.services.isCommandAvailable("editor-command")).toBe(false);
   await session.dispose();
+});
+
+it("publishes live preview changes from the actual host mode compartment", async () => {
+  const f = fixture();
+  const mode = new Compartment();
+  f.editor.cm.dispatch({ effects: StateEffect.appendConfig.of(mode.of(renderedFacet.of(false))) });
+  const session = await CompatibilitySession.create({
+    vaultId: "fixture", name: "Fixture", mobile: false,
+    editor: f.editor, extensions: f.extensions,
+    container: document.createElement("div"), port: f.port,
+    navigate: async () => {},
+  });
+  const field = createObsidianApi({ app: session }).editorLivePreviewField as StateField<boolean>;
+  try {
+    expect(field).toBeDefined();
+    expect(f.state().field(field)).toBe(false);
+    f.editor.cm.dispatch({ effects: mode.reconfigure(renderedFacet.of(true)) });
+    expect(f.state().field(field)).toBe(true);
+    f.editor.cm.dispatch({ effects: mode.reconfigure(renderedFacet.of(false)) });
+    expect(f.state().field(field)).toBe(false);
+  } finally {
+    await session.dispose();
+  }
+  expect(f.state().field(field, false)).toBeUndefined();
 });
 
 it("persists app-level local storage as JSON like the documented API", async () => {
