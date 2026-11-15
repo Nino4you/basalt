@@ -12,7 +12,8 @@ plugin bundles.
 KaTeX, Mermaid and Markdown tables are also rendered in the editor. A table stays visible while
 editing; only the active cell shows its Markdown source. Registered plugin code block processors
 still take precedence over the built-in Mermaid renderer. Plugin embeds keep their own life
-cycle. Multi-line math inside nested blockquotes/callouts and tables that cannot be mapped
+cycle and take precedence over the built-in image, media and note embeds, which live preview
+renders with the reading view's code (sections `#Heading`, blocks `#^id`, image sizes `|300x200`). Multi-line math inside nested blockquotes/callouts and tables that cannot be mapped
 unambiguously stay visible as source, to be safe. When an edge cell is emptied, the editor adds
 the optional outer table pipe if needed, so GFM does not shift the neighboring cell into another
 column. Known rendering limit: an escaped table pipe inside a code span may still show its
@@ -145,6 +146,11 @@ The loader follows a deliberately narrow but real execution model:
 - `loadData`/`saveData` read and write `Basalt/Plugins/<id>/data.json` as in Obsidian
   (indented, at most 16 MiB). Settings therefore travel with the vault to other devices and into
   backups and survive reinstalling the app. A plugin's saves run in order, so the last call wins.
+  Saves are coalesced: a settings tab that calls `saveData` per keystroke is written once typing
+  pauses for a second (at the latest every five seconds), and an unchanged value is not written at
+  all, so the file history gets one backup per edit instead of one per character. `loadData`
+  always sees the latest saved value; pending saves are written when the app is hidden or
+  closed, on vault switch, and directly while plugins unload.
   An invalid `data.json` is not silently replaced with defaults but reported as an error; if a
   plugin restored at startup fails because of this, the app shows a notice and the error in the
   plugin settings instead of disabling it without comment. The file stays unchanged. Older
@@ -169,6 +175,14 @@ listed in `VERIFIED_PLUGINS` there are marked as checked, with the version above
 in sync with this document. The mark needs the catalog's own repository: a fork or another
 repository with the same plugin id is untested, and the install dialog marks only the checked
 version itself. Being installable says nothing about compatibility.
+
+A catalog plugin's details offer a version picker: the latest release by default, or any of the
+last 30 GitHub releases that ship `manifest.json` and `main.js` (pre-releases marked, picking an
+older one installs it as a downgrade after a warning). The minimum Obsidian version per release
+comes from the plugin's `versions.json`, and the install dialog checks the downloaded manifest's
+`minAppVersion`; both are compared with the API version Basalt reports (`src/compat/api-version.ts`)
+and only warn, they never block. The release list uses the anonymous GitHub API (60 requests per
+hour), is loaded only when a plugin is opened and cached per app start.
 
 `FileManager.renameFile` moves the file and, when "Automatically update internal links" is on,
 rewrites links to it in notes and canvases exactly like a rename in the app: only links whose

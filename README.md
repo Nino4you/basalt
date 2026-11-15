@@ -38,8 +38,8 @@ Obsidian vaults and selected Obsidian plugins.
 **Writing**
 
 - CodeMirror 6 editor with live preview: Markdown syntax fades away, links and checkboxes are
-  clickable, and KaTeX math, Mermaid diagrams and tables render right in the editor. Tables
-  are edited cell by cell while the Markdown stays the source of truth.
+  clickable, and KaTeX math, Mermaid diagrams, tables, images and embedded notes render right
+  in the editor. Tables are edited cell by cell while the Markdown stays the source of truth.
 - Completion for `[[wiki links]]` (including `#headings`, `#^blocks` and note aliases) and
   `#tags`, page previews when hovering links, templates from a folder you choose (with title
   and Moment.js date placeholders), and a source mode.
@@ -48,7 +48,9 @@ Obsidian vaults and selected Obsidian plugins.
 - Paste or drop pictures and files into a note: they are stored in the attachment folder you
   choose and linked with `![[…]]`.
 - Optional Vim key bindings (`:w` saves).
-- Reading view with callouts, properties, footnotes, note embeds and syntax highlighting.
+- Embeds of whole notes, a single section (`![[Note#Heading]]`) or block (`![[Note#^id]]`), and
+  sized images (`![[photo.png|300]]` or `|300x200`), in live preview and reading view.
+- Reading view with callouts, properties, footnotes and syntax highlighting.
 - Print a note or save it as PDF (Linux), or export it as one self-contained HTML file.
 - PDFs, images, audio and video open in their own tabs; PDFs are rendered locally.
 
@@ -57,8 +59,9 @@ Obsidian vaults and selected Obsidian plugins.
 - File tree with folders, bookmarks, drag & drop and safe renaming that carries open tabs,
   bookmarks and unsaved changes along; links to a renamed or moved note are updated.
 - Backlinks with context, unlinked mentions that become links with one click, outgoing links,
-  tags, outline and full-text search (`tag:`, `path:`, `file:`, exclusion with `-`) with
-  search and replace across the vault.
+  tags, outline and full-text search (`tag:`, `path:`, `file:`, `line:`, `section:`, `task:`,
+  `task-todo:`, `task-done:`, `/regular expressions/`, exclusion with `-`) with search and
+  replace across the vault.
 - Daily notes with their own folder, date format (Moment.js style) and template, and commands
   to step to the previous or next one.
 - Graph view for the whole vault and as a local graph of the active note, with group colors.
@@ -139,7 +142,8 @@ you enable each one in the settings.
 Settings → Community plugins installs them for you:
 
 - **Browse** the Obsidian community catalog. Plugins Basalt has checked are marked; all others
-  are untested and may work, partly work or fail visibly.
+  are untested and may work, partly work or fail visibly. Each plugin installs its latest release
+  or any earlier version you pick; releases that need a newer Obsidian API are marked.
 - **From GitHub** installs the latest release of any repository, such as your own plugin or a
   beta that is not in the catalog.
 - **From files** installs a plugin you built yourself from its `manifest.json`, `main.js` and

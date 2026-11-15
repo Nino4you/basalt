@@ -10,6 +10,8 @@ import {
 } from "../backend";
 import { attachmentKind, attachmentLink } from "../attachments";
 import { importAttachments } from "./attachment-import";
+import { createEmbedPreviewHost } from "./editor-embeds";
+import { clearImageCache } from "./image-cache";
 import { autoCleanBackups } from "./backup-cleanup";
 import {
   readAppearance,
@@ -340,6 +342,7 @@ export class App {
               this.activePath,
             ) ?? null)
           : null,
+      embedPreview: createEmbedPreviewHost(this),
       pluginContext: () =>
         this.compatibility
           ? { sourcePath: this.activePath ?? "", app: this.compatibility }
@@ -384,7 +387,11 @@ export class App {
       this.updateHeader();
       this.updateStatus();
     });
-    this.on("index", () => this.updateBacklinkCount());
+    this.on("index", () => {
+      this.updateBacklinkCount();
+      // Embedded notes in live preview follow changes to their content.
+      this.editor.refreshLinks();
+    });
     this.applyLayout();
     this.renderGroups();
     this.showActive();
@@ -509,6 +516,7 @@ export class App {
     this.index.reset();
     this.reading.clear();
     this.clearAttachment();
+    clearImageCache();
     for (const view of this.groupViews.values()) view.mirror.release();
     this.pluginErrors.clear();
     const previous = this.compatibility;
@@ -1455,6 +1463,12 @@ export class App {
       return;
     }
     void this.createNote(name, { newTab });
+  }
+
+  /** Browser demo: SVG images live as text in the demo vault. */
+  async demoImage(path: string): Promise<string | null> {
+    if (native || !/\.svg$/i.test(path) || !this.index.has(path)) return null;
+    return backend.read(path);
   }
 
   openExternal(url: string): void {
@@ -4158,9 +4172,16 @@ export class App {
     );
     window.addEventListener("beforeunload", (event) => {
       this.writeWorkspace();
+      const pluginData = this.compatibility?.hasPendingPluginData() ?? false;
+      void this.compatibility
+        ?.flushPluginData()
+        .catch((error) => this.report(error));
       if (
-        this.store &&
-        [...this.store.notes.values()].some((note) => note.text !== note.saved)
+        pluginData ||
+        (this.store &&
+          [...this.store.notes.values()].some(
+            (note) => note.text !== note.saved,
+          ))
       )
         event.preventDefault();
     });
@@ -4182,6 +4203,9 @@ export class App {
       }
       this.writeWorkspace();
       void this.store?.saveAll().catch((error) => this.report(error));
+      void this.compatibility
+        ?.flushPluginData()
+        .catch((error) => this.report(error));
     });
 
     // Edge swipes open the drawers on touch devices.
