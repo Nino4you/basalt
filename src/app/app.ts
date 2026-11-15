@@ -7,7 +7,7 @@ import {
   validateNotePath,
   type VaultInfo,
 } from "../backend";
-import { attachmentKind, attachmentLink } from "../attachments";
+import { attachmentKind, attachmentLink, availablePath } from "../attachments";
 import { importAttachments } from "./attachment-import";
 import { autoCleanBackups } from "./backup-cleanup";
 import {
@@ -21,6 +21,8 @@ import { insertFootnote } from "../editor/footnotes";
 import { exportHtml, printNote } from "./print-export";
 import {
   findUpdate,
+  AndroidUpdateError,
+  installAndroidUpdate,
   installSignedUpdate,
   updateCheckDue,
   type AvailableUpdate,
@@ -118,6 +120,12 @@ import { openCommandPalette, openQuickSwitcher } from "./switcher";
 import { openFileRecovery } from "./file-recovery";
 import { LinkUpdate } from "./link-update";
 import { VaultIndex } from "./vault-index";
+import {
+  listenForShares,
+  shareMarkdown,
+  type SharedContent,
+} from "./android-share";
+import { openShareDialog } from "./share-dialog";
 
 export interface Tab {
   id: number;
@@ -480,6 +488,12 @@ export class App {
         requestAnimationFrame(() => root.classList.remove("is-starting")),
       );
     }
+    // Content shared from other Android apps ("Share" → Basalt); a no-op
+    // without the activity's bridge.
+    listenForShares(
+      (share) => this.receiveShare(share),
+      (error) => this.report(error),
+    );
     // Opt-in; a failed check (offline, rate limit) is not worth a notice.
     void this.checkForUpdates().catch((error) => console.warn(error));
   }
@@ -719,7 +733,92 @@ export class App {
       throw new Error(t("Für dieses Update gibt es keine automatische Installation."));
     await saveBeforeLeaving(this);
     this.writeWorkspace();
-    await installSignedUpdate(onProgress);
+    if (this.availableUpdate.apk && this.vault?.platform === "android") {
+      try {
+        await installAndroidUpdate(this.availableUpdate, onProgress);
+      } catch (error) {
+        throw androidUpdateMessage(error);
+      }
+    } else await installSignedUpdate(onProgress);
+  }
+
+  /** Asks where shared content goes, then stores it like a pasted note. */
+  receiveShare(share: SharedContent): void {
+    if (!this.vault) return;
+    closeMenu();
+    openShareDialog(
+      {
+        createNote: (content, name) => this.createSharedNote(content, name),
+        appendTarget: () => this.activeNote?.path ?? null,
+        appendToCurrent: (content) => this.appendShared(content),
+      },
+      share,
+    );
+  }
+
+  private async sharedEmbeds(
+    share: SharedContent,
+    sourcePath: string,
+  ): Promise<string[]> {
+    if (!share.files.length) return [];
+    const files = share.files.map(
+      (file) => new File([file.bytes], file.name, { type: file.type }),
+    );
+    const links = await importAttachments(
+      this.compatibility?.vault ?? null,
+      files,
+      {
+        sourcePath,
+        folderSetting: this.settings.get("attachmentFolder"),
+        pasted: false,
+      },
+    );
+    if (links) {
+      this.setFiles((await backend.info()).files);
+      this.syncVisibleFiles();
+    }
+    return links ? links.split("\n") : [];
+  }
+
+  private async createSharedNote(
+    share: SharedContent,
+    name: string,
+  ): Promise<string | null> {
+    const folder =
+      this.settings.get("newNoteLocation") === "current" && this.activePath
+        ? dirname(this.activePath)
+        : "";
+    const path = validateNotePath(
+      folder ? `${folder}/${name.trim()}` : name.trim(),
+    );
+    const folderOf = dirname(path);
+    const free = availablePath(
+      folderOf,
+      folderOf ? path.slice(folderOf.length + 1) : path,
+      (candidate) => this.index.has(candidate),
+    );
+    const embeds = await this.sharedEmbeds(share, free);
+    return this.createNote(free, {
+      text: `${shareMarkdown(share, embeds)}\n`,
+      throwOnError: true,
+    });
+  }
+
+  private async appendShared(share: SharedContent): Promise<void> {
+    const note = this.activeNote;
+    if (!note) throw new Error(t("Keine Notiz geöffnet."));
+    const embeds = await this.sharedEmbeds(share, note.path);
+    if (this.activeNote !== note) throw new Error(t("Die Notiz wurde gewechselt."));
+    const addition = shareMarkdown(share, embeds);
+    if (!addition) return;
+    this.setReading(false);
+    const doc = this.editor.view.state.doc;
+    const separator = !doc.length ? "" : doc.toString().endsWith("\n\n") ? "" : doc.toString().endsWith("\n") ? "\n" : "\n\n";
+    this.editor.view.dispatch({
+      changes: { from: doc.length, insert: `${separator}${addition}\n` },
+      selection: { anchor: doc.length + separator.length + addition.length + 1 },
+      scrollIntoView: true,
+    });
   }
 
   /** Sync conflict copies and notes with merge markers in this vault. */
@@ -4578,6 +4677,18 @@ export class App {
       // Restoring tabs is optional.
     }
   }
+}
+
+/** User-facing text for a failed Android update. */
+function androidUpdateMessage(error: unknown): Error {
+  if (error instanceof AndroidUpdateError && error.state === "cancelled")
+    return new Error(t("Das Update wurde abgebrochen."));
+  const message = error instanceof Error ? error.message : String(error);
+  if (message === "SIGNATURE_MISMATCH")
+    return new Error(
+      t("Das Update ist nicht mit dem Schlüssel dieser App signiert. Installiere es über die Quelle, aus der du Basalt hast."),
+    );
+  return new Error(t("Das Update konnte nicht installiert werden: {error}", { error: message }));
 }
 
 function emptyWorkspace(): SavedWorkspace {

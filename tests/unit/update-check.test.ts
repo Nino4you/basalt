@@ -113,3 +113,103 @@ it("prefers the signed updater and falls back to the release page", async () => 
     false,
   );
 });
+
+it("finds the universal APK only among Basalt's own release assets", async () => {
+  const { androidApk } = await import("../../src/app/update-check");
+  const good =
+    "https://github.com/Nino4you/basalt/releases/download/v0.5.0/Basalt_0.5.0_android-universal.apk";
+  expect(
+    androidApk(
+      [
+        { name: "Basalt_0.5.0_amd64.deb", browser_download_url: "x" },
+        {
+          name: "Basalt_0.5.0_android-universal.apk",
+          browser_download_url: good,
+        },
+      ],
+      "0.5.0",
+    ),
+  ).toBe(good);
+  expect(
+    androidApk(
+      [
+        {
+          name: "Basalt_0.5.0_android-universal.apk",
+          browser_download_url:
+            "https://evil.example/Basalt_0.5.0_android-universal.apk",
+        },
+      ],
+      "0.5.0",
+    ),
+  ).toBeNull();
+  // An APK of another version is not this release's package.
+  expect(
+    androidApk(
+      [
+        {
+          name: "Basalt_0.4.0_android-universal.apk",
+          browser_download_url: good,
+        },
+      ],
+      "0.5.0",
+    ),
+  ).toBeNull();
+  expect(androidApk(undefined, "0.5.0")).toBeNull();
+});
+
+it("drives the Android installer bridge through its events", async () => {
+  const { installAndroidUpdate, AndroidUpdateError } =
+    await import("../../src/app/update-check");
+  const update = {
+    version: "0.5.0",
+    url: RELEASE_PAGE,
+    notes: "",
+    installable: true,
+    apk: "https://github.com/Nino4you/basalt/releases/download/v0.5.0/Basalt_0.5.0_android-universal.apk",
+  };
+  const target = new EventTarget();
+  const send = (detail: unknown) =>
+    target.dispatchEvent(new CustomEvent("basalt-update", { detail }));
+  const calls: string[][] = [];
+  const bridge = {
+    installUpdate: (url: string, version: string) => {
+      calls.push([url, version]);
+      return true;
+    },
+  };
+  const progress = vi.fn();
+  const done = installAndroidUpdate(update, progress, bridge, target);
+  send({ state: "progress", downloaded: 5, total: 10 });
+  send({ state: "signature-checked" });
+  send({ state: "confirm" });
+  send({ state: "installed" });
+  await done;
+  expect(calls).toEqual([[update.apk, "0.5.0"]]);
+  expect(progress).toHaveBeenCalledWith({ downloaded: 5, total: 10 });
+
+  const cancelled = installAndroidUpdate(update, progress, bridge, target);
+  send({ state: "confirm" });
+  send({ state: "cancelled", message: "aborted" });
+  await expect(cancelled).rejects.toBeInstanceOf(AndroidUpdateError);
+
+  const failed = installAndroidUpdate(update, progress, bridge, target);
+  send({ state: "error", message: "SIGNATURE_MISMATCH" });
+  await expect(failed).rejects.toThrow("SIGNATURE_MISMATCH");
+
+  await expect(
+    installAndroidUpdate(
+      update,
+      progress,
+      { installUpdate: () => false },
+      target,
+    ),
+  ).rejects.toThrow("busy");
+  await expect(
+    installAndroidUpdate(
+      { ...update, apk: "https://evil.example/a.apk" },
+      progress,
+      bridge,
+      target,
+    ),
+  ).rejects.toThrow("No installable");
+});

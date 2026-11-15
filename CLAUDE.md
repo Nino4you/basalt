@@ -184,7 +184,8 @@ No UI framework: DOM is built with the `h()` / `icon()` helpers in `src/ui/dom.t
   (Syncthing/Nextcloud/Dropbox conflict copies and Git markers), `vault-styles.ts` (themes and
   CSS snippets from `Basalt/Config`), `print-export.ts` (print/PDF, standalone HTML) and
   `update-check.ts` (opt-in update check; the desktop app installs signed updates through
-  `src-tauri/src/updates.rs`, Android only links to the release) in `src/app/`; `properties.ts` +
+  `src-tauri/src/updates.rs`, Android through the patched activity's installer bridge) and
+  `android-share.ts` + `share-dialog.ts` (Android "Share" → Basalt) in `src/app/`; `properties.ts` +
   `properties-model.ts` (frontmatter fields, edited through the `yaml` document model),
   `footnotes.ts` and `attachments.ts` in `src/editor/`. Vim key bindings are a lazy chunk.
 - `src/canvas/` — JSON Canvas 1.0 (`.canvas`). Parsing keeps unknown fields so files written by
