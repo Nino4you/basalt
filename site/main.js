@@ -32,7 +32,7 @@ const de = {
     "Wiki-Links, Tags, Frontmatter, Callouts, Einbettungen, Canvas-Dateien und Bases verhalten sich so, wie du es erwartest.",
   "p3.title": "Gebaut für Linux und Android",
   "p3.text":
-    "Ein gemeinsamer Rust-Kern, eine native App und eine Oberfläche für Maus, Tastatur, Touch und Stift.",
+    "Ein gemeinsamer Rust-Kern, eine native App und eigene Layouts für Desktop, Tablet und Handy: Maus, Tastatur, Touch und Stift.",
   "p4.title": "Sorgsam mit deinen Daten",
   "p4.text":
     "Frühere Fassungen werden vor dem Überschreiben gesichert und lassen sich zurückholen. Änderungen von außen werden erkannt statt überschrieben.",

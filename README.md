@@ -89,11 +89,18 @@ Obsidian vaults and selected Obsidian plugins.
 - Quick switcher (Ctrl+O), command palette (Ctrl+P), full keyboard navigation and hotkeys you
   can change in the settings.
 - Light and dark theme with an accent color, plus Obsidian-style themes and CSS snippets from
-  the vault (`Basalt/Config/themes`, `Basalt/Config/snippets`); a dedicated phone layout with
-  drawers, a bottom navigation bar and a formatting toolbar.
+  the vault (`Basalt/Config/themes`, `Basalt/Config/snippets`).
+- A dedicated phone layout with drawers, a bottom navigation bar and a formatting toolbar.
+- A tablet layout of its own: a navigation rail with labelled views and a new-note button,
+  sidebars that sit beside the note while it keeps enough room and slide over it otherwise
+  (so turning the tablet just works), edge swipes, finger-sized targets and a focus mode that
+  leaves only the note.
 
 <p align="center">
   <img src="screenshots/02-mobile-dark.png" width="300" alt="Basalt on a phone: reading view with bottom navigation bar" />
+</p>
+<p align="center">
+  <img src="screenshots/03-tablet-dark.png" width="640" alt="Basalt on a tablet in landscape: navigation rail, files beside the note and the outline" />
 </p>
 
 ## Installation

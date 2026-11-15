@@ -257,3 +257,19 @@ body.is-focus-mode .focus-mode-exit:hover,
 body.is-focus-mode .focus-mode-exit:focus-visible {
   opacity: 1;
 }
+
+/* ── dialogs ─────────────────────────────────────────────────────────────── */
+
+body.is-tablet .vertical-tab-nav-item {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+body.is-tablet .suggestion-item {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+body.is-tablet .modal .setting-item {
+  min-height: 56px;
+}
