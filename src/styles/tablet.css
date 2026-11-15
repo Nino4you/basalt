@@ -215,3 +215,45 @@ body.is-tablet .search-input {
 body.is-tablet .menu-item {
   min-height: 40px;
 }
+
+/* ── focus mode (any layout) ─────────────────────────────────────────────── */
+
+.focus-mode-exit,
+.focus-mode-button {
+  display: none;
+}
+/* The header button is for touch screens; keyboards have the command. */
+body.is-touch:not(.is-mobile) .focus-mode-button {
+  display: inline-flex;
+}
+body.is-focus-mode .workspace-ribbon,
+body.is-focus-mode .workspace-split.mod-left-split,
+body.is-focus-mode .workspace-split.mod-right-split,
+body.is-focus-mode .workspace-split.mod-bottom-split,
+body.is-focus-mode .workspace-resize-handle,
+body.is-focus-mode .workspace-tab-header-container.mod-root,
+body.is-focus-mode .view-header,
+body.is-focus-mode .status-bar,
+body.is-focus-mode .mobile-navbar,
+body.is-focus-mode .workspace-group:not(.is-active),
+body.is-focus-mode .workspace-group-sash {
+  display: none !important;
+}
+body.is-focus-mode .focus-mode-exit {
+  position: fixed;
+  top: calc(var(--safe-top, 0px) + 10px);
+  right: 14px;
+  z-index: 70;
+  display: inline-flex;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 999px;
+  background: var(--background-secondary);
+  box-shadow: var(--shadow-s);
+  opacity: 0.55;
+  transition: opacity 150ms var(--ease);
+}
+body.is-focus-mode .focus-mode-exit:hover,
+body.is-focus-mode .focus-mode-exit:focus-visible {
+  opacity: 1;
+}

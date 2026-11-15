@@ -832,4 +832,7 @@ export const en = {
   "Ausgehend": "Outgoing",
   "Ansichten": "Views",
   "Graph": "Graph",
+  "Fokusmodus": "Focus mode",
+  "Fokusmodus beenden": "Leave focus mode",
+  "Fokusmodus umschalten": "Toggle focus mode",
 } as const;

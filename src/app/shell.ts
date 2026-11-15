@@ -283,6 +283,24 @@ export function buildShell(root: HTMLElement) {
     "book-open",
     t("Leseansicht"),
   );
+  // Shown on touch screens; elsewhere the command and its menu entry do it.
+  const focusButton = commandButton(
+    "toggle-focus-mode",
+    "maximize-2",
+    t("Fokusmodus"),
+    "focus-mode-button",
+  );
+  // Leaves focus mode, the only control it keeps besides the note.
+  const focusExit = h(
+    "button",
+    {
+      class: "clickable-icon focus-mode-exit",
+      label: t("Fokusmodus beenden"),
+      attrs: { type: "button" },
+      data: { command: "toggle-focus-mode", tooltipPosition: "left" },
+    },
+    icon("minimize-2"),
+  );
   const moreButton = h(
     "button",
     {
@@ -410,7 +428,7 @@ export function buildShell(root: HTMLElement) {
         h("div", "view-header-nav-buttons", backButton, forwardButton),
       ),
       h("div", "view-header-title-container", breadcrumb, title),
-      h("div", "view-actions", modeButton, moreButton),
+      h("div", "view-actions", focusButton, modeButton, moreButton),
     ),
     saveWarning,
     viewContent,
@@ -583,6 +601,7 @@ export function buildShell(root: HTMLElement) {
       mobileNavbar,
     ),
     scrim,
+    focusExit,
   );
 
   return {
@@ -611,6 +630,7 @@ export function buildShell(root: HTMLElement) {
     title,
     modeButton,
     moreButton,
+    focusExit,
     backButton,
     forwardButton,
     saveWarning,

@@ -142,3 +142,22 @@ test("an edge swipe opens the files sheet", async ({ page }) => {
   });
   await expect(workspace(page)).toHaveClass(/is-left-open/);
 });
+
+test("focus mode leaves only the note", async ({ page }) => {
+  await open(page, 1280, 800);
+  await page.getByRole("button", { name: "Fokusmodus", exact: true }).tap();
+  await expect(page.locator("body")).toHaveClass(/is-focus-mode/);
+  await expect(page.locator(".workspace-ribbon")).toBeHidden();
+  await expect(page.locator("#left-split")).toBeHidden();
+  await expect(
+    page.locator(".workspace-tab-header-container.mod-root").first(),
+  ).toBeHidden();
+  await expect(
+    page.getByRole("textbox", { name: "Markdown-Editor" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Fokusmodus beenden" }).tap();
+  await expect(page.locator("body")).not.toHaveClass(/is-focus-mode/);
+  await expect(page.locator(".workspace-ribbon")).toBeVisible();
+  // The layout is as it was: the files are still docked.
+  await expect(page.locator("#workspace")).toHaveClass(/is-left-open/);
+});

@@ -3639,6 +3639,18 @@ export class App {
     return this.sheets.right ? this.drawer === "right" : this.layout.rightOpen;
   }
 
+  /** Only the note: rail, sidebars, tabs and status bar step aside. */
+  focusMode = false;
+
+  setFocusMode(on: boolean): void {
+    this.focusMode = on;
+    document.body.classList.toggle("is-focus-mode", on);
+    if (on) this.closeDrawers();
+    const button = document.querySelector(".focus-mode-button");
+    button?.setAttribute("aria-pressed", String(on));
+    this.focusView();
+  }
+
   /** Touch screens too wide for the phone layout. */
   private get isTablet(): boolean {
     return this.touch.matches && !this.isMobile;
@@ -4644,6 +4656,12 @@ export class App {
                 onClick: () => this.commands.run("save"),
               }
             : null,
+          {
+            title: t("Fokusmodus"),
+            icon: "maximize-2",
+            checked: this.focusMode,
+            onClick: () => this.commands.run("toggle-focus-mode"),
+          },
           note && this.vault?.platform !== "android"
             ? {
                 title: t("Drucken oder als PDF speichern"),
@@ -4951,6 +4969,13 @@ export class App {
       icon: "book-open",
       when: hasNote,
       run: () => this.setReading(!this.active.reading),
+    });
+    add({
+      id: "toggle-focus-mode",
+      name: t("Fokusmodus umschalten"),
+      icon: "maximize-2",
+      global: true,
+      run: () => this.setFocusMode(!this.focusMode),
     });
     add({
       id: "toggle-source-mode",
