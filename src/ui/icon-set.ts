@@ -1,5 +1,12 @@
 import type { IconNode } from "lucide";
 import {
+  ArrowDown,
+  ArrowUp,
+  LayoutGrid,
+  Filter,
+  Map as MapIcon,
+  Regex,
+  Slice,
   ArrowLeft,
   ArrowLeftRight,
   ArrowRight,
@@ -141,6 +148,13 @@ import {
  * literal names a Lucide icon that is missing here.
  */
 export const hostIcons: Record<string, IconNode> = {
+  ArrowDown,
+  ArrowUp,
+  LayoutGrid,
+  Filter,
+  Map: MapIcon,
+  Regex,
+  Slice,
   AppWindow,
   ArrowLeft,
   ArrowLeftRight,

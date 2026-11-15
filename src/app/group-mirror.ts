@@ -122,7 +122,9 @@ export class GroupMirror {
           icon(
             tab.kind === "canvas"
               ? "layout-dashboard"
-              : tab.kind === "plugin"
+              : tab.kind === "base"
+                ? "table"
+                : tab.kind === "plugin"
                 ? "puzzle"
                 : "file",
             28,

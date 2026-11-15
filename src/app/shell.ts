@@ -328,6 +328,11 @@ export function buildShell(root: HTMLElement) {
     id: "canvas-host",
     attrs: { hidden: true },
   });
+  const baseHost = h("div", {
+    class: "base-host",
+    id: "base-host",
+    attrs: { hidden: true },
+  });
   const attachmentHost = h("div", {
     class: "attachment-host",
     id: "attachment-host",
@@ -341,6 +346,7 @@ export function buildShell(root: HTMLElement) {
     previewEl,
     pluginView,
     canvasHost,
+    baseHost,
     attachmentHost,
     empty,
   );
@@ -598,6 +604,7 @@ export function buildShell(root: HTMLElement) {
     previewEl,
     pluginView,
     canvasHost,
+    baseHost,
     attachmentHost,
     empty,
     saveStatus,

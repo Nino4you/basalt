@@ -193,6 +193,11 @@ No UI framework: DOM is built with the `h()` / `icon()` helpers in `src/ui/dom.t
   `android-share.ts` + `share-dialog.ts` (Android "Share" → Basalt) in `src/app/`; `properties.ts` +
   `properties-model.ts` (frontmatter fields, edited through the `yaml` document model),
   `footnotes.ts` and `attachments.ts` in `src/editor/`. Vim key bindings are a lazy chunk.
+- `src/bases/` — Bases (`.base`): `model.ts` reads the YAML (filters, formulas, display names,
+  views) and edits only the `sort` lines of a view; `expr.ts` is the filter/formula language
+  (parser + evaluator, after the public Bases docs); `query.ts` runs a view; `view.ts` renders
+  table and cards. `.base` is a text document like `.canvas` (`VaultPath::is_document`), saved
+  through `NoteStore`.
 - `src/canvas/` — JSON Canvas 1.0 (`.canvas`). Parsing keeps unknown fields so files written by
   other apps round-trip losslessly.
 - `src/markdown.ts` — `marked` rendering, always sanitized through DOMPurify; remote image

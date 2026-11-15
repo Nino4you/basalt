@@ -3,6 +3,7 @@ import type { EditorState } from "@codemirror/state";
 import {
   backend,
   native,
+  validateBasePath,
   validateCanvasPath,
   validateNotePath,
   type VaultInfo,
@@ -41,6 +42,12 @@ import {
 } from "./sync-conflicts";
 import { foldAll, toggleFold, unfoldAll } from "@codemirror/language";
 import { emptyCanvas } from "../canvas/model";
+import { parse as parseYaml } from "yaml";
+import { IMAGE_TYPES, MAX_ATTACHMENT_BYTES } from "../attachments";
+import { frontmatterRange } from "../editor/properties-model";
+import { BaseView } from "../bases/view";
+import { emptyBase } from "../bases/model";
+import type { EvalHost, FileRecord } from "../bases/expr";
 import { CanvasView } from "../canvas/view";
 import { TFile, TFolder } from "../compat/files";
 import {
@@ -62,6 +69,7 @@ import {
   errorMessage,
   extension,
   formatHotkey,
+  frameThrottle,
   h,
   icon,
 } from "../ui/dom";
@@ -135,7 +143,7 @@ import { openPopout, popoutPath, SaveBroadcast } from "./popout";
 export interface Tab {
   id: number;
   path: string | null;
-  kind: "empty" | "markdown" | "canvas" | "plugin" | "attachment";
+  kind: "empty" | "markdown" | "canvas" | "base" | "plugin" | "attachment";
   viewType: string | null;
   reading: boolean;
   note: Note | null;
@@ -277,6 +285,7 @@ export class App {
   private pluginViewReady: Promise<void> = Promise.resolve();
   private requestedPluginLeaf: WorkspaceLeaf | null = null;
   private canvasView: CanvasView | null = null;
+  private baseView: BaseView | null = null;
   private readonly attachmentView: AttachmentView;
   private drawer: "left" | "right" | null = null;
   /** Panel picked on a phone, where bottom panels share the right drawer. */
@@ -488,7 +497,9 @@ export class App {
 
   /** The note or canvas file the active tab edits through the note store. */
   get activeDocument(): Note | null {
-    return this.active.kind === "markdown" || this.active.kind === "canvas"
+    return this.active.kind === "markdown" ||
+      this.active.kind === "canvas" ||
+      this.active.kind === "base"
       ? this.active.note
       : null;
   }
@@ -589,7 +600,7 @@ export class App {
       group.tabs.every(
         (tab) =>
           tab.path === null ||
-          (/\.(md|canvas)$/i.test(tab.path) && this.index.has(tab.path)),
+          (/\.(md|canvas|base)$/i.test(tab.path) && this.index.has(tab.path)),
       ),
     );
   }
@@ -995,7 +1006,7 @@ export class App {
       .map((file) => file.path)
       .filter(
         (path) =>
-          /\.(md|canvas)$/i.test(path) ||
+          /\.(md|canvas|base)$/i.test(path) ||
           !!attachmentKind(path) ||
           !!session.services.getViewTypeForExtension(extension(path)),
       );
@@ -1054,7 +1065,7 @@ export class App {
     const epoch = this.epoch;
     const queue = this.index.files.filter(
       (path) =>
-        /\.(md|canvas)$/i.test(path) && this.index.content(path) === undefined,
+        /\.(md|canvas|base)$/i.test(path) && this.index.content(path) === undefined,
     );
     if (!queue.length) return;
     this.indexing = true;
@@ -1091,7 +1102,7 @@ export class App {
     file: TFile,
   ): Promise<void> {
     const type = file.extension.toLowerCase();
-    if (session !== this.compatibility || (type !== "md" && type !== "canvas"))
+    if (session !== this.compatibility || (type !== "md" && type !== "canvas" && type !== "base"))
       return;
     const text = await session.vault.read(file);
     if (session !== this.compatibility) return;
@@ -1124,7 +1135,7 @@ export class App {
       if (this.activeNote === note) {
         this.editor.setText(text);
         if (this.active.reading) this.reading.render(note.path, text);
-      } else if (this.activeDocument === note) this.canvasView?.setText(text);
+      } else if (this.activeDocument === note) this.setDocumentText(text);
       this.renderGroups();
     }
     this.index.setContent(path, text);
@@ -1504,7 +1515,15 @@ export class App {
     if (tab === this.active && this.pluginView?.leaf !== this.requestedPluginLeaf) this.unmountPluginView();
     tab.path = path;
     tab.note = note;
-    tab.kind = viewType ? "plugin" : isCanvas(path) ? "canvas" : attachment ? "attachment" : "markdown";
+    tab.kind = viewType
+      ? "plugin"
+      : isCanvas(path)
+        ? "canvas"
+        : isBase(path)
+          ? "base"
+          : attachment
+            ? "attachment"
+            : "markdown";
     tab.viewType = viewType;
     tab.loaded = true;
     tab.state = null;
@@ -1672,11 +1691,14 @@ export class App {
     shell.empty.hidden = tab.kind !== "empty";
     shell.pluginView.hidden = tab.kind !== "plugin";
     shell.canvasHost.hidden = tab.kind !== "canvas";
+    shell.baseHost.hidden = tab.kind !== "base";
     shell.attachmentHost.hidden = tab.kind !== "attachment";
     if (tab.kind === "attachment") void this.showAttachment(tab);
     else this.clearAttachment();
     if (tab.kind === "canvas" && tab.note && tab.path) this.showCanvas(tab);
     else this.canvasView?.suspend();
+    if (tab.kind === "base" && tab.note && tab.path) this.showBase(tab);
+    else this.baseView?.suspend();
     shell.editorEl.hidden = !note || tab.reading;
     shell.previewEl.hidden = !note || !tab.reading;
     if (note && tab.path) {
@@ -1757,6 +1779,121 @@ export class App {
     this.canvasView.load(tab.path!, note.text);
   }
 
+  /** Pushes new text of the active canvas or base into its view. */
+  private setDocumentText(text: string): void {
+    if (this.active.kind === "canvas") this.canvasView?.setText(text);
+    else if (this.active.kind === "base") this.baseView?.setText(text);
+  }
+
+  private showBase(tab: Tab): void {
+    if (!this.baseView) {
+      this.baseView = new BaseView({
+        records: () => this.baseRecords(),
+        record: (path) => this.baseRecord(path),
+        evalHost: () => this.baseEvalHost(),
+        openFile: (path, newTab) => void this.openPath(path, { newTab }),
+        resolve: (target, source) => this.index.resolve(target, source),
+        loadImage: (path) => this.loadVaultImage(path),
+        // Base edits are saved like canvas edits: drafts, autosave, backups.
+        onChange: (path, text) => this.onCanvasChange(path, text),
+      });
+      this.shell.baseHost.append(this.baseView.el);
+      const refresh = frameThrottle(() => {
+        if (this.active.kind === "base") this.baseView?.refresh();
+      });
+      this.on("index", refresh);
+    }
+    this.baseView.load(tab.path!, tab.note!.text);
+  }
+
+  /** File records for bases, built from the index and parsed frontmatter. */
+  private baseRecords(): FileRecord[] {
+    const records: FileRecord[] = [];
+    for (const path of this.index.files) {
+      if (!/\.md$/i.test(path)) continue;
+      const record = this.baseRecord(path);
+      if (record) records.push(record);
+    }
+    return records;
+  }
+
+  private readonly frontmatterCache = new Map<string, { text: string; data: Record<string, unknown> }>();
+
+  private baseRecord(path: string): FileRecord | null {
+    if (!this.index.has(path)) return null;
+    const text = this.index.content(path) ?? "";
+    let cached = this.frontmatterCache.get(path);
+    if (!cached || cached.text !== text) {
+      cached = { text, data: /\.md$/i.test(path) ? frontmatterData(text) : {} };
+      this.frontmatterCache.set(path, cached);
+    }
+    const meta = this.index.metaOf(path);
+    const file = this.compatibility?.vault.getFileByPath(path);
+    return {
+      path,
+      properties: cached.data,
+      tags: meta?.tags ?? [],
+      links: meta?.links.filter((link) => !link.embed).map((link) => link.target) ?? [],
+      embeds: meta?.links.filter((link) => link.embed).map((link) => link.target) ?? [],
+      size: file ? file.stat.size : new TextEncoder().encode(text).length,
+      ctime: file?.stat.ctime ? new Date(file.stat.ctime) : null,
+      mtime: file?.stat.mtime ? new Date(file.stat.mtime) : null,
+    };
+  }
+
+  private baseEvalHost(): EvalHost {
+    return {
+      resolve: (target, source) => this.index.resolve(target, source),
+      file: (path) => this.baseRecord(path),
+      backlinks: (path) => [...new Set(this.index.backlinks(path).map((entry) => entry.source))],
+      now: () => new Date(),
+      locale: getLocale(),
+    };
+  }
+
+  /** An object URL for a vault image (native vaults only), or null. */
+  private async loadVaultImage(path: string): Promise<string | null> {
+    const session = this.compatibility;
+    const mime = IMAGE_TYPES[extension(path)];
+    const file = session?.vault.getFileByPath(path);
+    if (!session || !mime || !file || file.stat.size > MAX_ATTACHMENT_BYTES) return null;
+    try {
+      const data = await session.vault.readBinary(file);
+      return URL.createObjectURL(new Blob([data], { type: mime }));
+    } catch {
+      return null;
+    }
+  }
+
+  /** Creates a base with one table view; names without extension get `.base`. */
+  async createBase(folder?: string): Promise<string | null> {
+    const vault = this.vault;
+    if (!vault) return null;
+    const base =
+      folder ??
+      (this.settings.get("newNoteLocation") === "current" && this.activePath
+        ? dirname(this.activePath)
+        : "");
+    try {
+      let path = "";
+      for (let n = 0; ; n++) {
+        const name = `${base ? `${base}/` : ""}${t("Unbenannt")}${n ? ` ${n}` : ""}`;
+        path = validateBasePath(name);
+        if (!this.index.has(path)) break;
+      }
+      await backend.create(path, emptyBase(t("Tabelle")), vault.id);
+      if (vault !== this.vault) return null;
+      this.setFiles((await backend.info()).files);
+      await this.refreshCompatibility().catch((error) => this.report(error));
+      if (this.compatibility) this.syncVisibleFiles();
+      await this.openPath(path);
+      return path;
+    } catch (error) {
+      this.report(error);
+      return null;
+    }
+  }
+
   /** Renders a directly opened attachment using vault-scoped binary reads. */
   private showAttachment(tab: Tab): Promise<void> {
     return this.attachmentView.show(tab.path, this.compatibility);
@@ -1812,6 +1949,7 @@ export class App {
   focusView(): void {
     if (this.isMobile) return;
     if (this.active.kind === "canvas") this.canvasView?.focus();
+    else if (this.active.kind === "base") this.baseView?.focus();
     else if (this.activeNote && !this.active.reading) this.editor.focus();
     else if (this.activeNote)
       this.shell.previewEl.focus({ preventScroll: true });
@@ -2103,7 +2241,7 @@ export class App {
         }
       this.index.setContent(fresh.path, fresh.text);
       if (tab === this.active) {
-        if (tab.kind === "canvas") this.canvasView?.setText(fresh.text);
+        if (tab.kind === "canvas" || tab.kind === "base") this.setDocumentText(fresh.text);
         else {
           this.editor.setText(fresh.text);
           if (tab.reading) this.reading.render(fresh.path, fresh.text);
@@ -2176,7 +2314,8 @@ export class App {
     await this.save(note, { backup: true });
     for (const tab of this.allTabs) if (tab.note === note) tab.state = null;
     if (this.activeDocument === note) {
-      if (this.active.kind === "canvas") this.canvasView?.setText(text);
+      if (this.active.kind === "canvas" || this.active.kind === "base")
+        this.setDocumentText(text);
       else {
         this.editor.setText(text);
         if (this.active.reading) this.reading.render(note.path, text);
@@ -4142,7 +4281,7 @@ export class App {
             .then(() => notify(t("Pfad kopiert.")))
             .catch(() => notify(t("Kopieren nicht möglich."), true)),
       },
-      /\.(md|canvas)$/i.test(path)
+      /\.(md|canvas|base)$/i.test(path)
         ? {
             title: t("Versionsverlauf"),
             icon: "history",
@@ -4529,6 +4668,12 @@ export class App {
       name: t("Neue Canvas erstellen"),
       icon: "layout-dashboard",
       run: () => void this.createCanvas(),
+    });
+    add({
+      id: "new-base",
+      name: t("Neue Base erstellen"),
+      icon: "table",
+      run: () => void this.createBase(),
     });
     add({
       id: "new-tab",
@@ -5132,6 +5277,24 @@ function syncChildren(parent: HTMLElement, children: HTMLElement[]): void {
 
 export function isCanvas(path: string): boolean {
   return /\.canvas$/i.test(path);
+}
+
+export function isBase(path: string): boolean {
+  return /\.base$/i.test(path);
+}
+
+/** Frontmatter of a note as plain data; empty when missing or invalid. */
+function frontmatterData(text: string): Record<string, unknown> {
+  const range = frontmatterRange(text);
+  if (!range) return {};
+  try {
+    const data: unknown = parseYaml(text.slice(range.yamlFrom, range.yamlTo));
+    return data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
 }
 
 /** Keep note and plugin buffers intact when a save conflict blocks navigation. */

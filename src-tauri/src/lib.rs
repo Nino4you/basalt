@@ -494,7 +494,7 @@ async fn create_note(
 ) -> Result<()> {
     let path = VaultPath::parse(&path).map_err(error)?;
     if !path.is_document() {
-        return Err("Only Markdown notes and canvases can be created".into());
+        return Err("Only Markdown notes, canvases and bases can be created".into());
     }
     lock_session(&state, &vault_id)?
         .storage
@@ -515,7 +515,7 @@ async fn save_note(
 ) -> Result<()> {
     let path = VaultPath::parse(&path).map_err(error)?;
     if !path.is_document() {
-        return Err("Only Markdown notes and canvases can be edited".into());
+        return Err("Only Markdown notes, canvases and bases can be edited".into());
     }
     let session = lock_session(&state, &vault_id)?;
     if backup == Some(false) {
