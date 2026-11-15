@@ -1,4 +1,3 @@
-import { RAIL_WIDTH } from "../ui/device";
 import { topModal } from "../ui/modal";
 import type { App } from "./app";
 import type { Shell } from "./shell";
@@ -65,7 +64,7 @@ export function installSheetGestures(app: App, shell: Shell): void {
           side = candidate;
       if (!side) {
         opening = true;
-        if (floats.left && !visible("left") && touch.clientX < RAIL_WIDTH + 20)
+        if (floats.left && !visible("left") && touch.clientX < app.railWidth + 20)
           side = "left";
         else if (
           floats.right &&
@@ -79,7 +78,7 @@ export function installSheetGestures(app: App, shell: Shell): void {
       const rect = el.getBoundingClientRect();
       // The closed card sits beyond the rail (left) or the screen edge.
       const distance =
-        side === "left" ? rect.width + RAIL_WIDTH + 16 : rect.width + 16;
+        side === "left" ? rect.width + app.railWidth + 16 : rect.width + 16;
       drag = {
         side,
         opening,

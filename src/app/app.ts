@@ -81,7 +81,12 @@ import { fuzzyMatch } from "../ui/fuzzy";
 import { notify } from "../ui/notice";
 import { installTooltips } from "../ui/tooltip";
 import { CommandRegistry } from "./commands";
-import { PHONE_QUERY, sidebarSheets, TOUCH_QUERY } from "../ui/device";
+import {
+  PHONE_QUERY,
+  RAIL_WIDTH,
+  sidebarSheets,
+  TOUCH_QUERY,
+} from "../ui/device";
 import { installSheetGestures } from "./sheet-gestures";
 import { buildMobileToolbar } from "./mobile-toolbar";
 import { EditorView } from "@codemirror/view";
@@ -425,6 +430,7 @@ export class App {
       this.renderGroups();
       if (key === "fontSize") this.editor.measure();
       if (key === "inlineTitle") this.showActive();
+      if (key === "tabletDock") this.applyLayout();
     });
     this.mobile.addEventListener("change", () => this.applyLayout());
     this.touch.addEventListener("change", () => this.applyLayout());
@@ -3616,7 +3622,6 @@ export class App {
       const visible = this.isPanelVisible(id);
       button.replaceChildren(
         svg ? (svg.cloneNode(true) as SVGElement) : icon("file"),
-        h("span", { class: "rail-item-label", text: label }),
       );
       button.setAttribute("aria-label", label);
       button.setAttribute("aria-pressed", String(visible));
@@ -3704,6 +3709,11 @@ export class App {
     return this.touch.matches && !this.isMobile;
   }
 
+  /** Width the tablet dock takes from the note: none when it floats at the bottom. */
+  get railWidth(): number {
+    return this.settings.get("tabletDock") === "bottom" ? 0 : RAIL_WIDTH;
+  }
+
   /** Tablet sidebars that float as cards right now (not pinned beside the note). */
   get floatingSides(): { left: boolean; right: boolean } {
     if (!this.isTablet) return { left: false, right: false };
@@ -3719,7 +3729,7 @@ export class App {
     if (this.isMobile) return { left: true, right: true };
     if (!this.isTablet) return { left: false, right: false };
     return sidebarSheets(
-      window.innerWidth,
+      window.innerWidth - this.railWidth,
       {
         open: this.layout.leftOpen,
         width: this.layout.leftWidth,

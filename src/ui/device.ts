@@ -14,8 +14,8 @@ export const PHONE_QUERY =
  */
 export const TOUCH_QUERY = "(any-pointer: coarse), (hover: none)";
 
-/** Width of the tablet navigation rail (the ribbon on tablets). */
-export const RAIL_WIDTH = 72;
+/** Room the floating dock on the left takes (56 px dock and its gaps). */
+export const RAIL_WIDTH = 76;
 /** Tablets dock a sidebar beside the note only while the note keeps this width. */
 export const NOTE_MIN_WIDTH = 520;
 
@@ -27,11 +27,12 @@ export const NOTE_MIN_WIDTH = 520;
  * the note keeps its width beside both.
  */
 export function sidebarSheets(
-  viewportWidth: number,
+  /** Width beside the dock: the viewport minus RAIL_WIDTH, or all of it. */
+  width: number,
   left: { open: boolean; width: number; pinned: boolean },
   right: { width: number; pinned: boolean },
 ): { left: boolean; right: boolean } {
-  const room = viewportWidth - RAIL_WIDTH;
+  const room = width;
   const leftSheet = !left.pinned || room - left.width < NOTE_MIN_WIDTH;
   const leftDocked = !leftSheet && left.open;
   const rightSheet =

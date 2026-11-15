@@ -837,7 +837,7 @@ export const en = {
   "Fokusmodus umschalten": "Toggle focus mode",
   "Anpinnen": "Pin",
   "Lösen": "Unpin",
-  "Heute": "Today",
-  "Befehle": "Commands",
-  "Design": "Theme",
+  "Leiste auf dem Tablet": "Tablet dock",
+  "Wo die schwebende Leiste mit Ansichten und Aktionen auf Tablets sitzt.": "Where the floating dock with views and actions sits on tablets.",
+  "Unten": "Bottom",
 } as const;

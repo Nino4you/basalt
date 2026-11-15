@@ -59,17 +59,20 @@ async function drag(page: Page, x0: number, x1: number, rest = false) {
   );
 }
 
-test("the rail opens labelled views as a floating card", async ({ page }) => {
+test("the dock opens views as a floating card", async ({ page }) => {
   await open(page, 1280, 800);
+  // Icons only; their names are what touch readers and tooltips use.
   for (const name of [
     "Dateien",
     "Suche",
     "Lesezeichen",
-    "Öffnen",
-    "Heute",
-    "Befehle",
+    "Neue Notiz",
+    "Einstellungen",
   ])
-    await expect(page.locator(".workspace-ribbon")).toContainText(name);
+    await expect(rail(page, name)).toBeVisible();
+  await expect(page.locator(".workspace-ribbon .rail-item-label")).toHaveCount(
+    0,
+  );
   const files = rail(page, "Dateien");
   // Even in landscape the sidebar floats until it is pinned.
   await expect(workspace(page)).toHaveClass(/is-left-sheet/);
@@ -200,4 +203,50 @@ test("the rail and status bar stay above Android's navigation bar", async ({
   expect(status!.y + status!.height).toBeLessThanOrEqual(limit);
   await rail(page, "Einstellungen").tap();
   await expect(page.getByRole("dialog")).toBeVisible();
+});
+
+test("the dock can float at the bottom instead", async ({ page }) => {
+  await page.addInitScript(() => {
+    const settings = JSON.parse(
+      localStorage.getItem("basalt-settings") ?? "{}",
+    );
+    localStorage.setItem(
+      "basalt-settings",
+      JSON.stringify({ ...settings, tabletDock: "bottom" }),
+    );
+  });
+  await open(page, 834, 1194);
+  await expect(page.locator("body")).toHaveClass(/is-dock-bottom/);
+  const dock = await page.locator(".workspace-ribbon").boundingBox();
+  // A pill centred near the bottom, not a column at the left edge.
+  expect(dock!.width).toBeGreaterThan(dock!.height * 4);
+  expect(Math.abs(dock!.x + dock!.width / 2 - 834 / 2)).toBeLessThan(2);
+  expect(dock!.y + dock!.height).toBeGreaterThan(1194 - 100);
+  // The note starts at the left edge; nothing is reserved for a rail.
+  const note = await page.locator(".workspace-main-column").boundingBox();
+  expect(note!.x).toBeLessThan(10);
+
+  await rail(page, "Dateien").tap();
+  const card = await page.locator("#left-split").boundingBox();
+  expect(card!.y + card!.height).toBeLessThan(dock!.y);
+  await rail(page, "Dateien").tap();
+  await expect(workspace(page)).not.toHaveClass(/is-left-open/);
+  // Without a rail the card comes out of the screen edge.
+  await drag(page, 4, 380, true);
+  await expect(workspace(page)).toHaveClass(/is-left-open/);
+
+  // And it stays clear of Android's navigation bar.
+  await page.evaluate(() =>
+    document.documentElement.style.setProperty(
+      "--android-inset-bottom",
+      "48px",
+    ),
+  );
+  // The dock glides up; wait for it to arrive.
+  await expect
+    .poll(async () => {
+      const box = await page.locator(".workspace-ribbon").boundingBox();
+      return box!.y + box!.height;
+    })
+    .toBeLessThanOrEqual(1194 - 48);
 });

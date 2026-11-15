@@ -201,8 +201,9 @@ No UI framework: DOM is built with the `h()` / `icon()` helpers in `src/ui/dom.t
   table and cards. `.base` is a text document like `.canvas` (`VaultPath::is_document`), saved
   through `NoteStore`.
 - Layouts: `body.is-mobile` (phones, `PHONE_QUERY`), `body.is-tablet` (touch, wider) and the
-  desktop. Tablets turn the ribbon into a labelled navigation rail (`App.renderRail`,
-  `tablet.css`). Their sidebars float as cards (`App.floating`, both may be open; no backdrop,
+  desktop. Tablets turn the ribbon into a floating dock of icons (`App.renderRail`,
+  `tablet.css`), at the left or, with the `tabletDock` setting, at the bottom
+  (`body.is-dock-bottom`, `App.railWidth` is then 0). Their sidebars float as cards (`App.floating`, both may be open; no backdrop,
   an outside tap closes them) unless pinned (`layout.leftPinned`/`rightPinned`), and a pinned
   one docks only while the note keeps `NOTE_MIN_WIDTH` (`sidebarSheets` in `src/ui/device.ts`).
   `src/app/sheet-gestures.ts` makes cards follow the finger. Phones keep the one-at-a-time

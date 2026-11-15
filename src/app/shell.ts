@@ -41,8 +41,6 @@ function commandButton(
   label: string,
   extra = "",
   tooltip: "bottom" | "right" | "top" = "bottom",
-  /** Short caption under the icon in the tablet rail. */
-  railLabel?: string,
 ): HTMLButtonElement {
   return h(
     "button",
@@ -53,7 +51,6 @@ function commandButton(
       data: { command, tooltipPosition: tooltip },
     },
     icon(iconId),
-    railLabel ? h("span", { class: "rail-item-label", text: railLabel }) : null,
   );
 }
 
@@ -205,7 +202,6 @@ export function buildShell(root: HTMLElement) {
         t("Schnellauswahl öffnen"),
         "",
         "right",
-        t("Öffnen"),
       ),
       commandButton(
         "daily-note",
@@ -213,7 +209,6 @@ export function buildShell(root: HTMLElement) {
         t("Heutige Tagesnotiz öffnen"),
         "",
         "right",
-        t("Heute"),
       ),
       commandButton(
         "command-palette",
@@ -221,7 +216,6 @@ export function buildShell(root: HTMLElement) {
         t("Befehlspalette öffnen"),
         "",
         "right",
-        t("Befehle"),
       ),
       commandButton(
         "open-graph",
@@ -229,7 +223,6 @@ export function buildShell(root: HTMLElement) {
         t("Graphansicht öffnen"),
         "",
         "right",
-        t("Graph"),
       ),
       pluginRibbon,
     ),
@@ -242,16 +235,8 @@ export function buildShell(root: HTMLElement) {
         t("Farbschema wechseln"),
         "",
         "right",
-        t("Design"),
       ),
-      commandButton(
-        "settings",
-        "settings",
-        t("Einstellungen"),
-        "",
-        "right",
-        t("Optionen"),
-      ),
+      commandButton("settings", "settings", t("Einstellungen"), "", "right"),
     ),
   );
 
