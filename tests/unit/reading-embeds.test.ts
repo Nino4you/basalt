@@ -149,3 +149,21 @@ it("toggles folded callouts by click and keyboard", async () => {
   expect(title.getAttribute("aria-expanded")).toBe("false");
   await session.dispose();
 });
+
+it("embeds only the named section or block and sizes images", async () => {
+  const text = "![[Attachments/Plan.md#Goals]]\n\n![[Attachments/Plan.md#^risk]]\n\n![[Attachments/Missing.png|240x80]]";
+  const { view, el, session, app } = await render(text);
+  app.index.content = () =>
+    "# Plan\n\n## Goals\n\nFast\n\n## Risks\n\nNot atomic. ^risk\n";
+  view.render("Note.md", text);
+  const embeds = el.querySelectorAll<HTMLElement>(".markdown-embed-content");
+  expect(embeds[0].textContent).toContain("Goals");
+  expect(embeds[0].textContent).toContain("Fast");
+  expect(embeds[0].textContent).not.toContain("Risks");
+  expect(embeds[1].textContent?.trim()).toBe("Not atomic.");
+  const image = el.querySelector<HTMLImageElement>(".image-embed img")!;
+  expect(image.getAttribute("width")).toBe("240");
+  expect(image.style.height).toBe("80px");
+  view.clear();
+  await session.dispose();
+});

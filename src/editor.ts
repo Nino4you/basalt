@@ -38,6 +38,11 @@ import { EditorExtensionRegistry } from "./compat/editor-extensions";
 import type { PluginEmbed } from "./compat/embeds";
 import { embedHost, pluginEmbeds } from "./editor/plugin-embeds";
 import {
+  embedPreviewHost,
+  embedPreviews,
+  type EmbedPreviewHost,
+} from "./editor/embeds";
+import {
   attachmentHandlers,
   attachmentHost,
   type AttachmentHost,
@@ -110,6 +115,8 @@ export interface EditorHost
   pluginCodeBlock?(language: string): CodeBlockProcessor | undefined;
   pluginContext?(): { sourcePath: string; app: unknown } | null;
   pluginEmbed?(target: string): PluginEmbed | null;
+  /** Image, media and note embeds in live preview. */
+  embedPreview?: EmbedPreviewHost;
 }
 
 export interface EditorOptions {
@@ -211,6 +218,8 @@ export class MarkdownEditor {
       attachmentHandlers,
       livePreview,
       richPreview,
+      host.embedPreview ? embedPreviewHost.of(host.embedPreview) : [],
+      embedPreviews,
       propertiesEditor,
       footnoteMarks,
       Prec.highest(keymap.of([{ key: "Escape", run: finishRichSource }])),
