@@ -134,6 +134,7 @@ import {
   Zap,
   ZoomIn,
   ZoomOut,
+  AppWindow,
 } from "lucide";
 
 /**
@@ -152,6 +153,7 @@ export const hostIcons: Record<string, IconNode> = {
   Map: MapIcon,
   Regex,
   Slice,
+  AppWindow,
   ArrowLeft,
   ArrowLeftRight,
   ArrowRight,

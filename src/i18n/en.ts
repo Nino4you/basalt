@@ -786,6 +786,8 @@ export const en = {
   "Keine Notizen passen zu den Filtern.": "No notes match the filters.",
   "Diese Base hat noch keine Ansicht. Lege im Quelltext unter „views“ eine an.":
     "This base has no view yet. Add one under “views” in the source.",
+  "In neuem Fenster öffnen": "Open in new window",
+  "Das Fenster wurde blockiert.": "The window was blocked.",
   "Block „{name}“ nicht gefunden.": "Block “{name}” not found.",
   "Abschnitt „{name}“ nicht gefunden.": "Section “{name}” not found.",
   "Einbettung bearbeiten": "Edit embed",

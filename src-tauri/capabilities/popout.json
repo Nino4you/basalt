@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "popout",
+  "description": "Note pop-out windows load the same local app and use the same scoped vault commands, but cannot open further windows.",
+  "windows": ["popout-*"],
+  "permissions": ["core:default", "core:window:allow-destroy"]
+}

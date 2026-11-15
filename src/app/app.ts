@@ -128,6 +128,7 @@ import { openCommandPalette, openQuickSwitcher } from "./switcher";
 import { openFileRecovery } from "./file-recovery";
 import { LinkUpdate } from "./link-update";
 import { VaultIndex } from "./vault-index";
+import { openPopout, popoutPath, SaveBroadcast } from "./popout";
 
 export interface Tab {
   id: number;
@@ -242,6 +243,15 @@ export class App {
   split: SplitNode = { group: 0 };
   ws: SavedWorkspace = emptyWorkspace();
   layout: Layout;
+  /**
+   * The note this window was popped out for, or null in the main window. A
+   * pop-out shows one tab without sidebars, runs no plugins and never writes
+   * the main window's workspace or layout.
+   */
+  readonly popout = popoutPath();
+  private readonly saves = new SaveBroadcast((vaultId, path, text) => {
+    if (vaultId === this.vault?.id) this.adoptText(path, text);
+  });
   indexing = false;
 
   private readonly listeners = new Map<AppEvent, Set<() => void>>();
@@ -291,7 +301,8 @@ export class App {
     document.documentElement.classList.add("is-starting");
     this.shell = buildShell(root);
     this.attachmentView = new AttachmentView(this.shell.attachmentHost);
-    this.layout = loadLayout();
+    this.layout = this.popout ? popoutLayout() : loadLayout();
+    document.body.classList.toggle("is-popout", this.popout !== null);
     this.linkPreview = new LinkPreview((target, source) => {
       const path = this.index.resolve(target, source);
       if (!path || extension(path) !== "md") return null;
@@ -498,6 +509,7 @@ export class App {
         requestAnimationFrame(() => root.classList.remove("is-starting")),
       );
     }
+    if (this.popout) return;
     // Opt-in; a failed check (offline, rate limit) is not worth a notice.
     void this.checkForUpdates().catch((error) => console.warn(error));
   }
@@ -513,6 +525,7 @@ export class App {
     this.failed.clear();
     this.vault = next;
     this.store = new NoteStore(backend, next.id);
+    this.store.onSaved = (path, text) => this.saves.post(next.id, path, text);
     this.index.reset();
     this.reading.clear();
     this.clearAttachment();
@@ -529,7 +542,9 @@ export class App {
     if (previous) await previous.dispose().catch((error) => this.report(error));
     if (epoch !== this.epoch) return;
 
-    this.ws = loadWorkspace(next.id);
+    this.ws = this.popout
+      ? { ...emptyWorkspace(), tabs: [{ path: this.popout, reading: false }] }
+      : loadWorkspace(next.id);
     this.shell.vaultName.textContent = next.name;
     this.shell.environment.textContent = native
       ? t("{platform} · lokal", { platform: next.platform === "android" ? "Android" : "Linux" })
@@ -540,8 +555,10 @@ export class App {
     // Plugins read and parse every note before they load. When the saved
     // tabs are plain notes and canvases, show them first and connect the
     // plugins afterwards; tabs of plugin or attachment files need the session.
-    const pluginsLater = native && this.documentsOnly();
-    if (native && !pluginsLater) await this.connectPlugins(next);
+    // A pop-out leaves plugins to the main window, so none runs twice.
+    const plugins = native && !this.popout;
+    const pluginsLater = plugins && this.documentsOnly();
+    if (plugins && !pluginsLater) await this.connectPlugins(next);
     if (epoch !== this.epoch) return;
     await this.restoreTabs(epoch);
     if (epoch !== this.epoch) return;
@@ -550,6 +567,7 @@ export class App {
       if (epoch !== this.epoch) return;
     }
     void this.indexFiles();
+    if (this.popout) return;
     // Old backups go once a day; a failure only costs disk space.
     void autoCleanBackups(backend, next.id, {
       maxAgeDays: this.settings.get("backupMaxAgeDays"),
@@ -986,8 +1004,17 @@ export class App {
     if (session !== this.compatibility || (type !== "md" && type !== "canvas" && type !== "base"))
       return;
     const text = await session.vault.read(file);
-    if (session !== this.compatibility || !this.store) return;
-    const note = this.store.notes.get(file.path);
+    if (session !== this.compatibility) return;
+    this.adoptText(file.path, text);
+  }
+
+  /**
+   * Shows `text` as the saved content of `path`, which another program or
+   * window wrote. A local draft is kept and reported instead.
+   */
+  private adoptText(path: string, text: string): void {
+    if (!this.store) return;
+    const note = this.store.notes.get(path);
     if (note && note.saved !== text) {
       if (note.text !== note.saved) {
         this.failed.set(
@@ -1010,7 +1037,7 @@ export class App {
       } else if (this.activeDocument === note) this.setDocumentText(text);
       this.renderGroups();
     }
-    this.index.setContent(file.path, text);
+    this.index.setContent(path, text);
   }
 
   async chooseVault(): Promise<void> {
@@ -3108,7 +3135,8 @@ export class App {
     this.shell.leftBottomSplit.inert = !leftOpen || mobile;
     this.renderDock();
     try {
-      localStorage.setItem(LAYOUT_KEY, JSON.stringify(this.layout));
+      if (!this.popout)
+        localStorage.setItem(LAYOUT_KEY, JSON.stringify(this.layout));
     } catch {
       // Layout is a convenience; ignore storage failures.
     }
@@ -3837,6 +3865,15 @@ export class App {
       ...(this.isMobile
         ? []
         : ([
+            ...(this.canPopOut(tab)
+              ? [
+                  {
+                    title: t("In neuem Fenster öffnen"),
+                    icon: "app-window",
+                    onClick: () => void this.popOut(tab),
+                  },
+                ]
+              : []),
             {
               title: t("Nach rechts teilen"),
               icon: "columns-2",
@@ -3851,6 +3888,35 @@ export class App {
           ] satisfies MenuEntry[])),
       ...(tab.path ? this.fileMenuItems(tab.path) : []),
     ];
+  }
+
+  /** Pop-outs are for notes and canvases on desktop, from the main window. */
+  canPopOut(tab: Tab): boolean {
+    return (
+      !this.popout &&
+      !this.isMobile &&
+      this.vault?.platform !== "android" &&
+      !!tab.path &&
+      /\.(md|canvas)$/i.test(tab.path)
+    );
+  }
+
+  /**
+   * Opens the tab's note in a window of its own. The tab stays here; saves in
+   * either window reach the other one.
+   */
+  async popOut(tab: Tab): Promise<void> {
+    const path = tab.path;
+    if (!path || !this.canPopOut(tab)) return;
+    try {
+      if (tab.note && tab.note.text !== tab.note.saved)
+        await this.save(tab.note);
+      await openPopout(path, basename(path).replace(/\.(md|canvas)$/i, ""));
+    } catch (error) {
+      if (error instanceof Error && error.message === "blocked")
+        notify(t("Das Fenster wurde blockiert."), true);
+      else this.report(error);
+    }
   }
 
   /** Shows `tab` and opens it a second time in a new group on `side`. */
@@ -4314,6 +4380,13 @@ export class App {
       run: () => void this.newTab(),
     });
     add({
+      id: "open-in-new-window",
+      name: t("In neuem Fenster öffnen"),
+      icon: "app-window",
+      when: () => this.canPopOut(this.active),
+      run: () => void this.popOut(this.active),
+    });
+    add({
       id: "close-tab",
       name: t("Aktuellen Tab schließen"),
       hotkey: "Mod+W",
@@ -4709,7 +4782,7 @@ export class App {
   // ── persistence ───────────────────────────────────────────────────────────
 
   private writeWorkspace(): void {
-    if (!this.vault) return;
+    if (!this.vault || this.popout) return;
     const groups = this.groups.map((group) => ({
       tabs: group.tabs.map((tab) => ({ path: tab.path, reading: tab.reading })),
       active: group.tabs.indexOf(group.active),
@@ -4800,6 +4873,16 @@ function loadWorkspace(vaultId: string): SavedWorkspace {
     // A corrupt workspace file only loses the tab layout.
   }
   return result;
+}
+
+/** A pop-out window starts with every sidebar closed. */
+function popoutLayout(): Layout {
+  return {
+    ...loadLayout(),
+    leftOpen: false,
+    rightOpen: false,
+    bottomOpen: false,
+  };
 }
 
 function loadLayout(): Layout {
