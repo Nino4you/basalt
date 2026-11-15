@@ -1,17 +1,24 @@
+import { tokenizeQuery } from "./search-query";
+
 /**
  * The single search term a replacement applies to, in the case it was typed,
  * or null when the query has none or several. Filters such as `path:` and
- * `tag:` may accompany it; they only narrow the files. Same syntax as
- * `parseQuery`.
+ * `tag:` may accompany it; they only narrow the files. A regular expression
+ * or a `line:`/`section:`/`task:` clause would make the replacement apply
+ * elsewhere than the search shows, so those queries replace nothing.
  */
 export function replaceableTerm(query: string): string | null {
   const terms: string[] = [];
-  const pattern = /(-)?(?:(tag|path|file):)?(?:"([^"]*)"|(\S+))/gi;
-  for (let m = pattern.exec(query); m; m = pattern.exec(query)) {
-    const value = m[3] ?? m[4];
-    if (!value || m[1] || m[2]) continue;
-    if (value.startsWith("#") && value.length > 1) continue;
-    terms.push(value);
+  for (const token of tokenizeQuery(query)) {
+    if (token.regex) return null;
+    if (token.operator) {
+      if (!["tag", "path", "file"].includes(token.operator)) return null;
+      continue;
+    }
+    if (token.negated || !token.value) continue;
+    if (!token.quoted && token.value.startsWith("#") && token.value.length > 1)
+      continue;
+    terms.push(token.value);
   }
   return terms.length === 1 ? terms[0] : null;
 }

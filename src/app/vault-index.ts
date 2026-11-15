@@ -1,3 +1,11 @@
+import {
+  isEmptyQuery,
+  matcherHits,
+  regexMatches,
+  scopedHits,
+  scopedMatches,
+  type ParsedQuery,
+} from "./search-query";
 import { canvasIndexText } from "../canvas/model";
 
 /**
@@ -378,6 +386,12 @@ export class LinkResolver {
     if (!name) return SELF;
     if (this.fileSet.has(name)) return name;
     const requested = /\.md$/i.test(name) ? name : `${name}.md`;
+    const note = this.find(requested, source);
+    // Attachments are linked by their full file name (`![[Photo.png]]`).
+    return note ?? (requested === name ? null : this.find(name, source));
+  }
+
+  private find(requested: string, source: string): string | null {
     const slash = source.lastIndexOf("/");
     if (slash >= 0) {
       const sibling = source.slice(0, slash + 1) + requested;
@@ -655,52 +669,7 @@ export interface SearchResult {
   matches: SearchMatch[];
 }
 
-export interface ParsedQuery {
-  terms: string[];
-  tags: string[];
-  path: string[];
-  file: string[];
-  excludedTerms: string[];
-  excludedTags: string[];
-  excludedPath: string[];
-  excludedFile: string[];
-}
-
-/** Supports plain terms, "quoted phrases", `-` exclusions and `tag:`, `path:` and `file:` operators. */
-export function parseQuery(query: string): ParsedQuery {
-  const parsed: ParsedQuery = {
-    terms: [],
-    tags: [],
-    path: [],
-    file: [],
-    excludedTerms: [],
-    excludedTags: [],
-    excludedPath: [],
-    excludedFile: [],
-  };
-  const pattern = /(-)?(?:(tag|path|file):)?(?:"([^"]*)"|(\S+))/gi;
-  for (let m = pattern.exec(query); m; m = pattern.exec(query)) {
-    const value = (m[3] ?? m[4]).toLowerCase();
-    if (!value) continue;
-    const operator = m[2]?.toLowerCase();
-    if (m[1]) {
-      if (operator === "tag") parsed.excludedTags.push(value.replace(/^#/, ""));
-      else if (operator === "path") parsed.excludedPath.push(value);
-      else if (operator === "file") parsed.excludedFile.push(value);
-      else if (value.startsWith("#") && value.length > 1)
-        parsed.excludedTags.push(value.slice(1));
-      else parsed.excludedTerms.push(value);
-      continue;
-    }
-    if (operator === "tag") parsed.tags.push(value.replace(/^#/, ""));
-    else if (operator === "path") parsed.path.push(value);
-    else if (operator === "file") parsed.file.push(value);
-    else if (value.startsWith("#") && value.length > 1)
-      parsed.tags.push(value.slice(1));
-    else parsed.terms.push(value);
-  }
-  return parsed;
-}
+export { parseQuery, type ParsedQuery } from "./search-query";
 
 const MAX_MATCHES_PER_FILE = 30;
 
@@ -709,6 +678,7 @@ export function searchNote(
   path: string,
   query: ParsedQuery,
 ): SearchResult | null {
+  if (isEmptyQuery(query)) return null;
   const lowerPath = path.toLowerCase();
   const name = lowerPath.slice(lowerPath.lastIndexOf("/") + 1);
   if (query.path.some((part) => !lowerPath.includes(part))) return null;
@@ -734,45 +704,68 @@ export function searchNote(
   for (const term of query.excludedTerms) {
     if (lowerPath.includes(term) || lower.includes(term)) return null;
   }
-  const matches: SearchMatch[] = [];
-  if (query.terms.length && lower) {
-    const text = index.content(path) ?? "";
-    for (const term of query.terms) {
-      for (
-        let at = lower.indexOf(term);
-        at >= 0 && matches.length < MAX_MATCHES_PER_FILE;
-        at = lower.indexOf(term, at + term.length)
-      ) {
-        const lineStart = lower.lastIndexOf("\n", at - 1) + 1;
-        let lineEnd = lower.indexOf("\n", at);
-        if (lineEnd < 0) lineEnd = lower.length;
-        // Long lines are trimmed around the hit so rows stay cheap to render.
-        const from = Math.max(lineStart, at - 60);
-        const to = Math.min(lineEnd, at + term.length + 120);
-        matches.push({
-          line: 0,
-          offset: at,
-          start: at - from + (from > lineStart ? 1 : 0),
-          length: term.length,
-          text:
-            (from > lineStart ? "…" : "") +
-            text.slice(from, to) +
-            (to < lineEnd ? "…" : ""),
-        });
-      }
-    }
-    matches.sort((a, b) => a.offset - b.offset);
+  const text = index.content(path) ?? "";
+  for (const regex of query.regexes) {
+    const inName = regexMatches(regex, path);
+    if (!inName && !regexMatches(regex, text)) return null;
+    nameMatch ||= inName;
   }
-  if (
-    !query.terms.length &&
-    !query.tags.length &&
-    !query.path.length &&
-    !query.file.length &&
-    !query.excludedTerms.length &&
-    !query.excludedTags.length &&
-    !query.excludedPath.length &&
-    !query.excludedFile.length
-  )
-    return null;
+  for (const regex of query.excludedRegexes)
+    if (regexMatches(regex, path) || regexMatches(regex, text)) return null;
+  // Lower-casing can change the length of a few characters (such as "İ");
+  // scoped clauses compare positions in both, so they need equal lengths.
+  const scopedText = lower.length === text.length ? text : lower;
+  for (const clause of query.excludedScoped)
+    if (scopedMatches(clause, scopedText, lower)) return null;
+  const ranges: Array<{ from: number; to: number }> = [];
+  for (const clause of query.scoped) {
+    const found = scopedHits(clause, scopedText, lower, MAX_MATCHES_PER_FILE);
+    if (!found.length) return null;
+    ranges.push(...found);
+  }
+  const whole = { from: 0, to: text.length };
+  if (lower)
+    for (const matcher of [
+      ...query.terms.map((term) => ({ text: term })),
+      ...query.regexes.map((regex) => ({ regex })),
+    ])
+      for (const hit of matcherHits(
+        matcher,
+        text,
+        lower,
+        whole,
+        MAX_MATCHES_PER_FILE,
+      ))
+        if (hit.to > hit.from) ranges.push(hit);
+  ranges.sort((a, b) => a.from - b.from || b.to - a.to);
+  const matches: SearchMatch[] = [];
+  let last = -1;
+  for (const range of ranges) {
+    // Overlapping hits of several terms show once.
+    if (range.from < last) continue;
+    if (matches.length >= MAX_MATCHES_PER_FILE) break;
+    matches.push(snippet(text, range.from, range.to - range.from));
+    last = range.to;
+  }
   return { path, nameMatch, matches };
+}
+
+/** One result row: the hit's line, trimmed around long hits. */
+function snippet(text: string, at: number, length: number): SearchMatch {
+  const lineStart = text.lastIndexOf("\n", at - 1) + 1;
+  let lineEnd = text.indexOf("\n", at);
+  if (lineEnd < 0) lineEnd = text.length;
+  // Long lines are trimmed around the hit so rows stay cheap to render.
+  const from = Math.max(lineStart, at - 60);
+  const to = Math.min(lineEnd, at + Math.min(length, 200) + 120);
+  return {
+    line: 0,
+    offset: at,
+    start: at - from + (from > lineStart ? 1 : 0),
+    length: Math.min(length, to - at),
+    text:
+      (from > lineStart ? "…" : "") +
+      text.slice(from, to) +
+      (to < lineEnd ? "…" : ""),
+  };
 }
