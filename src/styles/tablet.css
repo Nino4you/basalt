@@ -273,3 +273,18 @@ body.is-tablet .suggestion-item {
 body.is-tablet .modal .setting-item {
   min-height: 56px;
 }
+
+/* ── system bars ─────────────────────────────────────────────────────────── */
+
+/*
+ * Android draws its navigation bar over the bottom of the WebView. Phones
+ * keep clear of it with their navigation bar; tablets would put the rail's
+ * settings, the vault switcher and the status bar under it, where taps go
+ * to the system. The formatting toolbar pads itself while editing.
+ */
+body.is-tablet:not(.is-editing) .app-container {
+  padding-bottom: max(var(--keyboard-inset, 0px), var(--safe-bottom));
+}
+body.is-tablet:not(.is-editing) .status-bar {
+  bottom: var(--safe-bottom);
+}

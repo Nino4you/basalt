@@ -161,3 +161,26 @@ test("focus mode leaves only the note", async ({ page }) => {
   // The layout is as it was: the files are still docked.
   await expect(page.locator("#workspace")).toHaveClass(/is-left-open/);
 });
+
+test("the rail and status bar stay above Android's navigation bar", async ({
+  page,
+}) => {
+  await open(page, 834, 1194);
+  // What src/ui/android-insets.ts sets for a 48 px gesture/navigation bar.
+  await page.evaluate(() =>
+    document.documentElement.style.setProperty(
+      "--android-inset-bottom",
+      "48px",
+    ),
+  );
+  const limit = 1194 - 48;
+  for (const name of ["Einstellungen", "Farbschema wechseln"]) {
+    const box = await rail(page, name).boundingBox();
+    expect(box!.y + box!.height, name).toBeLessThanOrEqual(limit);
+  }
+  const status = await page.locator(".status-bar").boundingBox();
+  expect(status!.y + status!.height).toBeLessThanOrEqual(limit);
+  // And the settings open with a tap there.
+  await rail(page, "Einstellungen").tap();
+  await expect(page.getByRole("dialog")).toBeVisible();
+});
