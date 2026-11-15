@@ -1,5 +1,13 @@
 # Basalt: agent notes
 
+Read CONSTRAINTS.md before writing code. Do not weaken it to make a change pass.
+
+## Public repository privacy
+
+- Treat every commit, PR, issue, screenshot and attached report as public. Never include private email addresses, personal data, credentials, real vault contents or identifying local paths.
+- Use synthetic fixtures and repository-relative paths. Inspect the staged diff, commit metadata and attachments for private data before committing or publishing; use a GitHub noreply address for author/committer metadata.
+- Keep raw local diagnostics outside tracked files; sanitize any excerpts before including them. Publication still requires authorization.
+
 ## Execution boundaries
 
 - This is Basalt, an independent implementation targeting Linux and Android, not an Obsidian fork. Never commit Obsidian application code, unpacked app packages or decompiler output.
