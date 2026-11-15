@@ -974,6 +974,36 @@ export class TextComponent extends InputComponent<string> {
   }
 }
 
+export class SearchComponent extends TextComponent {
+  readonly clearButtonEl: HTMLButtonElement;
+  constructor(containerEl: HTMLElement) {
+    const wrapper = element("div", "search-input-container");
+    super(wrapper);
+    (this.inputEl as HTMLInputElement).type = "search";
+    this.clearButtonEl = document.createElement("button");
+    this.clearButtonEl.type = "button";
+    this.clearButtonEl.textContent = "×";
+    this.clearButtonEl.setAttribute("aria-label", getLocale() === "de" ? "Suche leeren" : "Clear search");
+    this.clearButtonEl.addEventListener("click", () => {
+      this.setValue("");
+      this.onChanged();
+      this.inputEl.focus();
+    });
+    wrapper.append(this.inputEl, this.clearButtonEl);
+    containerEl.append(wrapper);
+  }
+  override getValue(): string {
+    return this.inputEl.value;
+  }
+  onChanged(): void {
+    this.inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  override setDisabled(disabled: boolean): this {
+    this.clearButtonEl.disabled = disabled;
+    return super.setDisabled(disabled);
+  }
+}
+
 export class TextAreaComponent extends InputComponent<string> {
   constructor(settingEl: HTMLElement) {
     super(settingEl, "textarea");
@@ -1230,6 +1260,39 @@ export class Setting {
     const component = new ColorComponent(this.controlEl);
     this.controlEl.append(component.inputEl);
     return this.addComponent(component, callback);
+  }
+}
+
+export class SettingGroup {
+  readonly listEl = element("div", "setting-group");
+  private readonly headingEl = element("h3", "setting-group-heading");
+  private readonly actionsEl = element("div", "setting-group-actions");
+  constructor(containerEl: HTMLElement) {
+    this.headingEl.hidden = true;
+    containerEl.append(this.headingEl, this.actionsEl, this.listEl);
+  }
+  setHeading(text: string | DocumentFragment): this {
+    this.headingEl.replaceChildren(text);
+    this.headingEl.hidden = false;
+    return this;
+  }
+  addClass(...classes: string[]): this {
+    this.listEl.classList.add(...classes);
+    return this;
+  }
+  addSetting(callback: (setting: Setting) => void): this {
+    callback(new Setting(this.listEl));
+    return this;
+  }
+  addSearch(callback: (component: SearchComponent) => unknown): this {
+    const container = element("div", "setting-group-search");
+    this.listEl.prepend(container);
+    callback(new SearchComponent(container));
+    return this;
+  }
+  addExtraButton(callback: (component: ExtraButtonComponent) => unknown): this {
+    callback(new ExtraButtonComponent(this.actionsEl));
+    return this;
   }
 }
 
@@ -1839,9 +1902,11 @@ export function createObsidianApi(
     PluginSettingTab,
     SettingPage,
     Setting,
+    SettingGroup,
     BaseComponent,
     ValueComponent,
     TextComponent,
+    SearchComponent,
     TextAreaComponent,
     ToggleComponent,
     ButtonComponent,
