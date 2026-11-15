@@ -41,6 +41,8 @@ function commandButton(
   label: string,
   extra = "",
   tooltip: "bottom" | "right" | "top" = "bottom",
+  /** Short caption under the icon in the tablet rail. */
+  railLabel?: string,
 ): HTMLButtonElement {
   return h(
     "button",
@@ -51,6 +53,36 @@ function commandButton(
       data: { command, tooltipPosition: tooltip },
     },
     icon(iconId),
+    railLabel ? h("span", { class: "rail-item-label", text: railLabel }) : null,
+  );
+}
+
+/**
+ * Title, pin and close button of a sidebar while it floats as a card on a
+ * tablet. The right one wraps the tab strip, which stays its title there.
+ */
+function sheetHeader(side: "left" | "right", title: HTMLElement | null) {
+  const button = (action: string, iconId: string, label: string) =>
+    h(
+      "button",
+      {
+        class: `clickable-icon sheet-${action}`,
+        label,
+        attrs: { type: "button" },
+        data: { sheetSide: side, sheetAction: action, tooltipPosition: "bottom" },
+      },
+      icon(iconId),
+    );
+  return h(
+    "div",
+    `sheet-header mod-${side}`,
+    title,
+    h(
+      "div",
+      "sheet-controls",
+      button("pin", "pin", t("Anpinnen")),
+      button("close", "x", t("Schließen")),
+    ),
   );
 }
 
@@ -173,6 +205,7 @@ export function buildShell(root: HTMLElement) {
         t("Schnellauswahl öffnen"),
         "",
         "right",
+        t("Öffnen"),
       ),
       commandButton(
         "daily-note",
@@ -180,6 +213,7 @@ export function buildShell(root: HTMLElement) {
         t("Heutige Tagesnotiz öffnen"),
         "",
         "right",
+        t("Heute"),
       ),
       commandButton(
         "command-palette",
@@ -187,6 +221,7 @@ export function buildShell(root: HTMLElement) {
         t("Befehlspalette öffnen"),
         "",
         "right",
+        t("Befehle"),
       ),
       commandButton(
         "open-graph",
@@ -194,6 +229,7 @@ export function buildShell(root: HTMLElement) {
         t("Graphansicht öffnen"),
         "",
         "right",
+        t("Graph"),
       ),
       pluginRibbon,
     ),
@@ -206,8 +242,16 @@ export function buildShell(root: HTMLElement) {
         t("Farbschema wechseln"),
         "",
         "right",
+        t("Design"),
       ),
-      commandButton("settings", "settings", t("Einstellungen"), "", "right"),
+      commandButton(
+        "settings",
+        "settings",
+        t("Einstellungen"),
+        "",
+        "right",
+        t("Optionen"),
+      ),
     ),
   );
 
@@ -236,6 +280,7 @@ export function buildShell(root: HTMLElement) {
     docks["left-bottom"].content,
   );
   docks["left-bottom"].empty.textContent = t("Ansicht hier ablegen");
+  const leftSheetTitle = h("div", { class: "sheet-title" });
   const leftSplit = h(
     "aside",
     {
@@ -246,6 +291,7 @@ export function buildShell(root: HTMLElement) {
     h(
       "div",
       "workspace-split-inner",
+      sheetHeader("left", leftSheetTitle),
       docks.left.tabs,
       docks.left.content,
       leftBottomHandle,
@@ -484,7 +530,12 @@ export function buildShell(root: HTMLElement) {
       id: "right-split",
       label: t("Rechte Seitenleiste"),
     },
-    h("div", "workspace-split-inner", docks.right.tabs, docks.right.content),
+    h(
+      "div",
+      "workspace-split-inner",
+      sheetHeader("right", docks.right.tabs),
+      docks.right.content,
+    ),
   );
 
   const leftHandle = h("div", {
@@ -608,6 +659,7 @@ export function buildShell(root: HTMLElement) {
     workspace,
     ribbon,
     railPanels,
+    leftSheetTitle,
     pluginRibbon,
     leftSplit,
     rightSplit,

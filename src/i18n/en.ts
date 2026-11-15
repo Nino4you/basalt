@@ -835,4 +835,9 @@ export const en = {
   "Fokusmodus": "Focus mode",
   "Fokusmodus beenden": "Leave focus mode",
   "Fokusmodus umschalten": "Toggle focus mode",
+  "Anpinnen": "Pin",
+  "Lösen": "Unpin",
+  "Heute": "Today",
+  "Befehle": "Commands",
+  "Design": "Theme",
 } as const;

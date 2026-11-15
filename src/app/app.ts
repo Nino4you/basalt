@@ -82,6 +82,7 @@ import { notify } from "../ui/notice";
 import { installTooltips } from "../ui/tooltip";
 import { CommandRegistry } from "./commands";
 import { PHONE_QUERY, sidebarSheets, TOUCH_QUERY } from "../ui/device";
+import { installSheetGestures } from "./sheet-gestures";
 import { buildMobileToolbar } from "./mobile-toolbar";
 import { EditorView } from "@codemirror/view";
 import { Explorer } from "./explorer";
@@ -234,6 +235,9 @@ interface Layout {
   leftOpen: boolean;
   rightOpen: boolean;
   bottomOpen: boolean;
+  /** Tablets: the sidebar docks beside the note instead of floating. */
+  leftPinned: boolean;
+  rightPinned: boolean;
   /** Which panel lives in which dock area; moved by drag & drop. */
   dock: DockLayout;
   /** Panels the user closed; they keep their place in `dock` for reopening. */
@@ -3507,12 +3511,26 @@ export class App {
     document.body.classList.toggle("is-touch", this.touch.matches);
     const tablet = this.isTablet;
     document.body.classList.toggle("is-tablet", tablet);
-    if (!mobile) this.mobilePanel = null;
-    // A sheet that no longer fits as one (rotation, desktop) closes.
+    if (!mobile) {
+      this.mobilePanel = null;
+      this.drawer = null;
+    }
+    // A card that no longer floats (pinned with room, desktop) closes.
     const sheets = this.sheets;
-    if (!mobile && this.drawer && !sheets[this.drawer]) this.drawer = null;
-    workspace.classList.toggle("is-left-sheet", !mobile && sheets.left);
-    workspace.classList.toggle("is-right-sheet", !mobile && sheets.right);
+    if (!tablet || !sheets.left) this.floating.left = false;
+    if (!tablet || !sheets.right) this.floating.right = false;
+    workspace.classList.toggle("is-left-sheet", tablet && sheets.left);
+    workspace.classList.toggle("is-right-sheet", tablet && sheets.right);
+    for (const side of ["left", "right"] as const)
+      for (const pin of document.querySelectorAll<HTMLElement>(
+        `.sheet-pin[data-sheet-side="${side}"]`,
+      )) {
+        const pinned =
+          side === "left" ? this.layout.leftPinned : this.layout.rightPinned;
+        pin.classList.toggle("is-active", pinned);
+        pin.setAttribute("aria-pressed", String(pinned));
+        pin.setAttribute("aria-label", pinned ? t("Lösen") : t("Anpinnen"));
+      }
     const leftOpen = this.leftVisible;
     const rightOpen = this.rightVisible;
     const bottomOpen = this.bottomVisible;
@@ -3526,6 +3544,7 @@ export class App {
       `${this.layout.bottomHeight}px`,
     );
     workspace.style.setProperty("--left-bottom-height", `${this.layout.leftBottomHeight}px`);
+    // Phones dim the note behind a drawer; tablet cards leave it usable.
     scrim.classList.toggle("is-visible", this.drawer !== null);
     this.shell.leftSplit.inert = !leftOpen;
     this.shell.rightSplit.inert = !rightOpen;
@@ -3564,6 +3583,15 @@ export class App {
    */
   private renderRail(shown: DockLayout): void {
     const ids = [...shown.left.panels, ...shown["left-bottom"].panels] as DockPanelId[];
+    const active = shown.left.active as DockPanelId | null;
+    const activeTab = active
+      ? isPluginPanel(active)
+        ? this.pluginPanels.get(active)?.tab
+        : this.shell.panelTabs[active]
+      : null;
+    this.shell.leftSheetTitle.textContent = active
+      ? (RAIL_LABELS[active] ?? activeTab?.getAttribute("aria-label") ?? "")
+      : "";
     const buttons = ids.map((id) => {
       let button = this.railButtons.get(id);
       if (!button) {
@@ -3632,11 +3660,31 @@ export class App {
   }
 
   get leftVisible(): boolean {
-    return this.sheets.left ? this.drawer === "left" : this.layout.leftOpen;
+    if (this.isMobile) return this.drawer === "left";
+    return this.sheets.left ? this.floating.left : this.layout.leftOpen;
   }
 
   get rightVisible(): boolean {
-    return this.sheets.right ? this.drawer === "right" : this.layout.rightOpen;
+    if (this.isMobile) return this.drawer === "right";
+    return this.sheets.right ? this.floating.right : this.layout.rightOpen;
+  }
+
+  /** Tablet sidebars open as floating cards; both may be open at once. */
+  private readonly floating = { left: false, right: false };
+
+  /** Pins a tablet sidebar beside the note, or lets it float again. */
+  setPinned(side: "left" | "right", pinned: boolean): void {
+    const visible = side === "left" ? this.leftVisible : this.rightVisible;
+    if (side === "left") {
+      this.layout.leftPinned = pinned;
+      this.layout.leftOpen = visible;
+    } else {
+      this.layout.rightPinned = pinned;
+      this.layout.rightOpen = visible;
+    }
+    // Unpinned, it stays on screen as a card until dismissed.
+    this.floating[side] = visible;
+    this.applyLayout();
   }
 
   /** Only the note: rail, sidebars, tabs and status bar step aside. */
@@ -3652,22 +3700,32 @@ export class App {
   }
 
   /** Touch screens too wide for the phone layout. */
-  private get isTablet(): boolean {
+  get isTablet(): boolean {
     return this.touch.matches && !this.isMobile;
   }
 
+  /** Tablet sidebars that float as cards right now (not pinned beside the note). */
+  get floatingSides(): { left: boolean; right: boolean } {
+    if (!this.isTablet) return { left: false, right: false };
+    return this.sheets;
+  }
+
   /**
-   * Sidebars shown as drawers or sheets over the note instead of beside it:
-   * always on phones, on tablets when the note would get too narrow, never
-   * with a mouse. Only one of them is open at a time (`drawer`).
+   * Sidebars shown over the note instead of beside it: drawers on phones
+   * (one at a time, `drawer`), floating cards on tablets unless pinned with
+   * room to spare (`floating`), never with a mouse.
    */
   private get sheets(): { left: boolean; right: boolean } {
     if (this.isMobile) return { left: true, right: true };
     if (!this.isTablet) return { left: false, right: false };
     return sidebarSheets(
       window.innerWidth,
-      { open: this.layout.leftOpen, width: this.layout.leftWidth },
-      { width: this.layout.rightWidth },
+      {
+        open: this.layout.leftOpen,
+        width: this.layout.leftWidth,
+        pinned: this.layout.leftPinned,
+      },
+      { width: this.layout.rightWidth, pinned: this.layout.rightPinned },
     );
   }
 
@@ -3689,22 +3747,17 @@ export class App {
 
   toggleLeft(force?: boolean): void {
     const next = force ?? !this.leftVisible;
-    if (this.sheets.left) this.drawer = next ? "left" : null;
-    else {
-      this.layout.leftOpen = next;
-      // A docked sidebar takes room; a sheet on the other side may close.
-      if (this.drawer === "right") this.drawer = null;
-    }
+    if (this.isMobile) this.drawer = next ? "left" : null;
+    else if (this.sheets.left) this.floating.left = next;
+    else this.layout.leftOpen = next;
     this.applyLayout();
   }
 
   toggleRight(force?: boolean): void {
     const next = force ?? !this.rightVisible;
-    if (this.sheets.right) this.drawer = next ? "right" : null;
-    else {
-      this.layout.rightOpen = next;
-      if (this.drawer === "left") this.drawer = null;
-    }
+    if (this.isMobile) this.drawer = next ? "right" : null;
+    else if (this.sheets.right) this.floating.right = next;
+    else this.layout.rightOpen = next;
     this.applyLayout();
   }
 
@@ -3727,9 +3780,12 @@ export class App {
     else this.toggleBottom(true);
   }
 
+  /** Closes phone drawers and floating tablet cards; pinned sidebars stay. */
   closeDrawers(): void {
-    if (this.drawer === null) return;
+    if (this.drawer === null && !this.floating.left && !this.floating.right)
+      return;
     this.drawer = null;
+    this.floating.left = this.floating.right = false;
     this.applyLayout();
   }
 
@@ -4705,6 +4761,24 @@ export class App {
     document
       .getElementById("sync-conflicts")!
       .addEventListener("click", () => openSyncConflicts(this));
+    // Pin and close buttons in the header of a tablet sidebar card.
+    for (const split of [shell.leftSplit, shell.rightSplit])
+      split.addEventListener("click", (event) => {
+        const button = (event.target as Element).closest<HTMLElement>(
+          "[data-sheet-action]",
+        );
+        if (!button) return;
+        const side = button.dataset.sheetSide as "left" | "right";
+        if (button.dataset.sheetAction === "close") {
+          if (side === "left") this.toggleLeft(false);
+          else this.toggleRight(false);
+        } else
+          this.setPinned(
+            side,
+            !(side === "left" ? this.layout.leftPinned : this.layout.rightPinned),
+          );
+      });
+    installSheetGestures(this, shell);
     document
       .getElementById("export-draft")!
       .addEventListener("click", () => this.exportNote());
@@ -4784,7 +4858,8 @@ export class App {
     document.addEventListener(
       "touchend",
       (event) => {
-        if (!touch || !(this.isMobile || this.isTablet) || topModal()) return;
+        // Tablet cards follow the finger instead (sheet-gestures.ts).
+        if (!touch || !this.isMobile || topModal()) return;
         const point = event.changedTouches[0];
         const dx = point.clientX - touch.x;
         const dy = point.clientY - touch.y;
@@ -5427,6 +5502,8 @@ function loadLayout(): Layout {
     leftOpen: true,
     rightOpen: false,
     bottomOpen: false,
+    leftPinned: false,
+    rightPinned: false,
     dock: defaultDock(PANELS),
     closedPanels: [],
   };
@@ -5450,6 +5527,10 @@ function loadLayout(): Layout {
         layout.rightOpen = value.rightOpen;
       if (typeof value.bottomOpen === "boolean")
         layout.bottomOpen = value.bottomOpen;
+      if (typeof value.leftPinned === "boolean")
+        layout.leftPinned = value.leftPinned;
+      if (typeof value.rightPinned === "boolean")
+        layout.rightPinned = value.rightPinned;
       if (value.dock)
         layout.dock = normalizeDock(value.dock, PANELS, isPluginPanel);
       if (Array.isArray(value.closedPanels))

@@ -91,10 +91,10 @@ Obsidian vaults and selected Obsidian plugins.
 - Light and dark theme with an accent color, plus Obsidian-style themes and CSS snippets from
   the vault (`Basalt/Config/themes`, `Basalt/Config/snippets`).
 - A dedicated phone layout with drawers, a bottom navigation bar and a formatting toolbar.
-- A tablet layout of its own: a navigation rail with labelled views and a new-note button,
-  sidebars that sit beside the note while it keeps enough room and slide over it otherwise
-  (so turning the tablet just works), edge swipes, finger-sized targets and a focus mode that
-  leaves only the note.
+- A tablet layout of its own: a navigation rail with a new-note button and labelled views
+  and actions; sidebars float over the note as cards (no dimming, a tap beside one closes it)
+  that follow the finger when dragged, and can be pinned beside the note when there is room;
+  finger-sized targets and a focus mode that leaves only the note.
 
 <p align="center">
   <img src="screenshots/02-mobile-dark.png" width="300" alt="Basalt on a phone: reading view with bottom navigation bar" />

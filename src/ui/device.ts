@@ -20,21 +20,22 @@ export const RAIL_WIDTH = 72;
 export const NOTE_MIN_WIDTH = 520;
 
 /**
- * Which tablet sidebars slide over the note as sheets instead of sitting
- * beside it. The rule follows the room left for the note, not the
- * orientation: a large tablet in portrait can still dock the files, a small
- * one in landscape shows backlinks as a sheet. The left sidebar decides
- * first; the right one docks only if the note keeps its width beside both.
+ * Which tablet sidebars float over the note as cards instead of sitting
+ * beside it. They float unless pinned; a pinned one docks only while the
+ * note keeps its width, so a pinned sidebar still floats in portrait on a
+ * small tablet. The left sidebar decides first; the right one docks only if
+ * the note keeps its width beside both.
  */
 export function sidebarSheets(
   viewportWidth: number,
-  left: { open: boolean; width: number },
-  right: { width: number },
+  left: { open: boolean; width: number; pinned: boolean },
+  right: { width: number; pinned: boolean },
 ): { left: boolean; right: boolean } {
   const room = viewportWidth - RAIL_WIDTH;
-  const leftSheet = room - left.width < NOTE_MIN_WIDTH;
+  const leftSheet = !left.pinned || room - left.width < NOTE_MIN_WIDTH;
   const leftDocked = !leftSheet && left.open;
   const rightSheet =
+    !right.pinned ||
     room - (leftDocked ? left.width : 0) - right.width < NOTE_MIN_WIDTH;
   return { left: leftSheet, right: rightSheet };
 }

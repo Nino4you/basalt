@@ -13,6 +13,7 @@ import {
   ArrowUpNarrowWide,
   ArrowUpRight,
   BadgeCheck,
+  Pin,
   Maximize2,
   Minimize2,
   Focus,
@@ -164,6 +165,7 @@ export const hostIcons: Record<string, IconNode> = {
   ArrowUpNarrowWide,
   ArrowUpRight,
   BadgeCheck,
+  Pin,
   Maximize2,
   Minimize2,
   // Named as the window `focus` event, which the icon test cannot tell apart.

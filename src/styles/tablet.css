@@ -2,11 +2,11 @@
  * Tablet layout (body.is-tablet: touch screen wider than a phone).
  *
  * - The ribbon becomes a navigation rail: a new-note button, one labelled
- *   button per view of the left sidebar, then the actions.
- * - Sidebars dock beside the note while it keeps at least NOTE_MIN_WIDTH
- *   (src/ui/device.ts); otherwise they slide over it as sheets
- *   (.is-left-sheet / .is-right-sheet) with a backdrop that leaves the rail
- *   free, so another view is one tap away.
+ *   button per view of the left sidebar, then the labelled actions.
+ * - Sidebars float over the note as cards (.is-left-sheet / .is-right-sheet)
+ *   without a backdrop, and follow the finger (src/app/sheet-gestures.ts).
+ *   Pinned, one docks beside the note while it keeps NOTE_MIN_WIDTH
+ *   (src/ui/device.ts).
  * - Targets are sized for a finger.
  */
 
@@ -111,8 +111,55 @@ body.is-tablet .side-dock-panels {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-body.is-tablet .workspace-ribbon .side-dock-actions .clickable-icon,
-body.is-tablet .workspace-ribbon .side-dock-settings .clickable-icon,
+/* Desktop ribbons keep bare icons. */
+.workspace-ribbon .clickable-icon > .rail-item-label {
+  display: none;
+}
+/* On tablets every rail button reads like a view: icon over a caption. */
+body.is-tablet .workspace-ribbon .side-dock-actions > .clickable-icon,
+body.is-tablet .workspace-ribbon .side-dock-settings > .clickable-icon {
+  flex-direction: column;
+  gap: 3px;
+  width: 68px;
+  height: auto;
+  padding: 4px 0 6px;
+  border-radius: 12px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.15;
+}
+body.is-tablet .workspace-ribbon .clickable-icon > .rail-item-label {
+  display: block;
+}
+body.is-tablet .workspace-ribbon .side-dock-actions > .clickable-icon:hover,
+body.is-tablet .workspace-ribbon .side-dock-settings > .clickable-icon:hover {
+  background: transparent;
+}
+body.is-tablet .workspace-ribbon .side-dock-actions > .clickable-icon .svg-icon,
+body.is-tablet
+  .workspace-ribbon
+  .side-dock-settings
+  > .clickable-icon
+  .svg-icon {
+  box-sizing: content-box;
+  width: 20px;
+  height: 20px;
+  padding: 4px 18px;
+  border-radius: 16px;
+}
+body.is-tablet
+  .workspace-ribbon
+  .side-dock-actions
+  > .clickable-icon:hover
+  .svg-icon,
+body.is-tablet
+  .workspace-ribbon
+  .side-dock-settings
+  > .clickable-icon:hover
+  .svg-icon {
+  background: var(--background-modifier-hover);
+}
 body.is-tablet .basalt-plugin-ribbon {
   width: 48px;
   height: 44px;
@@ -123,10 +170,63 @@ body.is-tablet .side-dock-settings {
   gap: 6px;
 }
 
-/* ── sidebars: docked beside the note, or a sheet over it ────────────────── */
+/* ── sidebars: floating cards, or pinned beside the note ─────────────────── */
 
+/* Desktop and phones never show the card header. */
+.sheet-header.mod-left {
+  display: none;
+}
+.sheet-header.mod-right {
+  display: contents;
+}
+.sheet-controls {
+  display: none;
+}
 /* The rail selects the left views; their tab strip would only repeat it. */
 body.is-tablet .mod-left-split .workspace-split-inner > .mod-dock-header {
+  display: none;
+}
+body.is-tablet .sheet-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--header-height);
+  padding: 0 6px 0 16px;
+}
+body.is-tablet .sheet-header.mod-right {
+  padding-left: 0;
+}
+body.is-tablet .sheet-header.mod-right > .mod-dock-header {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-bottom: 0;
+}
+.sheet-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.is-tablet .sheet-controls {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+.sheet-pin.is-active {
+  color: var(--text-accent);
+}
+/* Docked sidebars need no close button: the rail or toggle closes them. */
+body.is-tablet
+  .workspace:not(.is-left-sheet)
+  .sheet-close[data-sheet-side="left"],
+body.is-tablet
+  .workspace:not(.is-right-sheet)
+  .sheet-close[data-sheet-side="right"] {
   display: none;
 }
 body.is-tablet .workspace-left-bottom.is-empty,
@@ -135,56 +235,74 @@ body.is-tablet .workspace-left-bottom.is-empty + .workspace-resize-handle {
 }
 body.is-tablet .workspace {
   position: relative;
+  --card-gap: 10px;
+  --card-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 body.is-tablet .workspace.is-left-sheet .mod-left-split,
 body.is-tablet .workspace.is-right-sheet .mod-right-split {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: var(--card-gap);
+  bottom: var(--card-gap);
   z-index: 50;
-  width: min(
-    var(--sheet-width, 340px),
-    calc(100vw - var(--ribbon-width) - 48px)
-  ) !important;
-  border: 0 !important;
+  width: min(360px, calc(100vw - var(--ribbon-width) - 64px)) !important;
+  border: 1px solid var(--background-modifier-border) !important;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--background-secondary) 96%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  box-shadow: none;
   visibility: hidden;
   transition:
-    transform 220ms var(--ease),
-    box-shadow 220ms var(--ease),
-    visibility 0s linear 220ms;
+    transform 320ms var(--card-ease),
+    box-shadow 320ms var(--card-ease),
+    visibility 0s linear 320ms;
   will-change: transform;
 }
 body.is-tablet .workspace.is-left-sheet .mod-left-split {
-  left: var(--ribbon-width);
-  transform: translateX(calc(-100% - var(--ribbon-width)));
-  border-radius: 0 var(--radius-l) var(--radius-l) 0;
+  left: calc(var(--ribbon-width) + var(--card-gap));
+  transform: translateX(
+    calc(-100% - var(--ribbon-width) - 2 * var(--card-gap))
+  );
 }
 body.is-tablet .workspace.is-right-sheet .mod-right-split {
-  right: 0;
-  transform: translateX(102%);
-  border-radius: var(--radius-l) 0 0 var(--radius-l);
+  right: var(--card-gap);
+  transform: translateX(calc(100% + 2 * var(--card-gap)));
 }
 body.is-tablet .workspace.is-left-sheet.is-left-open .mod-left-split,
 body.is-tablet .workspace.is-right-sheet.is-right-open .mod-right-split {
   transform: none;
   visibility: visible;
-  box-shadow: var(--shadow-l);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.12),
+    0 18px 48px rgba(0, 0, 0, 0.28);
   transition:
-    transform 220ms var(--ease),
-    box-shadow 220ms var(--ease);
+    transform 320ms var(--card-ease),
+    box-shadow 320ms var(--card-ease);
+}
+/* While a finger drags a card it follows without delay. */
+body.is-tablet .workspace .workspace-split.is-dragging {
+  visibility: visible !important;
+  transition: none !important;
 }
 body.is-tablet .workspace.is-left-sheet .workspace-split-inner,
 body.is-tablet .workspace.is-right-sheet .workspace-split-inner {
   width: 100% !important;
 }
-/* Sheets have a fixed width; only docked sidebars can be resized. */
+/* Cards have a fixed width; only pinned sidebars can be resized. */
 body.is-tablet .workspace.is-left-sheet .workspace-resize-handle.mod-left,
 body.is-tablet .workspace.is-right-sheet .workspace-resize-handle.mod-right {
   display: none;
 }
-/* The backdrop leaves the rail tappable: another view replaces the sheet. */
-body.is-tablet .workspace-drawer-backdrop {
-  left: var(--ribbon-width);
+/* A card's own contents sit on its translucent background. */
+body.is-tablet
+  .workspace.is-left-sheet
+  .mod-left-split
+  .workspace-sidedock-vault-profile,
+body.is-tablet
+  .workspace.is-right-sheet
+  .mod-right-split
+  .workspace-tab-header-container {
+  background: transparent;
 }
 
 /* ── touch sizes ─────────────────────────────────────────────────────────── */
