@@ -56,6 +56,8 @@
 
 - Die ältere öffentliche `request`-API nutzt jetzt denselben realen HTTP-Transport wie `requestUrl` und liefert dessen Text zurück. Zwei Regressionen erst rot, danach 655/655 Tests und Build erfolgreich; Browser-/native Transportwahl, HTTP-Fehler, `throw: false` und Netzfehler geprüft. LiveSync weiterhin ohne Ereignisfehler; Editing Toolbar und Code Styler bleiben an anderen Host-Lücken hängen. Keine neue Netzwerkberechtigung.
 
+- Kanbans Konstruktor scheiterte am schreibgeschützten `_loaded`-Feld. Es ist jetzt ein vom Host gepflegtes Kompatibilitätsfeld; die private Zustandsmaschine bleibt allein für Laden, Besitz und Aufräumen zuständig. Regression erst rot, danach 656/656 Tests und Build grün; absichtlich überschriebene Flags umgehen weder Einmaligkeit noch spätes Cleanup. Kanban erreicht nun die nächste reale Lücke im Extension-Registry-Zugriff, bleibt also als Fehler sichtbar.
+
 ### Blockiert / braucht Freigabe
 
 - Eine Lösung, die unrestricted Node/fs/Prozess-/Serverzugriff, globale Installationen, bezahlte APIs oder Veröffentlichung voraussetzt, ist nicht freigegeben. Andere sichere Lücken werden währenddessen weiterbearbeitet.
