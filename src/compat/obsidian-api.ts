@@ -12,6 +12,7 @@ import { createElement } from "lucide";
 import { findIcon, iconIds } from "../ui/icon-library";
 import { showMenu, type MenuEntry } from "../ui/menu";
 import { Component } from "./component";
+import { SettingPage } from "./setting-page";
 import { debounce } from "./debounce";
 import { installDomEvents } from "./dom-events";
 import { Editor, type EditorPosition } from "./editor-adapter";
@@ -1860,6 +1861,7 @@ export function createObsidianApi(
     Notice,
     Modal,
     PluginSettingTab,
+    SettingPage,
     Setting,
     BaseComponent,
     ValueComponent,
