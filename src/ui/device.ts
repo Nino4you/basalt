@@ -14,6 +14,27 @@ export const PHONE_QUERY =
  */
 export const TOUCH_QUERY = "(any-pointer: coarse), (hover: none)";
 
-/** Tablets too narrow (portrait) for both sidebars beside the note. */
-export const NARROW_TABLET_QUERY =
-  "(any-pointer: coarse) and (max-width: 1099px), (hover: none) and (max-width: 1099px)";
+/** Width of the tablet navigation rail (the ribbon on tablets). */
+export const RAIL_WIDTH = 72;
+/** Tablets dock a sidebar beside the note only while the note keeps this width. */
+export const NOTE_MIN_WIDTH = 520;
+
+/**
+ * Which tablet sidebars slide over the note as sheets instead of sitting
+ * beside it. The rule follows the room left for the note, not the
+ * orientation: a large tablet in portrait can still dock the files, a small
+ * one in landscape shows backlinks as a sheet. The left sidebar decides
+ * first; the right one docks only if the note keeps its width beside both.
+ */
+export function sidebarSheets(
+  viewportWidth: number,
+  left: { open: boolean; width: number },
+  right: { width: number },
+): { left: boolean; right: boolean } {
+  const room = viewportWidth - RAIL_WIDTH;
+  const leftSheet = room - left.width < NOTE_MIN_WIDTH;
+  const leftDocked = !leftSheet && left.open;
+  const rightSheet =
+    room - (leftDocked ? left.width : 0) - right.width < NOTE_MIN_WIDTH;
+  return { left: leftSheet, right: rightSheet };
+}

@@ -145,6 +145,13 @@ export function buildShell(root: HTMLElement) {
     class: "side-dock-plugins",
     id: "plugin-ribbon",
   });
+  // Tablets turn the ribbon into a navigation rail: a new-note button and
+  // one labelled button per left-sidebar view (filled in by the app).
+  const railPanels = h("div", {
+    class: "side-dock-panels",
+    label: t("Ansichten"),
+    attrs: { role: "group" },
+  });
   const ribbon = h(
     "nav",
     { class: "workspace-ribbon side-dock-ribbon mod-left", label: t("Werkzeuge") },
@@ -155,6 +162,8 @@ export function buildShell(root: HTMLElement) {
       "sidebar-toggle-button mod-left",
       "right",
     ),
+    commandButton("new-note", "plus", t("Neue Notiz"), "rail-fab", "right"),
+    railPanels,
     h(
       "div",
       "side-dock-actions",
@@ -579,6 +588,7 @@ export function buildShell(root: HTMLElement) {
   return {
     workspace,
     ribbon,
+    railPanels,
     pluginRibbon,
     leftSplit,
     rightSplit,

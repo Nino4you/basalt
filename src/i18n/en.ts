@@ -829,4 +829,7 @@ export const en = {
   "in offenen Aufgaben suchen": "search in open tasks",
   "in erledigten Aufgaben suchen": "search in completed tasks",
   "regulärer Ausdruck": "regular expression",
+  "Ausgehend": "Outgoing",
+  "Ansichten": "Views",
+  "Graph": "Graph",
 } as const;

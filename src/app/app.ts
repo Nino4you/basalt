@@ -81,7 +81,7 @@ import { fuzzyMatch } from "../ui/fuzzy";
 import { notify } from "../ui/notice";
 import { installTooltips } from "../ui/tooltip";
 import { CommandRegistry } from "./commands";
-import { NARROW_TABLET_QUERY, PHONE_QUERY, TOUCH_QUERY } from "../ui/device";
+import { PHONE_QUERY, sidebarSheets, TOUCH_QUERY } from "../ui/device";
 import { buildMobileToolbar } from "./mobile-toolbar";
 import { EditorView } from "@codemirror/view";
 import { Explorer } from "./explorer";
@@ -193,6 +193,17 @@ type AppEvent = "active" | "files" | "index" | "doc" | "tabs" | "bookmarks";
 
 /** Longest time between full plugin-vault refreshes while notes are saved. */
 const FULL_REFRESH_INTERVAL = 30_000;
+/** Short labels for the tablet rail; other views use their full name. */
+const RAIL_LABELS: Partial<Record<DockPanelId, string>> = {
+  files: t("Dateien"),
+  search: t("Suche"),
+  bookmarks: t("Lesezeichen"),
+  backlinks: t("Rückverweise"),
+  outgoing: t("Ausgehend"),
+  tags: t("Tags"),
+  outline: t("Gliederung"),
+  graph: t("Graph"),
+};
 
 interface SavedTab {
   path: string | null;
@@ -279,7 +290,6 @@ export class App {
   readonly pluginErrors = new Map<string, string>();
   private readonly mobile = matchMedia(PHONE_QUERY);
   private readonly touch = matchMedia(TOUCH_QUERY);
-  private readonly narrowTouch = matchMedia(NARROW_TABLET_QUERY);
   private readonly linkPreview: LinkPreview;
   private readonly groupViews = new Map<number, GroupView>();
   /** Structure of the split as last built into the DOM. */
@@ -414,7 +424,13 @@ export class App {
     });
     this.mobile.addEventListener("change", () => this.applyLayout());
     this.touch.addEventListener("change", () => this.applyLayout());
-    this.narrowTouch.addEventListener("change", () => this.applyLayout());
+    // Tablets dock or slide sidebars by the width left for the note.
+    window.addEventListener(
+      "resize",
+      debounce(() => {
+        if (this.isTablet) this.applyLayout();
+      }, 100),
+    );
     this.on("tabs", () => this.renderGroups());
     this.on("active", () => {
       this.updateHeader();
@@ -1539,7 +1555,8 @@ export class App {
       await leaf.openFile(file);
       return;
     }
-    if (this.isMobile) this.closeDrawers();
+    // Drawers and sheets give the note back once a file is picked.
+    this.closeDrawers();
     if (!options.newTab) {
       if (this.active.path === path && this.active.loaded &&
         (!options.pluginState || (this.active.viewType ?? "markdown") === options.pluginState.type)) {
@@ -3488,11 +3505,14 @@ export class App {
     const mobile = this.isMobile;
     document.body.classList.toggle("is-mobile", mobile);
     document.body.classList.toggle("is-touch", this.touch.matches);
-    document.body.classList.toggle("is-tablet", this.touch.matches && !mobile);
-    if (!mobile) {
-      this.drawer = null;
-      this.mobilePanel = null;
-    }
+    const tablet = this.isTablet;
+    document.body.classList.toggle("is-tablet", tablet);
+    if (!mobile) this.mobilePanel = null;
+    // A sheet that no longer fits as one (rotation, desktop) closes.
+    const sheets = this.sheets;
+    if (!mobile && this.drawer && !sheets[this.drawer]) this.drawer = null;
+    workspace.classList.toggle("is-left-sheet", !mobile && sheets.left);
+    workspace.classList.toggle("is-right-sheet", !mobile && sheets.right);
     const leftOpen = this.leftVisible;
     const rightOpen = this.rightVisible;
     const bottomOpen = this.bottomVisible;
@@ -3506,7 +3526,7 @@ export class App {
       `${this.layout.bottomHeight}px`,
     );
     workspace.style.setProperty("--left-bottom-height", `${this.layout.leftBottomHeight}px`);
-    scrim.classList.toggle("is-visible", mobile && this.drawer !== null);
+    scrim.classList.toggle("is-visible", this.drawer !== null);
     this.shell.leftSplit.inert = !leftOpen;
     this.shell.rightSplit.inert = !rightOpen;
     this.shell.bottomSplit.inert = !bottomOpen;
@@ -3534,9 +3554,56 @@ export class App {
     return shown;
   }
 
+  /** Tablet rail buttons, one per view of the left sidebar. */
+  private readonly railButtons = new Map<DockPanelId, HTMLButtonElement>();
+
+  /**
+   * The rail lists the views of the left sidebar with icon and label; the
+   * active one is marked while the sidebar shows it, and tapping it again
+   * closes the sidebar.
+   */
+  private renderRail(shown: DockLayout): void {
+    const ids = [...shown.left.panels, ...shown["left-bottom"].panels] as DockPanelId[];
+    const buttons = ids.map((id) => {
+      let button = this.railButtons.get(id);
+      if (!button) {
+        button = h("button", {
+          class: "rail-item",
+          attrs: { type: "button", "aria-pressed": "false" },
+          data: { panel: id },
+          on: {
+            click: () => {
+              if (this.isPanelVisible(id)) this.toggleLeft(false);
+              else this.showPanel(id);
+            },
+          },
+        });
+        this.railButtons.set(id, button);
+      }
+      const tab = isPluginPanel(id)
+        ? this.pluginPanels.get(id)?.tab
+        : this.shell.panelTabs[id];
+      const label = RAIL_LABELS[id] ?? tab?.getAttribute("aria-label") ?? id;
+      const svg = tab?.querySelector("svg");
+      const visible = this.isPanelVisible(id);
+      button.replaceChildren(
+        svg ? (svg.cloneNode(true) as SVGElement) : icon("file"),
+        h("span", { class: "rail-item-label", text: label }),
+      );
+      button.setAttribute("aria-label", label);
+      button.setAttribute("aria-pressed", String(visible));
+      button.classList.toggle("is-active", visible);
+      return button;
+    });
+    for (const id of this.railButtons.keys())
+      if (!ids.includes(id)) this.railButtons.delete(id);
+    syncChildren(this.shell.railPanels, buttons);
+  }
+
   /** Moves the panel elements into the tab strips and boxes of their areas. */
   private renderDock(): void {
     const shown = this.shownDock;
+    this.renderRail(shown);
     const { docks } = this.shell;
     const tabOf = (id: DockPanelId) =>
       isPluginPanel(id) ? this.pluginPanels.get(id)!.tab : this.shell.panelTabs[id];
@@ -3565,17 +3632,31 @@ export class App {
   }
 
   get leftVisible(): boolean {
-    return this.isMobile ? this.drawer === "left" : this.layout.leftOpen;
+    return this.sheets.left ? this.drawer === "left" : this.layout.leftOpen;
   }
 
   get rightVisible(): boolean {
-    if (this.isMobile) return this.drawer === "right";
-    // A portrait tablet cannot fit both sidebars beside readable text.
-    return this.layout.rightOpen && !(this.narrowTablet && this.layout.leftOpen);
+    return this.sheets.right ? this.drawer === "right" : this.layout.rightOpen;
   }
 
-  private get narrowTablet(): boolean {
-    return !this.isMobile && this.narrowTouch.matches;
+  /** Touch screens too wide for the phone layout. */
+  private get isTablet(): boolean {
+    return this.touch.matches && !this.isMobile;
+  }
+
+  /**
+   * Sidebars shown as drawers or sheets over the note instead of beside it:
+   * always on phones, on tablets when the note would get too narrow, never
+   * with a mouse. Only one of them is open at a time (`drawer`).
+   */
+  private get sheets(): { left: boolean; right: boolean } {
+    if (this.isMobile) return { left: true, right: true };
+    if (!this.isTablet) return { left: false, right: false };
+    return sidebarSheets(
+      window.innerWidth,
+      { open: this.layout.leftOpen, width: this.layout.leftWidth },
+      { width: this.layout.rightWidth },
+    );
   }
 
   get bottomVisible(): boolean {
@@ -3596,20 +3677,21 @@ export class App {
 
   toggleLeft(force?: boolean): void {
     const next = force ?? !this.leftVisible;
-    if (this.isMobile) this.drawer = next ? "left" : null;
+    if (this.sheets.left) this.drawer = next ? "left" : null;
     else {
       this.layout.leftOpen = next;
-      if (next && this.narrowTablet) this.layout.rightOpen = false;
+      // A docked sidebar takes room; a sheet on the other side may close.
+      if (this.drawer === "right") this.drawer = null;
     }
     this.applyLayout();
   }
 
   toggleRight(force?: boolean): void {
     const next = force ?? !this.rightVisible;
-    if (this.isMobile) this.drawer = next ? "right" : null;
+    if (this.sheets.right) this.drawer = next ? "right" : null;
     else {
       this.layout.rightOpen = next;
-      if (next && this.narrowTablet) this.layout.leftOpen = false;
+      if (this.drawer === "left") this.drawer = null;
     }
     this.applyLayout();
   }
@@ -4684,7 +4766,7 @@ export class App {
     document.addEventListener(
       "touchend",
       (event) => {
-        if (!touch || !this.isMobile || topModal()) return;
+        if (!touch || !(this.isMobile || this.isTablet) || topModal()) return;
         const point = event.changedTouches[0];
         const dx = point.clientX - touch.x;
         const dy = point.clientY - touch.y;
@@ -4693,8 +4775,14 @@ export class App {
         if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
         if (this.drawer === "left" && dx < 0) this.closeDrawers();
         else if (this.drawer === "right" && dx > 0) this.closeDrawers();
-        else if (!this.drawer && dx > 0 && start < 32) this.toggleLeft(true);
-        else if (!this.drawer && dx < 0 && start > innerWidth - 32)
+        else if (!this.drawer && dx > 0 && start < 32 && !this.leftVisible)
+          this.toggleLeft(true);
+        else if (
+          !this.drawer &&
+          dx < 0 &&
+          start > innerWidth - 32 &&
+          !this.rightVisible
+        )
           this.toggleRight(true);
       },
       { passive: true },

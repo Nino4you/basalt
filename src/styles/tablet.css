@@ -1,0 +1,217 @@
+/*
+ * Tablet layout (body.is-tablet: touch screen wider than a phone).
+ *
+ * - The ribbon becomes a navigation rail: a new-note button, one labelled
+ *   button per view of the left sidebar, then the actions.
+ * - Sidebars dock beside the note while it keeps at least NOTE_MIN_WIDTH
+ *   (src/ui/device.ts); otherwise they slide over it as sheets
+ *   (.is-left-sheet / .is-right-sheet) with a backdrop that leaves the rail
+ *   free, so another view is one tap away.
+ * - Targets are sized for a finger.
+ */
+
+/* Desktop and phones never show the rail parts. */
+.side-dock-panels,
+.workspace-ribbon .rail-fab {
+  display: none;
+}
+
+body.is-tablet {
+  --ribbon-width: 72px;
+  --header-height: 44px;
+  --font-ui-small: 14px;
+  --font-ui-smaller: 12.5px;
+}
+
+/* ── navigation rail ─────────────────────────────────────────────────────── */
+
+/* The rail is the tablet's navigation; it cannot be hidden like the ribbon. */
+body.is-tablet.hide-ribbon .workspace-ribbon {
+  display: flex;
+}
+body.is-tablet.hide-ribbon .sidebar-toggle-button.mod-inline {
+  display: none;
+}
+body.is-tablet .workspace-ribbon {
+  position: relative;
+  z-index: 60;
+  gap: 6px;
+  padding: 10px 0 12px;
+}
+/* The rail's view buttons open and close the left sidebar instead. */
+body.is-tablet .workspace-ribbon .sidebar-toggle-button.mod-left {
+  display: none;
+}
+body.is-tablet .workspace-ribbon .rail-fab {
+  display: inline-flex;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 6px;
+  border-radius: 16px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent, #fff);
+  box-shadow: var(--shadow-s);
+}
+body.is-tablet .workspace-ribbon .rail-fab:hover,
+body.is-tablet .workspace-ribbon .rail-fab:active {
+  background: var(--interactive-accent-hover, var(--interactive-accent));
+  color: var(--text-on-accent, #fff);
+}
+body.is-tablet .side-dock-panels {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--divider-color);
+}
+.rail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 68px;
+  height: auto;
+  padding: 4px 0 6px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.15;
+  cursor: pointer;
+}
+/* Material-style indicator: a pill behind the icon of the active view. */
+.rail-item .svg-icon {
+  box-sizing: content-box;
+  width: 22px;
+  height: 22px;
+  padding: 4px 18px;
+  border-radius: 16px;
+  transition: background-color 150ms var(--ease);
+}
+.rail-item:hover .svg-icon {
+  background: var(--background-modifier-hover);
+}
+.rail-item.is-active {
+  color: var(--text-normal);
+}
+.rail-item.is-active .svg-icon {
+  background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.22);
+  color: var(--text-accent);
+}
+.rail-item-label {
+  max-width: 68px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.is-tablet .workspace-ribbon .side-dock-actions .clickable-icon,
+body.is-tablet .workspace-ribbon .side-dock-settings .clickable-icon,
+body.is-tablet .basalt-plugin-ribbon {
+  width: 48px;
+  height: 44px;
+  border-radius: 12px;
+}
+body.is-tablet .side-dock-actions,
+body.is-tablet .side-dock-settings {
+  gap: 6px;
+}
+
+/* ── sidebars: docked beside the note, or a sheet over it ────────────────── */
+
+/* The rail selects the left views; their tab strip would only repeat it. */
+body.is-tablet .mod-left-split .workspace-split-inner > .mod-dock-header {
+  display: none;
+}
+body.is-tablet .workspace-left-bottom.is-empty,
+body.is-tablet .workspace-left-bottom.is-empty + .workspace-resize-handle {
+  display: none;
+}
+body.is-tablet .workspace {
+  position: relative;
+}
+body.is-tablet .workspace.is-left-sheet .mod-left-split,
+body.is-tablet .workspace.is-right-sheet .mod-right-split {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 50;
+  width: min(
+    var(--sheet-width, 340px),
+    calc(100vw - var(--ribbon-width) - 48px)
+  ) !important;
+  border: 0 !important;
+  visibility: hidden;
+  transition:
+    transform 220ms var(--ease),
+    box-shadow 220ms var(--ease),
+    visibility 0s linear 220ms;
+  will-change: transform;
+}
+body.is-tablet .workspace.is-left-sheet .mod-left-split {
+  left: var(--ribbon-width);
+  transform: translateX(calc(-100% - var(--ribbon-width)));
+  border-radius: 0 var(--radius-l) var(--radius-l) 0;
+}
+body.is-tablet .workspace.is-right-sheet .mod-right-split {
+  right: 0;
+  transform: translateX(102%);
+  border-radius: var(--radius-l) 0 0 var(--radius-l);
+}
+body.is-tablet .workspace.is-left-sheet.is-left-open .mod-left-split,
+body.is-tablet .workspace.is-right-sheet.is-right-open .mod-right-split {
+  transform: none;
+  visibility: visible;
+  box-shadow: var(--shadow-l);
+  transition:
+    transform 220ms var(--ease),
+    box-shadow 220ms var(--ease);
+}
+body.is-tablet .workspace.is-left-sheet .workspace-split-inner,
+body.is-tablet .workspace.is-right-sheet .workspace-split-inner {
+  width: 100% !important;
+}
+/* Sheets have a fixed width; only docked sidebars can be resized. */
+body.is-tablet .workspace.is-left-sheet .workspace-resize-handle.mod-left,
+body.is-tablet .workspace.is-right-sheet .workspace-resize-handle.mod-right {
+  display: none;
+}
+/* The backdrop leaves the rail tappable: another view replaces the sheet. */
+body.is-tablet .workspace-drawer-backdrop {
+  left: var(--ribbon-width);
+}
+
+/* ── touch sizes ─────────────────────────────────────────────────────────── */
+
+body.is-tablet .clickable-icon {
+  min-width: 40px;
+  min-height: 40px;
+}
+body.is-tablet .tree-item-self {
+  min-height: 40px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+body.is-tablet .workspace-tab-header.mod-dock {
+  width: 44px;
+}
+body.is-tablet .workspace-tab-header-inner-close-button {
+  width: 28px;
+  height: 28px;
+}
+body.is-tablet .workspace-resize-handle {
+  width: 16px;
+  margin: 0 -8px;
+}
+body.is-tablet .search-input {
+  height: 38px;
+}
+body.is-tablet .menu-item {
+  min-height: 40px;
+}

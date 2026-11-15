@@ -53,26 +53,6 @@ test("a phone turned sideways keeps the phone layout", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("a portrait tablet shows one sidebar at a time", async ({ page }) => {
-  await page.setViewportSize({ width: 834, height: 1194 });
-  await page.goto("/");
-  await expect(page.locator("#tab-name")).toHaveText("Willkommen");
-  await expect(page.locator("body")).toHaveClass(/is-tablet/);
-  const left = page.locator("#left-split");
-  const right = page.locator("#right-split");
-  await page
-    .getByRole("button", { name: "Rechte Seitenleiste umschalten" })
-    .tap();
-  // Desktop sidebars collapse to zero width rather than leaving the screen.
-  await expect(right).not.toHaveCSS("width", "0px");
-  await expect(left).toHaveCSS("width", "0px");
-  await page
-    .getByRole("button", { name: "Linke Seitenleiste umschalten" })
-    .tap();
-  await expect(left).not.toHaveCSS("width", "0px");
-  await expect(right).toHaveCSS("width", "0px");
-});
-
 test("phone settings open as a category list with pages and keep wide controls below their label", async ({
   page,
 }) => {
