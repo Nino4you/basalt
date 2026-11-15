@@ -60,6 +60,8 @@
 
 - Legacy-ES5-Konstruktoren unterstützen jetzt echte `super.call/apply`-Initialisierung über Reflect.construct, ohne die gemeinsamen Host-Klassen zu ersetzen. Zwei rote Lade-/Settings-Regressionen danach grün; fremde Receiver und ungültige Plugin-IDs bleiben abgewiesen. Unveränderte Mind Map und Note Refactor aktivieren und durchlaufen den Survey ohne Ereignisfehler. Gesamtsuite nach separater Parser-Reparatur 661/661, Build grün; Browser-Grundsuite erneut 148 bestanden/46 unveränderte Opt-in-Skips, Core 29/29 inklusive Unix-Symlinks und fmt/clippy grün.
 
+- Ein voller Unit-Lauf zeigte einen sporadischen fehlenden Embed (isoliert zunächst grün). Ursache deterministisch für große Notizen reproduziert: CodeMirror parst zunächst nur einen Teil; nachfolgender Parser-Fortschritt ohne Textänderung aktualisierte weder Plugin-Embeds noch Plugin-Codeblöcke. Zwei Regressionen erst rot, danach beide Dekorationsfelder um den echten Syntaxbaumwechsel ergänzt; 20 passende Tests, volle 661/661 und Build grün. Keine Wartezeit erhöht und kein Fehler versteckt. Die spätere Typecheck-Korrektur betraf ausschließlich die neue synthetische Test-Factory, deren loadFile-Methode der reale Embed-Vertrag verlangt.
+
 ### Blockiert / braucht Freigabe
 
 - Eine Lösung, die unrestricted Node/fs/Prozess-/Serverzugriff, globale Installationen, bezahlte APIs oder Veröffentlichung voraussetzt, ist nicht freigegeben. Andere sichere Lücken werden währenddessen weiterbearbeitet.
