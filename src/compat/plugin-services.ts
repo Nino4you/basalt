@@ -276,7 +276,11 @@ export class PluginServices {
       throw new Error(`View type is already registered: ${type}`);
     this.views.set(type, factory);
     this.resource(pluginId).views.add(type);
+    this.viewListener?.(type);
   }
+
+  /** Called after each `registerView`; the workspace loads leaves waiting for that type. */
+  viewListener?: (type: string) => void;
 
   getView(type: string): ((leaf: unknown) => unknown) | undefined {
     return this.views.get(type);

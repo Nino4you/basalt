@@ -20,6 +20,12 @@ export const PANELS = [
 ] as const satisfies readonly PanelSpec[];
 
 export type PanelId = (typeof PANELS)[number]["id"];
+/** A sidebar view that a plugin opened (`plugin:<view type>`). */
+export type PluginPanelId = `plugin:${string}`;
+export type DockPanelId = PanelId | PluginPanelId;
+
+export const isPluginPanel = (id: string): id is PluginPanelId =>
+  id.startsWith("plugin:");
 
 export const AREA_LABELS: Record<DockArea, string> = {
   left: t("Linke Seitenleiste"),
@@ -49,7 +55,7 @@ function commandButton(
 }
 
 /** Tab header of a dockable panel; it is moved between dock areas. */
-function panelTab(spec: PanelSpec): HTMLButtonElement {
+export function panelTab(spec: PanelSpec): HTMLButtonElement {
   return h(
     "button",
     {
@@ -67,7 +73,7 @@ function panelTab(spec: PanelSpec): HTMLButtonElement {
   );
 }
 
-function pane(spec: PanelSpec): HTMLElement {
+export function pane(spec: PanelSpec): HTMLElement {
   return h("div", {
     class: "workspace-leaf-content",
     label: spec.label,

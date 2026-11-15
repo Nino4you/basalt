@@ -48,6 +48,8 @@ export class WorkspaceLeaf extends Events {
   view: WorkspaceView;
   private readonly workspace: Workspace;
   parent?: WorkspaceSplit;
+  /** Set for leaves that live in a sidebar (`getLeftLeaf` / `getRightLeaf`). */
+  side: SideName | null = null;
   constructor(viewOrApp: WorkspaceView | { workspace: Workspace }, workspace?: Workspace) {
     super();
     this.workspace = workspace ?? (viewOrApp as { workspace: Workspace }).workspace;
@@ -56,7 +58,9 @@ export class WorkspaceLeaf extends Events {
     this.containerEl.className = "workspace-leaf";
   }
   get app(): object | undefined { return this.workspace.app; }
-  getRoot() { return this.workspace.rootSplit; }
+  getRoot(): unknown { return this.side ? this.workspace.sidedock(this.side) : this.workspace.rootSplit; }
+  /** The window-level container; Basalt has a single window. */
+  getContainer(): Workspace["rootSplit"] { return this.workspace.rootSplit; }
   async openFile(file: TFile, openState?: { active?: boolean; state?: Record<string, unknown> }): Promise<void> {
     this.workspace.validateFile(file);
     if (!this.app) return this.workspace.navigateFile(file);
@@ -102,6 +106,47 @@ export class WorkspaceSplit {
   }
 }
 
+export type SideName = "left" | "right";
+export type Side = SideName | "primary" | "secondary";
+
+/** Maps Obsidian's side names (`primary` is the left sidebar) to Basalt's. */
+export function sideName(side: Side): SideName {
+  if (side === "left" || side === "primary") return "left";
+  if (side === "right" || side === "secondary") return "right";
+  throw new Error(`Unknown sidebar: ${String(side)}`);
+}
+
+/** The shell's sidebars, as plugins see them through `leftSplit` / `rightSplit`. */
+export interface SidebarHost {
+  /** Shows a sidebar leaf as a panel tab once its view is loaded. */
+  show(leaf: WorkspaceLeaf): void;
+  /** Makes the leaf's panel the active tab and opens its sidebar. */
+  reveal(leaf: WorkspaceLeaf): void;
+  isOpen(side: SideName): boolean;
+  setOpen(side: SideName, open: boolean): void;
+}
+
+/** `workspace.leftSplit` / `rightSplit`: collapse state and the leaves docked there. */
+export class WorkspaceSidedock {
+  readonly containerEl = document.createElement("div");
+  constructor(private readonly workspace: Workspace, readonly side: SideName) {}
+  get collapsed(): boolean {
+    const host = this.workspace.host?.sidebar;
+    return host ? !host.isOpen(this.side) : true;
+  }
+  get children(): WorkspaceLeaf[] { return this.workspace.sideLeaves(this.side); }
+  getRoot(): WorkspaceSidedock { return this; }
+  getContainer(): Workspace["rootSplit"] { return this.workspace.rootSplit; }
+  expand(): void { this.setOpen(true); }
+  collapse(): void { this.setOpen(false); }
+  toggle(): void { this.setOpen(this.collapsed); }
+  private setOpen(open: boolean): void {
+    const host = this.workspace.host?.sidebar;
+    if (!host) throw new Error("Sidebars are not available in this host");
+    host.setOpen(this.side, open);
+  }
+}
+
 export interface HoverLinkSource {
   display: string;
   defaultMod: boolean;
@@ -111,7 +156,7 @@ export class Workspace extends Events {
   activeLeaf: WorkspaceLeaf;
   readonly layoutReady = true;
   readonly containerEl: HTMLElement;
-  readonly rootSplit: { containerEl: HTMLElement; getRoot(): unknown };
+  readonly rootSplit: { containerEl: HTMLElement; win: Window; doc: Document; getRoot(): unknown };
   readonly markdownLeaf: WorkspaceLeaf;
   app?: object;
   private services?: PluginServices;
@@ -125,7 +170,10 @@ export class Workspace extends Events {
     open(leaf: WorkspaceLeaf, state: ViewState): Promise<void>;
     activate?(leaf: WorkspaceLeaf): void;
     detach?(leaf: WorkspaceLeaf): void;
+    sidebar?: SidebarHost;
   };
+  readonly leftSplit: WorkspaceSidedock;
+  readonly rightSplit: WorkspaceSidedock;
   constructor(
     readonly markdownView: MarkdownView,
     private readonly navigate: (file: TFile) => Promise<void>,
@@ -133,12 +181,59 @@ export class Workspace extends Events {
   ) {
     super();
     this.containerEl = markdownView.containerEl;
-    const root = { containerEl: this.containerEl, getRoot: () => root };
+    const root = { containerEl: this.containerEl, win: window, doc: document, getRoot: () => root };
     this.rootSplit = root;
     this.markdownLeaf = this.activeLeaf = new WorkspaceLeaf(markdownView, this);
     this.leaves.add(this.activeLeaf);
+    this.leftSplit = new WorkspaceSidedock(this, "left");
+    this.rightSplit = new WorkspaceSidedock(this, "right");
   }
-  connect(app: object, services: PluginServices): void { this.app = app; this.services = services; }
+  sidedock(side: SideName): WorkspaceSidedock { return side === "left" ? this.leftSplit : this.rightSplit; }
+  sideLeaves(side: SideName): WorkspaceLeaf[] { return [...this.leaves].filter(leaf => leaf.side === side); }
+  /**
+   * A new, empty leaf in a sidebar. It shows up as a panel tab once a view is
+   * set on it; `split` (a new tab group) is treated like a new tab.
+   */
+  getLeftLeaf(_split?: boolean): WorkspaceLeaf { return this.createSideLeaf("left"); }
+  getRightLeaf(_split?: boolean): WorkspaceLeaf { return this.createSideLeaf("right"); }
+  private createSideLeaf(side: SideName): WorkspaceLeaf {
+    const empty = new MarkdownView(this.markdownView.editor, document.createElement("div"));
+    const leaf = new WorkspaceLeaf(empty, this);
+    leaf.side = side;
+    this.leaves.add(leaf);
+    return leaf;
+  }
+  async ensureSideLeaf(
+    type: string,
+    side: Side,
+    options: { active?: boolean; split?: boolean; reveal?: boolean; state?: Record<string, unknown> } = {},
+  ): Promise<WorkspaceLeaf> {
+    let leaf = this.getLeavesOfType(type).find(candidate => candidate.side !== null);
+    if (!leaf) {
+      leaf = this.createSideLeaf(sideName(side));
+      await leaf.setViewState({ type, state: options.state, active: options.active });
+    } else if (options.state) await leaf.setViewState({ type, state: options.state, active: options.active });
+    if (options.reveal !== false) await this.revealLeaf(leaf);
+    return leaf;
+  }
+  connect(app: object, services: PluginServices): void {
+    this.app = app;
+    this.services = services;
+    services.viewListener = type => this.loadWaitingLeaves(type);
+  }
+  /**
+   * Sidebar leaves whose view type is not registered yet. Like Obsidian, they
+   * load once the plugin registers the view (plugins often open their side
+   * view before `registerView`).
+   */
+  private readonly waiting = new Map<WorkspaceLeaf, ViewState>();
+  private loadWaitingLeaves(type: string): void {
+    for (const [leaf, state] of [...this.waiting]) {
+      if (state.type !== type) continue;
+      this.waiting.delete(leaf);
+      if (this.leaves.has(leaf)) this.track(this.openState(leaf, state));
+    }
+  }
   get activeEditor(): { editor: Editor; file: TFile } | null {
     const view = this.activeLeaf.view;
     return view instanceof MarkdownView && view.file ? { editor: view.editor, file: view.file } : null;
@@ -152,7 +247,7 @@ export class Workspace extends Events {
     return this.activeLeaf.view instanceof Constructor ? this.activeLeaf.view : null;
   }
   getLeavesOfType(type: string): WorkspaceLeaf[] {
-    return [...this.leaves].filter(leaf => leaf.view.getViewType() === type);
+    return [...this.leaves].filter(leaf => (this.waiting.get(leaf)?.type ?? leaf.view.getViewType()) === type);
   }
   /** Register an existing shell view without opening or moving its DOM. */
   registerHostView(view: WorkspaceView): WorkspaceLeaf {
@@ -185,11 +280,19 @@ export class Workspace extends Events {
     while (this.layoutTasks.length) await Promise.all(this.layoutTasks.splice(0));
   }
   iterateAllLeaves(callback: (leaf: WorkspaceLeaf) => unknown): void { for (const leaf of [...this.leaves]) callback(leaf); }
-  iterateRootLeaves(callback: (leaf: WorkspaceLeaf) => unknown): void { this.iterateAllLeaves(callback); }
+  iterateRootLeaves(callback: (leaf: WorkspaceLeaf) => unknown): void {
+    for (const leaf of [...this.leaves]) if (!leaf.side) callback(leaf);
+  }
   getLeafById(id: string): WorkspaceLeaf | null { return [...this.leaves].find(leaf => leaf.id === id) ?? null; }
   getMostRecentLeaf(): WorkspaceLeaf { return this.activeLeaf; }
   setActiveLeaf(leaf: WorkspaceLeaf): void {
     if (!this.leaves.has(leaf)) throw new Error("Leaf does not belong to this workspace");
+    // Sidebar views are shown, but the note stays the active leaf: editor
+    // commands and `activeEditor` keep acting on the note.
+    if (leaf.side) {
+      this.host?.sidebar?.reveal(leaf);
+      return;
+    }
     const changed = this.activeLeaf !== leaf;
     this.activeLeaf = leaf;
     if (leaf.view.file) this.recentFile = leaf.view.file;
@@ -206,6 +309,7 @@ export class Workspace extends Events {
     if (this.tasks.length) return this.flushPending();
   }
   detach(leaf: WorkspaceLeaf): void {
+    this.waiting.delete(leaf);
     if (!this.leaves.delete(leaf)) return;
     this.host?.detach?.(leaf);
     this.track(leaf.closeView());
@@ -234,6 +338,18 @@ export class Workspace extends Events {
   navigateFile(file: TFile): Promise<void> { return this.navigate(file); }
   async openState(leaf: WorkspaceLeaf, state: ViewState): Promise<void> {
     if (!this.leaves.has(leaf)) throw new Error("Leaf does not belong to this workspace");
+    if (leaf.side) {
+      if (state.type === "markdown" || state.type === "empty")
+        throw new Error("Notes cannot be opened in a sidebar in Basalt");
+      if (!this.services?.getView(state.type)) {
+        this.waiting.set(leaf, state);
+        return;
+      }
+      await this.loadView(leaf, { ...state, active: false }, leaf.containerEl);
+      this.host?.sidebar?.show(leaf);
+      if (state.active) this.host?.sidebar?.reveal(leaf);
+      return;
+    }
     if (this.host) return this.host.open(leaf, state);
     await this.loadView(leaf, state);
   }

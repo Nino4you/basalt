@@ -41,12 +41,14 @@ import { CanvasView } from "../canvas/view";
 import { TFile, TFolder } from "../compat/files";
 import {
   Menu as PluginMenu,
+  getIcon as getPluginIcon,
+  setIcon as setPluginIcon,
   TextFileView,
   type FileView,
 } from "../compat/obsidian-api";
 import { nativeRequestUrl } from "../compat/request";
 import { CompatibilitySession } from "../compat/session";
-import type { ViewState, WorkspaceLeaf } from "../compat/workspace";
+import type { SideName, ViewState, WorkspaceLeaf } from "../compat/workspace";
 import { MarkdownEditor, type EditorOptions } from "../editor";
 import type { EditorSuggestRegistration } from "../editor/editor-suggest";
 import { documentOutline, renderMarkdown, wordCount } from "../markdown";
@@ -97,8 +99,13 @@ import { GroupMirror } from "./group-mirror";
 import {
   buildGroup,
   buildShell,
+  isPluginPanel,
+  pane as panelPane,
+  panelTab,
   PANELS,
+  type DockPanelId,
   type PanelId,
+  type PluginPanelId,
   type Shell,
 } from "./shell";
 import {
@@ -258,7 +265,12 @@ export class App {
   private readonly attachmentView: AttachmentView;
   private drawer: "left" | "right" | null = null;
   /** Panel picked on a phone, where bottom panels share the right drawer. */
-  private mobilePanel: PanelId | null = null;
+  private mobilePanel: DockPanelId | null = null;
+  /** Sidebar views opened by plugins through `getLeftLeaf` / `getRightLeaf`. */
+  private readonly pluginPanels = new Map<
+    PluginPanelId,
+    { leaf: WorkspaceLeaf; tab: HTMLButtonElement; pane: HTMLElement }
+  >();
 
   private readonly saveWorkspace = debounce(() => this.writeWorkspace(), 250);
   private readonly emitIndex = debounce(() => {
@@ -806,6 +818,9 @@ export class App {
 
   /** Plugin navigation and explorer navigation share the same real views/leaves. */
   private bindPluginWorkspace(session: CompatibilitySession): void {
+    // Sidebar views of the previous vault's plugins are gone with its session.
+    for (const { pane } of this.pluginPanels.values()) pane.remove();
+    this.pluginPanels.clear();
     session.workspace.registerHostView(this.explorer);
     session.workspace.host = {
       open: async (leaf: WorkspaceLeaf, state: ViewState) => {
@@ -827,7 +842,74 @@ export class App {
         if (this.pluginView?.leaf === leaf && this.active !== this.pluginView.tab)
           void this.activate(this.pluginView.tab);
       },
+      detach: leaf => {
+        if (leaf.side) this.removePluginPanel(leaf);
+      },
+      sidebar: {
+        show: leaf => this.showPluginPanel(leaf),
+        reveal: leaf => {
+          const id = this.pluginPanelId(leaf);
+          if (id) this.showPanel(id);
+        },
+        isOpen: side => (side === "left" ? this.leftVisible : this.rightVisible),
+        setOpen: (side, open) => (side === "left" ? this.toggleLeft(open) : this.toggleRight(open)),
+      },
     };
+  }
+
+  private pluginPanelId(leaf: WorkspaceLeaf): PluginPanelId | null {
+    for (const [id, entry] of this.pluginPanels) if (entry.leaf === leaf) return id;
+    return null;
+  }
+
+  /**
+   * Docks a plugin's sidebar view as a panel tab. A view type keeps its
+   * place in the stored layout, so a plugin that recreates its view on the
+   * next start puts it back where the user moved it.
+   */
+  private showPluginPanel(leaf: WorkspaceLeaf): void {
+    const side: SideName = leaf.side ?? "right";
+    const label = leaf.getDisplayText();
+    let id = this.pluginPanelId(leaf);
+    let entry = id ? this.pluginPanels.get(id) : undefined;
+    if (!id || !entry) {
+      const type = leaf.view.getViewType();
+      let candidate: PluginPanelId = `plugin:${type}`;
+      for (let n = 2; this.pluginPanels.has(candidate); n++) candidate = `plugin:${type}:${n}`;
+      id = candidate;
+      const spec = { id, label, icon: "file", area: side };
+      entry = { leaf, tab: panelTab(spec), pane: panelPane(spec) };
+      entry.pane.classList.add("mod-plugin");
+      entry.pane.append(leaf.containerEl);
+      this.pluginPanels.set(id, entry);
+      if (!areaOf(this.layout.dock, id)) this.layout.dock[side].panels.push(id);
+    }
+    entry.tab.setAttribute("aria-label", label);
+    entry.pane.setAttribute("aria-label", label);
+    // Unknown icon ids keep the generic file icon instead of an empty tab.
+    if (getPluginIcon(leaf.getIcon())) setPluginIcon(entry.tab, leaf.getIcon());
+    this.applyLayout();
+  }
+
+  private removePluginPanel(leaf: WorkspaceLeaf): void {
+    const id = this.pluginPanelId(leaf);
+    if (!id) return;
+    const entry = this.pluginPanels.get(id)!;
+    this.pluginPanels.delete(id);
+    entry.tab.remove();
+    entry.pane.remove();
+    if (this.mobilePanel === id) this.mobilePanel = null;
+    this.applyLayout();
+  }
+
+  /** Closed panels plus plugin views that are not open right now. */
+  private get hiddenPanels(): string[] {
+    const absent = DOCK_AREAS.flatMap((area) =>
+      this.layout.dock[area].panels.filter(
+        (id) => isPluginPanel(id) && !this.pluginPanels.has(id),
+      ),
+    );
+    return [...this.layout.closedPanels, ...absent];
   }
 
   /** Plugin-compat status line shown in the settings. */
@@ -2965,7 +3047,7 @@ export class App {
   /** The dock layout as currently shown (phones fold the bottom area away). */
   private get shownDock(): DockLayout {
     const shown = effectiveDock(
-      withoutPanels(this.layout.dock, this.layout.closedPanels),
+      withoutPanels(this.layout.dock, this.hiddenPanels),
       this.isMobile,
     );
     if (this.mobilePanel) {
@@ -2978,25 +3060,29 @@ export class App {
   /** Moves the panel elements into the tab strips and boxes of their areas. */
   private renderDock(): void {
     const shown = this.shownDock;
-    const { docks, panelTabs, panes } = this.shell;
+    const { docks } = this.shell;
+    const tabOf = (id: DockPanelId) =>
+      isPluginPanel(id) ? this.pluginPanels.get(id)!.tab : this.shell.panelTabs[id];
+    const paneOf = (id: DockPanelId) =>
+      isPluginPanel(id) ? this.pluginPanels.get(id)!.pane : this.shell.panes[id];
     const draggable = String(!this.isMobile);
     this.shell.leftBottomSplit.classList.toggle("is-empty", shown["left-bottom"].panels.length === 0);
     this.shell.leftBottomHandle.hidden = shown["left-bottom"].panels.length === 0;
     for (const area of DOCK_AREAS) {
       const slot = shown[area];
-      const ids = slot.panels as PanelId[];
+      const ids = slot.panels as DockPanelId[];
       const { tabs, content, empty, add } = docks[area];
       add.hidden = this.layout.closedPanels.length === 0;
-      syncChildren(tabs, [...ids.map((id) => panelTabs[id]), add]);
-      syncChildren(content, [...ids.map((id) => panes[id]), empty]);
+      syncChildren(tabs, [...ids.map(tabOf), add]);
+      syncChildren(content, [...ids.map(paneOf), empty]);
       empty.hidden = ids.length > 0;
       for (const id of ids) {
         const selected = slot.active === id;
-        const tab = panelTabs[id];
+        const tab = tabOf(id);
         tab.classList.toggle("is-active", selected);
         tab.setAttribute("aria-selected", String(selected));
         tab.setAttribute("draggable", draggable);
-        panes[id].hidden = !selected;
+        paneOf(id).hidden = !selected;
       }
     }
   }
@@ -3020,7 +3106,7 @@ export class App {
   }
 
   /** Whether a panel is currently on screen (its area is open and it is the active tab there). */
-  isPanelVisible(id: PanelId): boolean {
+  isPanelVisible(id: DockPanelId): boolean {
     const shown = this.shownDock;
     const area = areaOf(shown, id);
     if (!area || shown[area].active !== id) return false;
@@ -3056,7 +3142,7 @@ export class App {
     if (this.isMobile) {
       const first = this.layout.dock.bottom.active;
       if (first && (force ?? !this.rightVisible))
-        this.mobilePanel = first as PanelId;
+        this.mobilePanel = first as DockPanelId;
       this.toggleRight(force);
       return;
     }
@@ -3077,7 +3163,7 @@ export class App {
   }
 
   /** Activates a panel wherever it is docked and opens that area. */
-  showPanel(id: PanelId): void {
+  showPanel(id: DockPanelId): void {
     this.reopen(id);
     this.layout.dock = activatePanel(this.layout.dock, id);
     if (this.isMobile) this.mobilePanel = id;
@@ -3090,12 +3176,12 @@ export class App {
    * Docks a panel into `area`, at `index` in its tab strip when given. Without
    * an index a panel that already lives there just becomes active.
    */
-  movePanelTo(id: PanelId, area: DockArea, index?: number): void {
+  movePanelTo(id: DockPanelId, area: DockArea, index?: number): void {
     this.reopen(id);
     if (index !== undefined) {
       // `index` counts the tabs on screen; closed panels still hold a place in
       // the stored list, so insert before the panel that is shown there.
-      const shown = withoutPanels(this.layout.dock, this.layout.closedPanels);
+      const shown = withoutPanels(this.layout.dock, this.hiddenPanels);
       const anchor = shown[area].panels[index];
       index = anchor
         ? this.layout.dock[area].panels.indexOf(anchor)
@@ -3113,12 +3199,12 @@ export class App {
     this.applyLayout();
   }
 
-  isPanelClosed(id: PanelId): boolean {
-    return this.layout.closedPanels.includes(id);
+  isPanelClosed(id: DockPanelId): boolean {
+    return !isPluginPanel(id) && this.layout.closedPanels.includes(id);
   }
 
-  private reopen(id: PanelId): void {
-    if (this.isPanelClosed(id))
+  private reopen(id: DockPanelId): void {
+    if (!isPluginPanel(id) && this.isPanelClosed(id))
       this.layout.closedPanels = this.layout.closedPanels.filter(
         (closed) => closed !== id,
       );
@@ -3128,7 +3214,12 @@ export class App {
    * Removes a panel from its dock area. It remembers its place there and comes
    * back through its command, the "+" button of any area or a layout reset.
    */
-  closePanel(id: PanelId): void {
+  closePanel(id: DockPanelId): void {
+    // Closing a plugin's sidebar view detaches its leaf, as in Obsidian.
+    if (isPluginPanel(id)) {
+      this.pluginPanels.get(id)?.leaf.detach();
+      return;
+    }
     if (this.isPanelClosed(id)) return;
     const before = this.shownDock;
     const area = areaOf(before, id);
@@ -3160,7 +3251,7 @@ export class App {
     );
   }
 
-  private panelMenu(id: PanelId): MenuEntry[] {
+  private panelMenu(id: DockPanelId): MenuEntry[] {
     const current = areaOf(this.layout.dock, id);
     const targets: Array<[DockArea, string, string]> = [
       ["left", t("In linke Seitenleiste verschieben"), "panel-left"],
@@ -3168,7 +3259,7 @@ export class App {
       ["right", t("In rechte Seitenleiste verschieben"), "panel-right"],
       ["bottom", t("In unteren Bereich verschieben"), "panel-bottom"],
     ];
-    const shown = withoutPanels(this.layout.dock, this.layout.closedPanels);
+    const shown = withoutPanels(this.layout.dock, this.hiddenPanels);
     const slot = current ? shown[current] : null;
     const index = slot ? slot.panels.indexOf(id) : -1;
     return [
@@ -3244,7 +3335,7 @@ export class App {
           : area === "right"
             ? this.layout.rightWidth
             : area === "left-bottom" ? this.layout.leftBottomHeight : this.layout.bottomHeight,
-      drop: (id, area, index) => this.movePanelTo(id as PanelId, area, index),
+      drop: (id, area, index) => this.movePanelTo(id as DockPanelId, area, index),
     });
     document.addEventListener("contextmenu", (event) => {
       const tab = (event.target as Element).closest?.<HTMLElement>(
@@ -3252,7 +3343,7 @@ export class App {
       );
       if (!tab) return;
       event.preventDefault();
-      showMenu(this.panelMenu(tab.dataset.panel as PanelId), {
+      showMenu(this.panelMenu(tab.dataset.panel as DockPanelId), {
         x: event.clientX,
         y: event.clientY,
       });
@@ -3265,7 +3356,7 @@ export class App {
       );
       if (!tab) return;
       event.preventDefault();
-      this.closePanel(tab.dataset.panel as PanelId);
+      this.closePanel(tab.dataset.panel as DockPanelId);
     });
     for (const area of DOCK_AREAS) {
       const { add } = docks[area];
@@ -3839,7 +3930,7 @@ export class App {
       const panel = target.closest<HTMLElement>(
         ".workspace-tab-header[data-panel]",
       );
-      if (panel) this.showPanel(panel.dataset.panel as PanelId);
+      if (panel) this.showPanel(panel.dataset.panel as DockPanelId);
     });
 
     shell.stripActions
@@ -4665,7 +4756,8 @@ function loadLayout(): Layout {
         layout.rightOpen = value.rightOpen;
       if (typeof value.bottomOpen === "boolean")
         layout.bottomOpen = value.bottomOpen;
-      if (value.dock) layout.dock = normalizeDock(value.dock, PANELS);
+      if (value.dock)
+        layout.dock = normalizeDock(value.dock, PANELS, isPluginPanel);
       if (Array.isArray(value.closedPanels))
         layout.closedPanels = PANELS.map((spec) => spec.id).filter((id) =>
           (value.closedPanels as unknown[]).includes(id),

@@ -27,7 +27,13 @@ import {
   stringifyYaml,
 } from "./frontmatter";
 import { Plugin } from "./plugin";
-import { MarkdownView, Workspace, WorkspaceLeaf, WorkspaceSplit } from "./workspace";
+import {
+  MarkdownView,
+  Workspace,
+  WorkspaceLeaf,
+  WorkspaceSidedock,
+  WorkspaceSplit,
+} from "./workspace";
 
 export interface DomElementInfo {
   cls?: string | string[];
@@ -1831,6 +1837,7 @@ export function createObsidianApi(
     MarkdownView,
     Workspace,
     WorkspaceSplit,
+    WorkspaceSidedock,
     WorkspaceLeaf,
     Scope,
     Editor,

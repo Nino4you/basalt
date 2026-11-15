@@ -21,6 +21,20 @@ const specs: PanelSpec[] = [
 ];
 
 describe("dock layout", () => {
+  it("keeps the stored place of dynamic plugin panels", () => {
+    const raw = {
+      left: { panels: ["files", "plugin:calendar", "bogus"], active: "plugin:calendar" },
+      right: { panels: ["plugin:calendar"], active: null },
+    };
+    const dock = normalizeDock(raw, specs, (id) => id.startsWith("plugin:"));
+    expect(dock.left).toEqual({
+      panels: ["files", "plugin:calendar", "search"],
+      active: "plugin:calendar",
+    });
+    expect(dock.right.panels).toEqual(["backlinks", "outline"]);
+    expect(normalizeDock(raw, specs).left.panels).toEqual(["files", "search"]);
+  });
+
   it("starts with every panel in its default area", () => {
     const dock = defaultDock(specs);
     expect(dock.left).toEqual({ panels: ["files", "search"], active: "files" });

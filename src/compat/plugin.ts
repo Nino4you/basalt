@@ -133,6 +133,19 @@ export class Plugin extends Component {
     this.services().registerMarkdownPostProcessor(this.manifest.id, handler);
   }
 
+  /** Registers a hover-link source on the workspace for this plugin's lifetime. */
+  registerHoverLinkSource(id: string, info: { display: string; defaultMod: boolean }): void {
+    const workspace = (this.app as {
+      workspace?: {
+        registerHoverLinkSource(id: string, info: unknown): void;
+        unregisterHoverLinkSource(id: string): void;
+      };
+    }).workspace;
+    if (!workspace) throw new Error("Hover link sources are not available in this host");
+    workspace.registerHoverLinkSource(id, info);
+    this.register(() => workspace.unregisterHoverLinkSource(id));
+  }
+
   registerEditorSuggest(suggest: unknown): void {
     this.services().registerEditorSuggest(this.manifest.id, suggest);
   }

@@ -56,6 +56,8 @@ Tests against real third-party plugin bundles (e.g. `tests/e2e/iconize.spec.ts`,
 `excalidraw.spec.ts`) are skipped unless `BASALT_PLUGIN_DIRS` is set — bundle directories joined by
 the **platform** path delimiter (`;` on Windows, `:` on Unix; see `tests/helpers/plugin-fixtures.ts`).
 They never run in CI, so green tests are no proof of real-plugin compatibility.
+`node tools/plugin-survey/run.mjs` loads the top community plugins in bulk and ranks the API gaps
+they hit (see `docs/plugin-compatibility.md`); it also only runs against the browser demo.
 
 Coverage traps:
 

@@ -37,6 +37,7 @@ Use Node.js 22+ and stable Rust; install JS dependencies with `npm ci`.
 - Playwright starts/reuses Vite at `127.0.0.1:1420` (strict port). Both `desktop` and `android-layout` projects exercise the **browser demo**; a passing mobile layout test does not verify SAF or Rust IPC.
 - Native Android smoke testing is `node tools/smoke_android.mjs`: requires adb, an emulator and a universal debug APK (`BASALT_APK_DIR` overrides its directory). It installs the APK and modifies emulator app data; it deliberately refuses physical devices.
 - Tests against real third-party plugin bundles (`tests/e2e/iconize.spec.ts`, `excalidraw.spec.ts`) require external built plugin folders via `BASALT_PLUGIN_DIRS` (platform path separator: `;` on Windows, `:` on Unix). They skip without plugin bundles, including in CI; ordinary green tests are not proof of real-plugin compatibility.
+- `node tools/plugin-survey/run.mjs` downloads the most-downloaded community plugins, loads each unchanged in the browser demo (`tests/e2e/plugin-survey.spec.ts`, skipped unless `BASALT_PLUGIN_SURVEY` is set) and writes a ranked gap report to `node_modules/.cache/basalt-plugin-survey/`.
 - Core symlink regression tests are `#[cfg(unix)]`; a Windows-only test run misses them.
 
 ## Contracts easy to break
