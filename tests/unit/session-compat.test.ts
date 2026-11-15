@@ -259,6 +259,32 @@ it("refuses to bind a foreign storage port or navigate foreign file objects", as
   expect(options.navigate).not.toHaveBeenCalled();
 });
 
+it("reports live host theme changes through modern and legacy plugin APIs", async () => {
+  const f = fixture();
+  const session = await CompatibilitySession.create({
+    vaultId: "fixture", name: "Fixture", mobile: false,
+    editor: f.editor, extensions: f.extensions,
+    container: document.createElement("div"), port: f.port,
+    navigate: async () => {},
+  });
+  const previousClass = document.body.className;
+  try {
+    document.body.classList.remove("theme-dark");
+    document.body.classList.add("theme-light");
+    expect(session.isDarkMode()).toBe(false);
+    expect(session.getTheme()).toBe("moonstone");
+    document.body.classList.replace("theme-light", "theme-dark");
+    expect(session.isDarkMode()).toBe(true);
+    expect(session.getTheme()).toBe("obsidian");
+    document.body.classList.replace("theme-dark", "theme-light");
+    expect(session.isDarkMode()).toBe(false);
+    expect(session.getTheme()).toBe("moonstone");
+  } finally {
+    document.body.className = previousClass;
+    await session.dispose();
+  }
+});
+
 it("exposes the host status bar container to plugins", async () => {
   const f = fixture();
   const statusBarEl = document.createElement("div");

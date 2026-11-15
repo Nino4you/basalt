@@ -50,6 +50,8 @@
 
 - `SearchComponent` und `SettingGroup` nach offiziellen Signaturen mit echten DOM-Controls ergänzt: Suchwert/Änderungsereignis, barrierefrei beschrifteter Löschbutton, deaktivierte Controls, gruppierte Settings und Fragment-Überschriften. Beide fehlenden Exporte erst rot reproduziert, danach 24 passende Tests und 651/651 gesamte Suite grün; Build erfolgreich. Custom Frames und Various Complements durchlaufen die unveränderten Bundles ohne Ereignisfehler. BRAT erreicht den weiterhin fehlenden Protocol-Handler; Iconic hat weitere reale Host-Lücken. Kein voller neuer 100er-Zähler aus Teiltests abgeleitet.
 
+- Theme-Lücke reproduziert: `App.isDarkMode` und das von Colored Text verwendete ältere `getTheme` fehlen. Beide lesen nun den echten aktuellen Host-Modus (inklusive Umschalten); keine feste Theme-Attrappe. Unverändertes Colored Text 1.3.1 aktiviert, rendert Einstellungen und deaktiviert ohne Ereignisfehler; 652/652 Unit-Tests und Produktionsbuild erfolgreich.
+
 ### Blockiert / braucht Freigabe
 
 - Eine Lösung, die unrestricted Node/fs/Prozess-/Serverzugriff, globale Installationen, bezahlte APIs oder Veröffentlichung voraussetzt, ist nicht freigegeben. Andere sichere Lücken werden währenddessen weiterbearbeitet.

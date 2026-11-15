@@ -335,6 +335,14 @@ export class CompatibilitySession {
     else localStorage.setItem(this.localStorageKey(key), JSON.stringify(value));
   }
 
+  isDarkMode(): boolean {
+    return document.body.classList.contains("theme-dark");
+  }
+
+  getTheme(): "obsidian" | "moonstone" {
+    return this.isDarkMode() ? "obsidian" : "moonstone";
+  }
+
   getAccentColor(): string {
     return getComputedStyle(document.body).getPropertyValue("--interactive-accent").trim();
   }
