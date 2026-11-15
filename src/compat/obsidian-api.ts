@@ -1,5 +1,6 @@
 import { getLocale } from "../i18n";
 import obsidianMoment from "moment";
+import { loadMermaid } from "../app/rich-content";
 import { constructLegacy } from "./legacy-constructor";
 import { installSvgCompat } from "./svg";
 import "moment/locale/de.js";
@@ -1969,6 +1970,7 @@ export function createObsidianApi(
     arrayBufferToHex,
     hexToArrayBuffer,
     getBlobArrayBuffer,
+    loadMermaid,
     requestUrl,
     request: (input: RequestUrlParam | string): Promise<string> => requestUrl(input).text,
     parseYaml,

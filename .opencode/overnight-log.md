@@ -66,6 +66,8 @@
 
 - Berichtsauswertung verschärft: bisher wurden reine Netzfehler trotz „ohne Fehler“ als sauber gezählt. Rote Node-Regressionsprüfung reproduziert die falsche Einstufung; nach einer Bedingungsänderung beide Report-Tests grün, fehlende/gescheiterte Ergebnisse weiterhin nicht sauber. Aktuelle 100 Rohresultate neu ausgewertet: unverändert 34/15/51, alle 34 sauberen Plugins tatsächlich mit leerer Fehlerliste. Keine Fehler umklassifiziert oder ausgeblendet; Prüfbefehl und Bedeutung grüner Diagnose-Läufe dokumentiert.
 
+- Der öffentliche Mermaid-Loader nutzt jetzt exakt denselben verzögert geladenen Renderer wie Host-Diagramme. Zwei fehlende-Export-Regressionen erst rot; gemeinsame Instanz, unveränderte strikte Host-Konfiguration und weitergereichte Importfehler geprüft. Eine neue Testannahme zum Fehlertext wurde auf die von Vitest erhaltene originale Fehlerursache korrigiert (kein Produktionsfehler verschluckt). 664/664 Unit-Tests mit vier Workern und Produktionsbuild grün. Unveränderte Mermaid Tools ohne Fehler und ohne fehlenden Export; Image in Editor behält seinen unabhängigen StateField-Fehler. Kein neuer voller 100er-Zähler behauptet.
+
 ### Blockiert / braucht Freigabe
 
 - Eine Lösung, die unrestricted Node/fs/Prozess-/Serverzugriff, globale Installationen, bezahlte APIs oder Veröffentlichung voraussetzt, ist nicht freigegeben. Andere sichere Lücken werden währenddessen weiterbearbeitet.
