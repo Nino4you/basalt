@@ -235,8 +235,10 @@ missing wiki links for this. **Cmdr 0.5.11** activates after adding the exported
 `app.statusBar.containerEl`, a real `MenuItem` class and the live command table
 `app.commands.commands` with `removeCommand`; it registers the command
 `cmdr:open-commander-settings` and deactivates cleanly. The macro and ribbon UI has not been
-clicked through completely. **Calendar 1.5.10** still fails on `Workspace.getRightLeaf` and stays
-deactivated; real sidebar leaf support is missing, and no placeholder was added. **Double Shift
+clicked through completely. **Calendar 1.5.10** used to fail on `Workspace.getRightLeaf`; sidebar
+leaves now exist (see "Sidebar views" below), and Calendar opens its view in the right sidebar,
+but its month grid still fails on `moment.localeData`, because the exported `moment` is not the
+full Moment.js API. **Double Shift
 Search 1.0.0** activates with `double-shift-search:open-vault-search`, and **Ninja Cursor
 0.0.14** activates without commands or views; both deactivate cleanly. **File Explorer Plus
 1.3.1** fails because there is no `file-explorer` view: the host has its own file tree but no
@@ -266,6 +268,34 @@ link. The reading view supports the same registered file embeds. The embedded fi
 storage location; source mode still shows the link. Without an active renderer, the previous link
 rendering stays. Plugin UI is released when the editor is hidden and before deactivation.
 
+### Sidebar views
+
+`workspace.getLeftLeaf` / `getRightLeaf` / `ensureSideLeaf` create leaves that live in a sidebar.
+Once a registered view is set on one, the app docks it as a panel tab (`plugin:<view type>`) in
+that sidebar; it can be dragged to another dock area like the built-in panels, and the stored
+layout remembers the place per view type for the next time the plugin opens it. Closing the tab
+detaches the leaf, and unloading the plugin removes it. A side leaf whose view type is not
+registered yet waits and loads on `registerView`, which several plugins rely on. Unlike Obsidian,
+a sidebar view never becomes `activeLeaf`: revealing it shows the panel, while the note stays the
+active leaf for editor commands. Notes cannot be opened in a sidebar. `leftSplit` / `rightSplit`
+report and change the sidebar's collapsed state; `split` (a new tab group) opens a new tab.
+Verified with the bulk survey: File Tree Alternative 2.x, Spaced Repetition, Quiet Outline,
+Reminder and Notebook Navigator open their sidebar views; Quiet Outline then fails on the
+internal `getActiveFileView`, Reminder on the Moment.js gap.
+
+### Bulk survey of community plugins
+
+`node tools/plugin-survey/run.mjs` downloads the most-downloaded community plugins (default 100;
+`--top`, `--ids`, `--local <dir>`) from their latest GitHub releases, reads the public
+`obsidian.d.ts` from the `obsidian` npm package, and loads every plugin unchanged into a fresh
+browser-demo session (`tests/e2e/plugin-survey.spec.ts`): enable, open a note, show sidebar
+views, render the first settings tab, disable. It writes `report.md` / `report.json` into
+`node_modules/.cache/basalt-plugin-survey/` with every error, a ranking of the missing APIs
+(failures seen at runtime and names the bundles reference statically) and the member coverage
+of the live API objects against `obsidian.d.ts`. Downloads are cached there and never committed.
+It runs the browser demo only, so it proves neither native IPC nor Android, and "loads cleanly"
+does not mean every feature works.
+
 ## Open compatibility stages
 
 1. Test the existing workspace integration of code blocks, plugin views, file extension
@@ -274,10 +304,11 @@ rendering stays. Plugin UI is released when the editor is hidden and before deac
 2. Check sync, pen and spreadsheet plugins on real devices (two clients, offline/resume, pen
    pressure, OCR/worker resources, file fidelity).
 
-Other shared gaps: visible plugin panes in the sidebars (Calendar) and the CodeMirror 5 mode for
-older syntax plugins. `Editor.exec` maps the documented commands onto the shared CodeMirror 6
-editor; `EditorSuggest` is connected to editor completion; `registerHoverLinkSource` stores
-plugin sources but is not yet queried for the host's own page preview. Node/Electron plugins do
+Other shared gaps: the full Moment.js API (Calendar, Reminder, Day Planner) and the CodeMirror 5
+mode for older syntax plugins. `Editor.exec` maps the documented commands onto the shared CodeMirror 6
+editor; `EditorSuggest` is connected to editor completion; `registerHoverLinkSource` (on the
+workspace and, unregistered on unload, on `Plugin`) stores plugin sources but is not yet queried
+for the host's own page preview. Node/Electron plugins do
 not automatically run on Android; an unrestricted file system shim is not an acceptable shortcut.
 
 `MetadataCache.getFileCache` returns parsed note data (links, embeds, tags, headings,

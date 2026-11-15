@@ -503,8 +503,29 @@ body.hide-ribbon .sidebar-toggle-button.mod-inline {
 }
 .workspace-leaf-content:not([data-pane="files"]):not([data-pane="search"]):not(
     [data-pane="graph"]
-  ) {
+  ):not(.mod-plugin) {
   padding: 8px 8px 32px;
+}
+
+/* Sidebar views that plugins open through getLeftLeaf / getRightLeaf. */
+.workspace-leaf-content.mod-plugin {
+  padding: 0;
+  overflow: hidden;
+}
+.workspace-leaf-content.mod-plugin > .workspace-leaf {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.workspace-leaf-content.mod-plugin .view-content {
+  background: transparent;
+}
+.workspace-leaf-content.mod-plugin .view-actions:empty {
+  display: none;
+}
+.workspace-leaf-content.mod-plugin .view-content-inner {
+  padding: 4px 8px 32px;
 }
 
 .workspace-sidedock-vault-profile {
