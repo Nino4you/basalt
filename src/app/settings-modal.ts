@@ -574,7 +574,10 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
           );
           return;
         }
-        const label = t("Installieren und neu starten");
+        // Android hands the package to the system installer, which asks first.
+        const label = update.apk && /Android/i.test(navigator.userAgent)
+          ? t("Installieren")
+          : t("Installieren und neu starten");
         version.control.append(
           h("button", {
             class: "mod-cta mod-update",

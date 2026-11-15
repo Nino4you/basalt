@@ -53,6 +53,8 @@ Obsidian vaults and selected Obsidian plugins.
 - Reading view with callouts, properties, footnotes and syntax highlighting.
 - Print a note or save it as PDF (Linux), or export it as one self-contained HTML file.
 - PDFs, images, audio and video open in their own tabs; PDFs are rendered locally.
+- On Android, "Share" in other apps sends text, links, images and PDFs to Basalt as a new note
+  or appended to the open one.
 
 **Organizing**
 
@@ -121,9 +123,8 @@ data in the browser, not in real files.
 Basalt is a **preview (0.4)** and not yet a complete replacement for Obsidian. The core is
 stable and tested, but some things are still missing:
 
-- no built-in sync (use a folder sync tool, see [docs/sync.md](docs/sync.md)); the desktop app
-  installs signed updates from Settings → General, Android updates are still a manual APK
-  download,
+- no built-in sync (use a folder sync tool, see [docs/sync.md](docs/sync.md)); the desktop app and
+  the Android APK install signed updates from Settings → General,
 - plugin compatibility only for selected plugins (see below),
 - backups of attachments have to be restored by hand (old backups are kept until you set a
   retention period in Settings → Files and links → Backups),

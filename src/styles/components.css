@@ -597,6 +597,63 @@ kbd {
   font-size: var(--font-ui-small);
 }
 
+/* ── share to Basalt (Android) ────────────────────────────────────────────── */
+
+.mod-share {
+  width: 480px;
+  max-width: calc(100vw - 32px);
+}
+.share-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 30vh;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+.share-preview-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+.share-preview-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-ui-small);
+  overflow-wrap: anywhere;
+}
+.share-preview-file svg {
+  flex: none;
+  color: var(--text-muted);
+}
+.share-skipped {
+  margin: 8px 0 0;
+  color: var(--text-warning, var(--text-error));
+  font-size: var(--font-ui-small);
+}
+.share-label {
+  display: block;
+  margin: 14px 0 6px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+.mod-share input[type="text"] {
+  width: 100%;
+  height: 36px;
+  font-size: var(--font-ui-medium);
+}
+.share-buttons {
+  flex-wrap: wrap;
+}
+.is-mobile .share-buttons > button {
+  flex: 1 1 100%;
+}
+
 /* A pop-out window is just the editor: no ribbon, no sidebars. */
 body.is-popout .workspace-ribbon,
 body.is-popout .sidebar-toggle-button {

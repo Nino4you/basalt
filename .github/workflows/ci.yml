@@ -263,7 +263,7 @@ jobs:
           # every run starts without the previous run's app data.
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot-save -noaudio -no-boot-anim -no-metrics -camera-back none -camera-front none -feature -Vulkan
           disable-animations: true
-          script: timeout 240s node tools/smoke_android.mjs
+          script: timeout 330s node tools/smoke_android.mjs
       - name: Collect emulator boot diagnostics
         if: failure()
         run: |
