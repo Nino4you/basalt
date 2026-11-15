@@ -30,6 +30,8 @@ export class NoteStore {
   private readonly deleting = new Set<string>();
   private readonly deleted = new WeakSet<Note>();
   private readonly removals = new Map<string, number>();
+  /** Called after each successful save, e.g. to tell other windows. */
+  onSaved: ((path: string, text: string) => void) | null = null;
 
   constructor(
     private readonly api: Backend,
@@ -118,6 +120,7 @@ export class NoteStore {
     });
     note.saved = snapshot;
     note.recovered = false;
+    this.onSaved?.(note.path, snapshot);
     if (note.text === snapshot)
       localStorage.removeItem(this.draftKey(note.path));
     else

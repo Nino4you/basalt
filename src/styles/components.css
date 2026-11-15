@@ -344,7 +344,7 @@ kbd {
 }
 .link-preview-title {
   margin-bottom: 6px;
-  font-weight: var(--font-semibold);
+  font-weight: 600;
   font-size: var(--font-ui-medium);
 }
 .link-preview-body {
@@ -595,6 +595,12 @@ kbd {
   margin: 8px 0 0;
   color: var(--text-error);
   font-size: var(--font-ui-small);
+}
+
+/* A pop-out window is just the editor: no ribbon, no sidebars. */
+body.is-popout .workspace-ribbon,
+body.is-popout .sidebar-toggle-button {
+  display: none;
 }
 
 /* ── prompt: quick switcher and command palette ───────────────────────────── */

@@ -763,6 +763,8 @@ export const en = {
   "Vim-Modus konnte nicht geladen werden": "Vim mode could not be loaded",
   "Vim-Tastenbelegung": "Vim key bindings",
   "Bearbeiten mit Vim-Befehlen; :w speichert.": "Edit with Vim commands; :w saves.",
+  "In neuem Fenster öffnen": "Open in new window",
+  "Das Fenster wurde blockiert.": "The window was blocked.",
   "Block „{name}“ nicht gefunden.": "Block “{name}” not found.",
   "Abschnitt „{name}“ nicht gefunden.": "Section “{name}” not found.",
   "Einbettung bearbeiten": "Edit embed",
