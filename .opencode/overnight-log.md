@@ -41,6 +41,7 @@
 - Einrichtung und Analyse begonnen; noch keine Produktänderung, noch keine behauptete Verbesserung der 100er-Zahlen.
 - Baseline eingefroren: `node_modules/.cache/basalt-plugin-survey-baseline-20261115/` enthält rohe Ergebnisse, Bericht, offizielle API-Oberfläche und `selected.json` mit 100 eindeutigen IDs/Versionen/SHA-256-Hashes. 100 Resultate, 0 Downloadfehler; alles ignoriert und nicht für Veröffentlichung vorgesehen.
 - Nächste sichere Fehlerfamilie: installierte, bereits vom Host verwendete CodeMirror-Module autocomplete/search fehlen nur in der expliziten Plugin-Modultabelle (TaskNotes, make.md, Metadata Menu). Keine neue Abhängigkeit oder Systemberechtigung nötig.
+- CodeMirror autocomplete/search ergänzt: zwei Regressionen erst rot (fehlende Module), danach grün mit identischen Host-Klassen/Effekten und echter EditorState-Nutzung. Build erfolgreich, gesamte Unit-Suite 640/640. Unveränderte drei Bundles erneut diagnostiziert: TaskNotes aktiviert jetzt, hat aber weitere echte Laufzeitfehler; make.md/Metadata Menu erreichen die nächste fehlende Abhängigkeit `@codemirror/lint`. Kein Plugin voreilig als sauber gezählt, keine Tests oder Fehler gefiltert.
 
 ### Blockiert / braucht Freigabe
 
