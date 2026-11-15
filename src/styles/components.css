@@ -652,6 +652,8 @@ kbd {
 }
 .is-mobile .share-buttons > button {
   flex: 1 1 100%;
+}
+
 /* A pop-out window is just the editor: no ribbon, no sidebars. */
 body.is-popout .workspace-ribbon,
 body.is-popout .sidebar-toggle-button {
