@@ -782,6 +782,8 @@ export const en = {
   "„{name}“ gibt es bereits.": "“{name}” already exists.",
   "Die Auswahl hat sich geändert. Bitte erneut auswählen.": "The selection has changed. Please select again.",
   "„{name}“ angelegt und verlinkt.": "Created and linked “{name}”.",
+  "In neuem Fenster öffnen": "Open in new window",
+  "Das Fenster wurde blockiert.": "The window was blocked.",
   "Block „{name}“ nicht gefunden.": "Block “{name}” not found.",
   "Abschnitt „{name}“ nicht gefunden.": "Section “{name}” not found.",
   "Einbettung bearbeiten": "Edit embed",
