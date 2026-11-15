@@ -6,7 +6,8 @@
 //! the public key in `tauri.conf.json` and was made for the announced version
 //! (`requireSignedVersion`). Nothing is installed without the user asking:
 //! the frontend first checks, then calls `app_update_install` on request.
-//! Android has no in-app installer; there the frontend links to the release.
+//! Android installs release APKs through the patched activity instead (see
+//! `tools/patch_android.mjs` and `installAndroidUpdate` in the frontend).
 
 use serde::Serialize;
 use std::sync::Mutex;
