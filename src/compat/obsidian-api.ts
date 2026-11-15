@@ -1,4 +1,6 @@
 import { getLocale } from "../i18n";
+import obsidianMoment from "moment";
+import "moment/locale/de.js";
 import { API_VERSION } from "./api-version";
 import { StateEffect, StateField } from "@codemirror/state";
 import DOMPurify from "dompurify";
@@ -545,21 +547,6 @@ export function createFragment(
   return fragment;
 }
 
-// shortcut: only the filename tokens Obsidian plugins use, swap for moment if locale-aware dates are needed.
-function momentFormat(date: Date, pattern: string): string {
-  const pad = (value: number, width = 2) => String(value).padStart(width, "0");
-  const tokens: Record<string, string> = {
-    YYYY: String(date.getFullYear()),
-    MM: pad(date.getMonth() + 1),
-    DD: pad(date.getDate()),
-    HH: pad(date.getHours()),
-    mm: pad(date.getMinutes()),
-    ss: pad(date.getSeconds()),
-    SSS: pad(date.getMilliseconds(), 3),
-  };
-  return pattern.replace(/YYYY|MM|DD|HH|mm|ss|SSS/g, (token) => tokens[token]);
-}
-
 /** Documented DOM extensions Obsidian adds to native prototypes. */
 function installDomHelpers(): void {
   const node = Node.prototype as unknown as Record<string, unknown>;
@@ -664,19 +651,8 @@ function installDomHelpers(): void {
   }
 }
 
-/** Obsidian exposes these globals; plugins call them without importing. */
-const obsidianMoment = Object.assign(
-  () => ({
-    format: (pattern: string) => momentFormat(new Date(), pattern),
-    // Plugins use the active interface language for dictionary selection.
-    locale: getLocale,
-  }),
-  {
-    // Moment also exposes these as statics on the callable itself.
-    format: (pattern: string) => momentFormat(new Date(), pattern),
-    locale: getLocale,
-  },
-);
+// Bundle the host's supported locales; date APIs never need ambient filesystem access.
+obsidianMoment.locale(getLocale());
 
 /** Obsidian extends built-ins exactly as documented in its global type patches. */
 function installLanguageHelpers(): void {
