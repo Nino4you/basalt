@@ -1,5 +1,6 @@
 import { setSystemBarTheme } from "../ui/android-insets";
 import { getLocale, resolveLocale, type Locale } from "../i18n";
+import { DEFAULT_DOCK_ORDER } from "./dock-order";
 
 export type ThemeChoice = "dark" | "light" | "system";
 export type EditingMode = "live" | "source";
@@ -46,6 +47,10 @@ export interface Settings {
   vimMode: boolean;
   /** Where the floating dock sits on tablets. */
   tabletDock: "left" | "bottom";
+  /** Order of the dock's (ribbon's) actions, see dock-order.ts. */
+  dockOrder: string[];
+  /** Dock actions the user hid. */
+  dockHidden: string[];
 }
 
 export const DEFAULT_ACCENT = "#8a5cf5";
@@ -78,6 +83,8 @@ export const defaults: Settings = {
   updateCheck: false,
   vimMode: false,
   tabletDock: "left",
+  dockOrder: DEFAULT_DOCK_ORDER,
+  dockHidden: [],
 };
 
 const KEY = "basalt-settings";

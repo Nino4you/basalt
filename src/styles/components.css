@@ -1170,3 +1170,41 @@ input.prompt-input:focus {
     max-width: none;
   }
 }
+
+/* Settings → Appearance → Customize dock (src/app/dock-order.ts). */
+.dock-order-group-title {
+  margin: 14px 0 4px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.dock-order-item .setting-item-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dock-order-item .setting-item-info > .svg-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+}
+.dock-order-item.is-spacer .setting-item-name {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.dock-order-item.is-spacer {
+  border-top: 1px dashed var(--background-modifier-border);
+  border-bottom: 1px dashed var(--background-modifier-border);
+}
+.dock-order-arrows {
+  display: flex;
+  gap: 2px;
+}
+.dock-order-reset {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}

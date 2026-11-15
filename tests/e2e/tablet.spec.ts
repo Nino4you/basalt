@@ -288,3 +288,66 @@ test("the dock can float at the bottom instead", async ({ page }) => {
     })
     .toBeLessThanOrEqual(1194 - 48);
 });
+
+/** What a long press on the dock sends: a positioned context menu event. */
+async function longPressDock(page: Page) {
+  await page.evaluate(() =>
+    document.querySelector(".workspace-ribbon")!.dispatchEvent(
+      new MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 38,
+        clientY: 300,
+      }),
+    ),
+  );
+}
+
+test("the dock's order can be changed", async ({ page }) => {
+  await open(page, 1280, 800);
+  // A long press on the dock leads to its settings.
+  await longPressDock(page);
+  await page.getByRole("menuitem", { name: "Leiste anpassen …" }).click();
+  const settings = page.getByRole("dialog");
+  await expect(settings.locator("#dock-order")).toBeVisible();
+
+  // Views: search first.
+  await settings.getByRole("button", { name: "Suche nach oben" }).click();
+  await expect(page.locator(".rail-item").first()).toHaveAttribute(
+    "aria-label",
+    "Suche",
+  );
+  // Actions: the graph hidden, settings moved above the gap.
+  await settings
+    .getByRole("switch", { name: "Graphansicht öffnen anzeigen" })
+    .click();
+  await expect(rail(page, "Graphansicht öffnen")).toBeHidden();
+  for (let i = 0; i < 5; i++)
+    await settings
+      .getByRole("button", { name: "Einstellungen nach oben" })
+      .click();
+  await expect(
+    page
+      .locator(".side-dock-actions")
+      .getByRole("button", { name: "Einstellungen" }),
+  ).toBeVisible();
+
+  // The order survives a restart, and the default comes back on request.
+  await page.reload();
+  await expect(page.locator(".rail-item").first()).toHaveAttribute(
+    "aria-label",
+    "Suche",
+  );
+  await expect(rail(page, "Graphansicht öffnen")).toBeHidden();
+  await longPressDock(page);
+  await page.getByRole("menuitem", { name: "Leiste anpassen …" }).click();
+  await page
+    .locator("#dock-order")
+    .getByRole("button", { name: "Standard wiederherstellen" })
+    .click();
+  await expect(page.locator(".rail-item").first()).toHaveAttribute(
+    "aria-label",
+    "Dateien",
+  );
+  await expect(rail(page, "Graphansicht öffnen")).toBeVisible();
+});

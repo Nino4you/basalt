@@ -88,6 +88,7 @@ import {
   TOUCH_QUERY,
 } from "../ui/device";
 import { installSheetGestures } from "./sheet-gestures";
+import { applyDockOrder, normalizeDockOrder } from "./dock-order";
 import { buildMobileToolbar } from "./mobile-toolbar";
 import { EditorView } from "@codemirror/view";
 import { Explorer } from "./explorer";
@@ -423,6 +424,7 @@ export class App {
     // Puts the live views into the document, where the wiring finds them.
     this.renderGroups();
     this.wireShell();
+    this.applyDockOrder();
     installTooltips();
     this.index.onChange(() => this.emitIndex());
     this.settings.onChange((key) => {
@@ -431,6 +433,7 @@ export class App {
       if (key === "fontSize") this.editor.measure();
       if (key === "inlineTitle") this.showActive();
       if (key === "tabletDock") this.applyLayout();
+      if (key === "dockOrder" || key === "dockHidden") this.applyDockOrder();
     });
     this.mobile.addEventListener("change", () => this.applyLayout());
     this.touch.addEventListener("change", () => this.applyLayout());
@@ -3710,6 +3713,16 @@ export class App {
     return this.touch.matches && !this.isMobile;
   }
 
+  /** Puts the dock's (ribbon's) actions in the order chosen in the settings. */
+  applyDockOrder(): void {
+    const hidden = this.settings.get("dockHidden");
+    applyDockOrder(
+      this.shell.ribbon,
+      normalizeDockOrder(this.settings.get("dockOrder")),
+      Array.isArray(hidden) ? hidden.filter((id) => typeof id === "string") : [],
+    );
+  }
+
   /** The tablet dock floats at the bottom (Settings → Appearance). */
   get dockAtBottom(): boolean {
     return this.isTablet && this.settings.get("tabletDock") === "bottom";
@@ -3863,6 +3876,54 @@ export class App {
     this.showPanel(id);
   }
 
+  /** The views of the left sidebar as the dock shows them, for reordering. */
+  leftDockViews(): Array<{ id: DockPanelId; label: string; icon: SVGElement }> {
+    const shown = this.shownDock.left.panels as DockPanelId[];
+    return shown.map((id) => {
+      const tab = isPluginPanel(id)
+        ? this.pluginPanels.get(id)?.tab
+        : this.shell.panelTabs[id];
+      const svg = tab?.querySelector("svg");
+      return {
+        id,
+        label: RAIL_LABELS[id] ?? tab?.getAttribute("aria-label") ?? id,
+        icon: svg ? (svg.cloneNode(true) as SVGElement) : icon("file"),
+      };
+    });
+  }
+
+  /** Swaps a left view with its shown neighbour; the sidebar's tabs follow. */
+  moveLeftDockView(id: DockPanelId, delta: -1 | 1): void {
+    const shown = this.shownDock.left.panels as DockPanelId[];
+    const neighbour = shown[shown.indexOf(id) + delta];
+    if (!neighbour) return;
+    const panels = [...this.layout.dock.left.panels];
+    const a = panels.indexOf(id);
+    const b = panels.indexOf(neighbour);
+    if (a < 0 || b < 0) return;
+    [panels[a], panels[b]] = [panels[b], panels[a]];
+    this.layout.dock = {
+      ...this.layout.dock,
+      left: { ...this.layout.dock.left, panels },
+    };
+    this.applyLayout();
+  }
+
+  /** The left views in their default order; plugin views keep theirs after. */
+  resetLeftDockViews(): void {
+    const order = PANELS.map((spec) => spec.id as string);
+    const rank = (id: string) =>
+      order.includes(id) ? order.indexOf(id) : order.length;
+    const panels = [...this.layout.dock.left.panels].sort(
+      (a, b) => rank(a) - rank(b),
+    );
+    this.layout.dock = {
+      ...this.layout.dock,
+      left: { ...this.layout.dock.left, panels },
+    };
+    this.applyLayout();
+  }
+
   resetPanelLayout(): void {
     this.layout.dock = defaultDock(PANELS);
     this.layout.closedPanels = [];
@@ -4007,6 +4068,24 @@ export class App {
             ? this.layout.rightWidth
             : area === "left-bottom" ? this.layout.leftBottomHeight : this.layout.bottomHeight,
       drop: (id, area, index) => this.movePanelTo(id as DockPanelId, area, index),
+    });
+    // A long press (or right click) on the dock leads to its order.
+    this.shell.ribbon.addEventListener("contextmenu", (event) => {
+      if ((event.target as Element).closest(".basalt-plugin-ribbon")) return;
+      event.preventDefault();
+      showMenu(
+        [
+          {
+            title: t("Leiste anpassen …"),
+            icon: "settings",
+            onClick: () => openSettings(this, "appearance", "dock-order"),
+          },
+        ],
+        // Synthetic events may come without a position: anchor at the dock.
+        Number.isFinite(event.clientX) && (event.clientX || event.clientY)
+          ? { x: event.clientX, y: event.clientY }
+          : this.shell.ribbon,
+      );
     });
     document.addEventListener("contextmenu", (event) => {
       const tab = (event.target as Element).closest?.<HTMLElement>(

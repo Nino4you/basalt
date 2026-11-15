@@ -13,6 +13,15 @@ import {
 } from "../ui/dom";
 import { confirmAction, Modal } from "../ui/modal";
 import {
+  ALWAYS_SHOWN,
+  DEFAULT_DOCK_ORDER,
+  dockItemLabel,
+  moveItem,
+  normalizeDockOrder,
+  PLUGINS,
+  SPACER,
+} from "./dock-order";
+import {
   listSnippets,
   listThemes,
   SNIPPET_FOLDER,
@@ -433,6 +442,120 @@ function vaultStyleSettings(app: App, content: HTMLElement): void {
   render();
 }
 
+/** Reorder the dock (ribbon on desktops): its views and its actions. */
+function dockOrderSettings(app: App, content: HTMLElement): void {
+  const section = h("div", { class: "dock-order-settings", id: "dock-order" });
+  content.append(section);
+  const settings = app.settings;
+  const arrows = (
+    label: string,
+    canUp: boolean,
+    canDown: boolean,
+    move: (delta: -1 | 1) => void,
+  ) =>
+    h(
+      "div",
+      "dock-order-arrows",
+      h(
+        "button",
+        {
+          class: "clickable-icon",
+          label: t("{name} nach oben", { name: label }),
+          attrs: { type: "button", disabled: !canUp },
+          on: { click: () => move(-1) },
+        },
+        icon("chevron-up", 18),
+      ),
+      h(
+        "button",
+        {
+          class: "clickable-icon",
+          label: t("{name} nach unten", { name: label }),
+          attrs: { type: "button", disabled: !canDown },
+          on: { click: () => move(1) },
+        },
+        icon("chevron-down", 18),
+      ),
+    );
+  const render = () => {
+    section.replaceChildren();
+    heading(section, t("Leiste anpassen"));
+    section.append(
+      h("p", {
+        class: "setting-item-description settings-paragraph",
+        text: t("Reihenfolge der Ansichten und Aktionen in der Leiste. Lange drücken auf die Leiste führt hierher."),
+      }),
+      h("div", { class: "dock-order-group-title", text: t("Ansichten") }),
+    );
+    const views = app.leftDockViews();
+    views.forEach((view, index) => {
+      const item = row(section, view.label);
+      item.el.classList.add("dock-order-item");
+      item.el.querySelector(".setting-item-info")!.prepend(view.icon);
+      item.control.append(
+        arrows(view.label, index > 0, index < views.length - 1, (delta) => {
+          app.moveLeftDockView(view.id, delta);
+          render();
+        }),
+      );
+    });
+    section.append(
+      h("div", { class: "dock-order-group-title", text: t("Aktionen") }),
+    );
+    const order = normalizeDockOrder(settings.get("dockOrder"));
+    const hidden = settings.get("dockHidden");
+    order.forEach((id, index) => {
+      const label = dockItemLabel(id);
+      const item = row(section, label);
+      item.el.classList.add("dock-order-item");
+      if (id === SPACER) item.el.classList.add("is-spacer");
+      // The same icon as in the dock, so the list is easy to match up.
+      const svg =
+        id === PLUGINS
+          ? icon("puzzle")
+          : (app.shell.ribbon
+              .querySelector(`[data-command="${id}"] svg`)
+              ?.cloneNode(true) as SVGElement | undefined);
+      if (svg) item.el.querySelector(".setting-item-info")!.prepend(svg);
+      item.control.append(
+        arrows(label, index > 0, index < order.length - 1, (delta) => {
+          settings.set("dockOrder", moveItem(order, id, delta));
+          render();
+        }),
+      );
+      if (!ALWAYS_SHOWN.has(id))
+        toggle(
+          item,
+          t("{name} anzeigen", { name: label }),
+          !hidden.includes(id),
+          (shown) => {
+            const rest = settings.get("dockHidden").filter((entry) => entry !== id);
+            settings.set("dockHidden", shown ? rest : [...rest, id]);
+          },
+        );
+    });
+    section.append(
+      h(
+        "div",
+        "dock-order-reset",
+        h("button", {
+          text: t("Standard wiederherstellen"),
+          attrs: { type: "button" },
+          on: {
+            click: () => {
+              settings.set("dockOrder", [...DEFAULT_DOCK_ORDER]);
+              settings.set("dockHidden", []);
+              app.resetLeftDockViews();
+              render();
+            },
+          },
+        }),
+      ),
+    );
+  };
+  render();
+}
+
 type CoreTab =
   "general" | "editor" | "files" | "appearance" | "hotkeys" | "plugins";
 /** Core pages, or `plugin:<id>:<index>` for a community plugin's setting tab. */
@@ -484,7 +607,12 @@ let lastTab: TabId = "general";
  * setting rows. On phones the sidebar is a page of its own (`mod-nav`) and a
  * category opens as a second page with a back button.
  */
-export function openSettings(app: App, initial: TabId = lastTab): void {
+export function openSettings(
+  app: App,
+  initial: TabId = lastTab,
+  /** Element id inside the page to scroll to, such as "dock-order". */
+  section?: string,
+): void {
   const modal = new Modal("mod-settings");
   modal.modalEl.setAttribute("aria-label", t("Einstellungen"));
   modal.modalEl.id = "settings";
@@ -1020,6 +1148,7 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
         settings.get("tabletDock"),
         set("tabletDock"),
       );
+      dockOrderSettings(app, content);
       toggle(
         row(
           content,
@@ -1342,6 +1471,10 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
   modal.closeButton.dataset.close = "settings";
   modal.onClose = releasePlugin;
   show(initial);
+  if (section)
+    requestAnimationFrame(() =>
+      document.getElementById(section)?.scrollIntoView({ block: "start" }),
+    );
   // Phones start on the category list, like Obsidian's mobile app.
   modal.modalEl.classList.add("mod-nav");
   modal.open();

@@ -840,4 +840,13 @@ export const en = {
   "Leiste auf dem Tablet": "Tablet dock",
   "Wo die schwebende Leiste mit Ansichten und Aktionen auf Tablets sitzt.": "Where the floating dock with views and actions sits on tablets.",
   "Unten": "Bottom",
+  "Plugin-Symbole": "Plugin icons",
+  "Abstand: was darunter steht, sitzt am Ende der Leiste": "Gap: everything below it sits at the end of the dock",
+  "Leiste anpassen …": "Customize dock …",
+  "{name} nach oben": "Move {name} up",
+  "{name} nach unten": "Move {name} down",
+  "Leiste anpassen": "Customize dock",
+  "Reihenfolge der Ansichten und Aktionen in der Leiste. Lange drücken auf die Leiste führt hierher.": "Order of the views and actions in the dock. A long press on the dock leads here.",
+  "Aktionen": "Actions",
+  "{name} anzeigen": "Show {name}",
 } as const;

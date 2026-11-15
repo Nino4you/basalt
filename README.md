@@ -91,8 +91,8 @@ Obsidian vaults and selected Obsidian plugins.
 - Light and dark theme with an accent color, plus Obsidian-style themes and CSS snippets from
   the vault (`Basalt/Config/themes`, `Basalt/Config/snippets`).
 - A dedicated phone layout with drawers, a bottom navigation bar and a formatting toolbar.
-- A tablet layout of its own: a floating dock of icons at the left edge or at the bottom
-  (Settings → Appearance); sidebars float over the note as cards (no dimming, a tap beside
+- A tablet layout of its own: a floating dock of icons at the left edge or at the bottom,
+  whose order and actions you choose (Settings → Appearance, or a long press on the dock); sidebars float over the note as cards (no dimming, a tap beside
   one closes it) that follow the finger when dragged, and can be pinned beside the note when
   there is room; finger-sized targets and a focus mode that leaves only the note.
 
