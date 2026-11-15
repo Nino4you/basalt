@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { loadIconLibrary } from "../../src/ui/icon-library";
 import {
+  ButtonComponent,
   createFragment,
   createObsidianApi,
   FuzzySuggestModal,
@@ -21,6 +22,30 @@ installDomCompat();
 // Plugin hosts load the full Lucide set before activation; do the same here.
 beforeAll(() => loadIconLibrary());
 describe("Obsidian DOM and UI compatibility", () => {
+  it("sets a button tooltip through the shared accessible tooltip helper", () => {
+    const button = new ButtonComponent(document.createElement("div"));
+    expect(button.setTooltip("Sync settings", { placement: "left" })).toBe(button);
+    expect(button.buttonEl.title).toBe("Sync settings");
+    expect(button.buttonEl.getAttribute("aria-label")).toBe("Sync settings");
+    button.setTooltip("Updated");
+    expect(button.buttonEl.title).toBe("Updated");
+  });
+
+  it("removes and reapplies button CTA styling without losing other state", () => {
+    const button = new ButtonComponent(document.createElement("div"))
+      .setButtonText("Apply")
+      .setDisabled(true)
+      .setCta();
+    button.buttonEl.classList.add("plugin-action");
+    expect(button.removeCta()).toBe(button);
+    expect(button.buttonEl.classList.contains("mod-cta")).toBe(false);
+    expect(button.buttonEl.classList.contains("plugin-action")).toBe(true);
+    expect(button.buttonEl.textContent).toBe("Apply");
+    expect(button.buttonEl.disabled).toBe(true);
+    expect(button.setCta()).toBe(button);
+    expect(button.buttonEl.classList.contains("mod-cta")).toBe(true);
+  });
+
   it("creates detached global DOM elements and honors parent options", () => {
     const parent = document.createElement("div");
     const child = createDiv({ cls: "cell", text: "A1", parent }, (el) => {

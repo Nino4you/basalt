@@ -42,6 +42,7 @@
 - Baseline eingefroren: `node_modules/.cache/basalt-plugin-survey-baseline-20261115/` enthält rohe Ergebnisse, Bericht, offizielle API-Oberfläche und `selected.json` mit 100 eindeutigen IDs/Versionen/SHA-256-Hashes. 100 Resultate, 0 Downloadfehler; alles ignoriert und nicht für Veröffentlichung vorgesehen.
 - Nächste sichere Fehlerfamilie: installierte, bereits vom Host verwendete CodeMirror-Module autocomplete/search fehlen nur in der expliziten Plugin-Modultabelle (TaskNotes, make.md, Metadata Menu). Keine neue Abhängigkeit oder Systemberechtigung nötig.
 - CodeMirror autocomplete/search ergänzt: zwei Regressionen erst rot (fehlende Module), danach grün mit identischen Host-Klassen/Effekten und echter EditorState-Nutzung. Build erfolgreich, gesamte Unit-Suite 640/640. Unveränderte drei Bundles erneut diagnostiziert: TaskNotes aktiviert jetzt, hat aber weitere echte Laufzeitfehler; make.md/Metadata Menu erreichen die nächste fehlende Abhängigkeit `@codemirror/lint`. Kein Plugin voreilig als sauber gezählt, keine Tests oder Fehler gefiltert.
+- Button-Tooltips und CTA-Rücknahme ergänzt: beide fehlenden Methoden durch rote Tests reproduziert; 19 UI-Tests und gesamte Suite 642/642 grün, Build erfolgreich. LiveSync erreicht jetzt die nächste Lücke `Setting.setDisabled` (statt setTooltip/removeCta). Bestehender Tooltip-Helper bietet native Titel/ARIA, keine positionierte Tooltip-UI; diese Einschränkung bleibt sichtbar, nicht durch erfundene Attribute kaschiert.
 
 ### Blockiert / braucht Freigabe
 

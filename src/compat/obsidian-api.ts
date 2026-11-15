@@ -1047,6 +1047,14 @@ export class ButtonComponent {
     this.buttonEl.classList.add("mod-cta");
     return this;
   }
+  removeCta(): this {
+    this.buttonEl.classList.remove("mod-cta");
+    return this;
+  }
+  setTooltip(value: string, options: Record<string, unknown> = {}): this {
+    setTooltip(this.buttonEl, value, options);
+    return this;
+  }
   setWarning(): this {
     this.buttonEl.classList.add("mod-warning");
     return this;
