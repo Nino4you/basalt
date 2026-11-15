@@ -68,6 +68,8 @@
 
 - Der öffentliche Mermaid-Loader nutzt jetzt exakt denselben verzögert geladenen Renderer wie Host-Diagramme. Zwei fehlende-Export-Regressionen erst rot; gemeinsame Instanz, unveränderte strikte Host-Konfiguration und weitergereichte Importfehler geprüft. Eine neue Testannahme zum Fehlertext wurde auf die von Vitest erhaltene originale Fehlerursache korrigiert (kein Produktionsfehler verschluckt). 664/664 Unit-Tests mit vier Workern und Produktionsbuild grün. Unveränderte Mermaid Tools ohne Fehler und ohne fehlenden Export; Image in Editor behält seinen unabhängigen StateField-Fehler. Kein neuer voller 100er-Zähler behauptet.
 
+- Die bereits installierte CodeMirror-Lint-Laufzeit ist jetzt ein explizit gepinnter Host-Baustein (`6.9.7`) und liegt in derselben Plugin-Modultabelle wie State/View. Fehlender Export erst rot reproduziert; echte Diagnose-Effekte, echte `EditorState`-Anwendung und Host-Identität geprüft. 665/665 Unit-Tests mit vier Workern, Produktionsbuild und `npm audit --omit=dev` (0 Befunde) grün. Keine zweite CodeMirror-Instanz und keine neue Netzwerk-/Systemberechtigung.
+
 ### Blockiert / braucht Freigabe
 
 - Eine Lösung, die unrestricted Node/fs/Prozess-/Serverzugriff, globale Installationen, bezahlte APIs oder Veröffentlichung voraussetzt, ist nicht freigegeben. Andere sichere Lücken werden währenddessen weiterbearbeitet.

@@ -1,6 +1,7 @@
 import * as autocomplete from "@codemirror/autocomplete";
 import * as commands from "@codemirror/commands";
 import * as language from "@codemirror/language";
+import * as lint from "@codemirror/lint";
 import * as search from "@codemirror/search";
 import * as state from "@codemirror/state";
 import * as view from "@codemirror/view";
@@ -16,6 +17,7 @@ export const editorModules = Object.freeze({
   "@codemirror/autocomplete": autocomplete,
   "@codemirror/commands": commands,
   "@codemirror/language": { ...language, tokenClassNodeProp },
+  "@codemirror/lint": lint,
   "@codemirror/search": search,
   "@codemirror/state": state,
   "@codemirror/view": view,
