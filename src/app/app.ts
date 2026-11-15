@@ -66,7 +66,8 @@ import {
   icon,
 } from "../ui/dom";
 import { closeMenu, showMenu, type MenuEntry } from "../ui/menu";
-import { Modal, SuggestModal, topModal } from "../ui/modal";
+import { confirmAction, Modal, SuggestModal, topModal } from "../ui/modal";
+import { fuzzyMatch } from "../ui/fuzzy";
 import { notify } from "../ui/notice";
 import { installTooltips } from "../ui/tooltip";
 import { CommandRegistry } from "./commands";
@@ -80,6 +81,7 @@ import { ReadingView } from "./reading";
 import { LinkPreview } from "./link-preview";
 import { SearchView } from "./search";
 import { expandTemplate, templatePaths } from "./templates";
+import { mergeNoteText, suggestNoteName, wikiLinkTo } from "./note-tools";
 import { formatDate, parseDate } from "../dates";
 import { SettingsStore } from "./settings";
 import { openSettings } from "./settings-modal";
@@ -2929,6 +2931,201 @@ export class App {
       );
   }
 
+  // ── note composer ─────────────────────────────────────────────────────────
+
+  /** Asks for another note and merges `path` into it. */
+  promptMergeFile(path = this.activePath): void {
+    if (!path || !/\.md$/i.test(path) || !this.index.has(path)) return;
+    const notes = this.index.files
+      .filter((file) => /\.md$/i.test(file) && file !== path)
+      .map((file) => ({ file, lower: file.toLowerCase() }));
+    const modal = new SuggestModal(
+      t("Zielnotiz suchen …"),
+      t("Zusammenführen mit"),
+      (raw) => {
+        const query = raw.trim().toLowerCase();
+        return notes
+          .map((note) => ({ ...note, match: fuzzyMatch(query, note.file, note.lower) }))
+          .filter((note) => note.match)
+          .sort((a, b) => b.match!.score - a.match!.score)
+          .map(({ file }) => ({
+            render(parent: HTMLElement) {
+              parent.append(
+                h(
+                  "div",
+                  "suggestion-content",
+                  h("div", {
+                    class: "suggestion-title",
+                    text: basename(file).replace(/\.md$/i, ""),
+                  }),
+                  dirname(file)
+                    ? h("div", { class: "suggestion-note", text: dirname(file) })
+                    : null,
+                ),
+              );
+            },
+            run: () => {
+              confirmAction({
+                title: t("Notizen zusammenführen"),
+                text: t("„{source}“ an „{target}“ anhängen und danach in den Papierkorb verschieben? Links auf die Notiz zeigen dann auf das Ziel.", {
+                  source: basename(path).replace(/\.md$/i, ""),
+                  target: basename(file).replace(/\.md$/i, ""),
+                }),
+                confirm: t("Zusammenführen"),
+                run: () => this.mergeFile(path, file),
+                onError: (error) => this.report(error),
+              });
+            },
+          }));
+      },
+      [
+        ["↑↓", t("navigieren")],
+        ["↵", t("zusammenführen")],
+        ["esc", t("schließen")],
+      ],
+      t("Keine passende Notiz."),
+    );
+    modal.open();
+  }
+
+  /**
+   * Appends `source` to `target`, points links at the target and moves the
+   * source to the trash. Every step goes through the version-checked save
+   * (the target is backed up first); a failure leaves the source in place.
+   */
+  async mergeFile(source: string, target: string): Promise<void> {
+    const store = this.store;
+    if (!store || source === target) return;
+    if (!this.index.has(source) || !this.index.has(target))
+      throw new Error(t("Die Datei gibt es nicht mehr."));
+    const update = this.settings.get("updateLinks")
+      ? new LinkUpdate(this.index.files, new Map([[source, target]]))
+      : null;
+    const sources = update
+      ? (await this.linkSources(update)).filter((path) => path !== source)
+      : [];
+    if (store !== this.store) return;
+    const from = await store.load(source);
+    const into = await store.load(target);
+    if (store !== this.store) return;
+    const merged = mergeNoteText(into.text, from.text);
+    await this.replaceText(into, merged);
+    this.index.setContent(target, merged);
+    if (update && sources.length) await this.updateLinks(update, sources);
+    if (store !== this.store) return;
+    await this.deleteFile(source, store);
+    if (store === this.store) await this.openPath(target);
+    notify(t("Notizen zusammengeführt."));
+  }
+
+  /** Moves the editor selection into a new note and leaves a link behind. */
+  promptExtractSelection(): void {
+    const path = this.activePath;
+    if (!path || this.active.kind !== "markdown" || this.active.reading) return;
+    const view = this.editor.view;
+    const { from, to } = view.state.selection.main;
+    if (from === to) {
+      notify(t("Zuerst Text auswählen, der in eine neue Notiz soll."));
+      return;
+    }
+    const selection = view.state.sliceDoc(from, to);
+    const folder =
+      this.settings.get("newNoteLocation") === "current" ? dirname(path) : "";
+    const modal = new Modal("mod-new-note");
+    modal.setTitle(t("Auswahl in neue Notiz extrahieren"));
+    const input = h("input", {
+      attrs: {
+        type: "text",
+        placeholder: t("Name der Notiz"),
+        maxlength: "180",
+        autocomplete: "off",
+        spellcheck: "false",
+        enterkeyhint: "done",
+      },
+      label: t("Name der Notiz"),
+    });
+    const name = suggestNoteName(selection) || t("Unbenannt");
+    input.value = folder ? `${folder}/${name}` : name;
+    const error = h("p", {
+      class: "field-error",
+      attrs: { role: "alert", hidden: true },
+    });
+    const submit = h("button", {
+      class: "mod-cta",
+      text: t("Extrahieren"),
+      attrs: { type: "submit" },
+    });
+    const form = h(
+      "form",
+      { attrs: { novalidate: true } },
+      h("p", {
+        class: "modal-description",
+        text: t("Die Auswahl wird durch einen Link auf die neue Notiz ersetzt."),
+      }),
+      input,
+      error,
+      h(
+        "div",
+        "modal-button-container",
+        h("button", {
+          text: t("Abbrechen"),
+          attrs: { type: "button" },
+          on: { click: () => modal.close() },
+        }),
+        submit,
+      ),
+    );
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submit.disabled = true;
+      void this.extractSelection(path, from, to, selection, input.value)
+        .then(() => modal.close())
+        .catch((reason) => {
+          error.textContent = errorMessage(reason);
+          error.hidden = false;
+          submit.disabled = false;
+          input.focus();
+        });
+    });
+    modal.contentEl.append(form);
+    modal.open();
+    input.focus();
+    input.select();
+  }
+
+  private async extractSelection(
+    source: string,
+    from: number,
+    to: number,
+    selection: string,
+    name: string,
+  ): Promise<void> {
+    const vault = this.vault;
+    if (!vault) return;
+    const target = validateNotePath(name);
+    if (this.index.has(target))
+      throw new Error(t("„{name}“ gibt es bereits.", { name: target }));
+    const view = this.editor.view;
+    // The note or the selection changed while the dialog was open.
+    if (this.activePath !== source || view.state.sliceDoc(from, to) !== selection)
+      throw new Error(t("Die Auswahl hat sich geändert. Bitte erneut auswählen."));
+    await this.ensureFolder(dirname(target));
+    await backend.create(target, selection.replace(/\s+$/, "") + "\n", vault.id);
+    if (vault !== this.vault) return;
+    this.setFiles((await backend.info()).files);
+    await this.refreshCompatibility().catch((error) => this.report(error));
+    if (this.compatibility) this.syncVisibleFiles();
+    if (this.activePath === source && view.state.sliceDoc(from, to) === selection) {
+      const link = wikiLinkTo(this.index.files, target, source);
+      view.dispatch({
+        changes: { from, to, insert: link },
+        selection: { anchor: from + link.length },
+      });
+      this.docEdited.flush();
+      notify(t("„{name}“ angelegt und verlinkt.", { name: basename(target).replace(/\.md$/i, "") }));
+    }
+  }
+
   /** Creates the missing folders of `folder`, one level at a time. */
   private async ensureFolder(folder: string): Promise<void> {
     if (!folder) return;
@@ -3954,6 +4151,13 @@ export class App {
         : null,
       /\.md$/i.test(path)
         ? {
+            title: t("Zusammenführen mit …"),
+            icon: "merge",
+            onClick: () => this.promptMergeFile(path),
+          }
+        : null,
+      /\.md$/i.test(path)
+        ? {
             title: t("Als Markdown exportieren"),
             icon: "download",
             onClick: () => this.exportNote(path),
@@ -4585,6 +4789,20 @@ export class App {
       name: t("Nächste Tagesnotiz öffnen"),
       icon: "chevron-right",
       run: () => void this.adjacentDailyNote(1),
+    });
+    add({
+      id: "merge-file",
+      name: t("Aktuelle Notiz mit einer anderen zusammenführen"),
+      icon: "merge",
+      when: () => this.active.kind === "markdown" && !!this.activePath,
+      run: () => this.promptMergeFile(),
+    });
+    add({
+      id: "extract-selection",
+      name: t("Auswahl in neue Notiz extrahieren"),
+      icon: "scissors",
+      when: () => hasNote() && this.active.kind === "markdown" && !this.active.reading,
+      run: () => this.promptExtractSelection(),
     });
     add({
       id: "add-property",
