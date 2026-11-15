@@ -57,7 +57,7 @@ const de = {
   "f2.a":
     "Rückverweise mit Kontext und unverlinkte Erwähnungen, die zu Links werden",
   "f2.b":
-    "Volltextsuche mit <code>tag:</code>, <code>path:</code> und <code>file:</code>",
+    "Volltextsuche mit <code>tag:</code>, <code>path:</code>, <code>line:</code>, <code>task:</code> und regulären Ausdrücken",
   "f2.c": "Graph des ganzen Vaults oder lokaler Graph einer Notiz",
   "f2.d":
     "Benenne eine Notiz um oder verschiebe sie, und alle Links ziehen mit",

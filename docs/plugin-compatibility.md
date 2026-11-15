@@ -12,7 +12,8 @@ plugin bundles.
 KaTeX, Mermaid and Markdown tables are also rendered in the editor. A table stays visible while
 editing; only the active cell shows its Markdown source. Registered plugin code block processors
 still take precedence over the built-in Mermaid renderer. Plugin embeds keep their own life
-cycle. Multi-line math inside nested blockquotes/callouts and tables that cannot be mapped
+cycle and take precedence over the built-in image, media and note embeds, which live preview
+renders with the reading view's code (sections `#Heading`, blocks `#^id`, image sizes `|300x200`). Multi-line math inside nested blockquotes/callouts and tables that cannot be mapped
 unambiguously stay visible as source, to be safe. When an edge cell is emptied, the editor adds
 the optional outer table pipe if needed, so GFM does not shift the neighboring cell into another
 column. Known rendering limit: an escaped table pipe inside a code span may still show its

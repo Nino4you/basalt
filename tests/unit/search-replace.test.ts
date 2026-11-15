@@ -10,6 +10,9 @@ it("replaces only a single term, keeping the typed case", () => {
   expect(replaceableTerm("#tag")).toBeNull();
   expect(replaceableTerm("-weg path:a")).toBeNull();
   expect(replaceableTerm("")).toBeNull();
+  expect(replaceableTerm("/bas.lt/")).toBeNull();
+  expect(replaceableTerm("basalt line:(granit)")).toBeNull();
+  expect(replaceableTerm("basalt -task:x")).toBeNull();
 });
 
 it("replaces like the search finds, or with matching case", () => {
