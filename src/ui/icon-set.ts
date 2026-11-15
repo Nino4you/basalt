@@ -127,6 +127,7 @@ import {
   Zap,
   ZoomIn,
   ZoomOut,
+  AppWindow,
 } from "lucide";
 
 /**
@@ -138,6 +139,7 @@ import {
  * literal names a Lucide icon that is missing here.
  */
 export const hostIcons: Record<string, IconNode> = {
+  AppWindow,
   ArrowLeft,
   ArrowLeftRight,
   ArrowRight,

@@ -776,6 +776,8 @@ export const en = {
   "Das Update wurde abgebrochen.": "The update was cancelled.",
   "Das Update konnte nicht installiert werden: {error}": "The update could not be installed: {error}",
   "Das Update ist nicht mit dem Schlüssel dieser App signiert. Installiere es über die Quelle, aus der du Basalt hast.": "The update is not signed with this app's key. Install it from the source you got Basalt from.",
+  "In neuem Fenster öffnen": "Open in new window",
+  "Das Fenster wurde blockiert.": "The window was blocked.",
   "Block „{name}“ nicht gefunden.": "Block “{name}” not found.",
   "Abschnitt „{name}“ nicht gefunden.": "Section “{name}” not found.",
   "Einbettung bearbeiten": "Edit embed",
