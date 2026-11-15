@@ -54,6 +54,8 @@
 
 - `editorLivePreviewField` bildet jetzt den echten Host-Facet ab, statt als fehlender Export CodeMirror abstürzen zu lassen. Regression erst rot; Umschalten Source/Live und Abbau beim Session-Ende geprüft, 653/653 Unit-Tests und Build erfolgreich. Vollständiger unveränderter 100er-Lauf: 31 sauber, 15 mit Fehlern, 54 Ladefehler; Excalidraw jetzt ohne Ereignisfehler. Alle 100 Versionen und Original-Asset-Hashes erneut identisch; zweiter Rohdaten-Zwischenstand nur im ignorierten Cache gesichert.
 
+- Die ältere öffentliche `request`-API nutzt jetzt denselben realen HTTP-Transport wie `requestUrl` und liefert dessen Text zurück. Zwei Regressionen erst rot, danach 655/655 Tests und Build erfolgreich; Browser-/native Transportwahl, HTTP-Fehler, `throw: false` und Netzfehler geprüft. LiveSync weiterhin ohne Ereignisfehler; Editing Toolbar und Code Styler bleiben an anderen Host-Lücken hängen. Keine neue Netzwerkberechtigung.
+
 ### Blockiert / braucht Freigabe
 
 - Eine Lösung, die unrestricted Node/fs/Prozess-/Serverzugriff, globale Installationen, bezahlte APIs oder Veröffentlichung voraussetzt, ist nicht freigegeben. Andere sichere Lücken werden währenddessen weiterbearbeitet.

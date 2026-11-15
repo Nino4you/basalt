@@ -1960,6 +1960,7 @@ export function createObsidianApi(
     hexToArrayBuffer,
     getBlobArrayBuffer,
     requestUrl,
+    request: (input: RequestUrlParam | string): Promise<string> => requestUrl(input).text,
     parseYaml,
     stringifyYaml,
     getFrontMatterInfo,
