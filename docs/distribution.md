@@ -14,10 +14,17 @@ is sent.
   into the new version. A `.deb` asks for the administrator password; the Windows installer runs
   without questions. If the release has no `latest.json` or Basalt was built from source, the
   update is only announced with a download link.
-- **Android and the browser demo:** one request to
-  `api.github.com/repos/Nino4you/basalt/releases/latest`; a newer release is announced with a
-  link to its GitHub page. Installing stays manual, so every download can be verified against the
-  signing fingerprints in the README.
+- **Android:** one request to `api.github.com/repos/Nino4you/basalt/releases/latest`. When the
+  release has `Basalt_<version>_android-universal.apk`, "Install" downloads it inside the app,
+  checks that it is Basalt in exactly that version and signed with the same certificate as the
+  installed app, and hands it to Android's installer, which asks to confirm (the first time
+  Android also asks to allow installs from Basalt). An APK from another source (F-Droid, a
+  debug build) has another certificate; Basalt then refuses and points to that source.
+  Builds made with `BASALT_ANDROID_STORE=1 node tools/patch_android.mjs` have no installer and
+  no `REQUEST_INSTALL_PACKAGES` permission, as Google Play requires; they only link to the
+  release.
+- **Browser demo:** the same request; a newer release is announced with a link to its GitHub
+  page.
 
 ## Store listing metadata
 
@@ -53,7 +60,8 @@ F-Droid builds apps from source on its own servers. To get Basalt included:
 ## Google Play
 
 1. Create the app in the Play Console with the package name `io.github.nino4you.basalt`.
-2. Upload the release AAB from the release workflow (the APK is not accepted for new apps) and
+2. Build with `BASALT_ANDROID_STORE=1` set for `node tools/patch_android.mjs` (no in-app
+   installer, see above), then upload the release AAB from the release workflow (the APK is not accepted for new apps) and
    enroll in Play App Signing; the upload key can stay the release key from
    `docs/release-signing.md`.
 3. Fill in the content rating, data safety (Basalt collects no data; network access is used

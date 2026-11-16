@@ -59,7 +59,7 @@ export function findConflicts(
 ): Conflict[] {
   const conflicts: Conflict[] = [];
   for (const path of files) {
-    if (!/\.(md|canvas)$/i.test(path)) continue;
+    if (!/\.(md|canvas|base)$/i.test(path)) continue;
     const copy = conflictCopyOf(path);
     if (copy) {
       conflicts.push({ kind: "copy", path, ...copy });

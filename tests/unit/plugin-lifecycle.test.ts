@@ -167,3 +167,16 @@ describe("compiled plugin activation (no external bundle loader)", () => {
     );
   });
 });
+
+it("registers hover link sources for the plugin's lifetime", () => {
+  const workspace = {
+    registerHoverLinkSource: vi.fn(),
+    unregisterHoverLinkSource: vi.fn(),
+  };
+  const plugin = new Plugin({ workspace }, { id: "recent", name: "Recent", version: "1.0.0" });
+  plugin.load();
+  plugin.registerHoverLinkSource("recent", { display: "Recent files", defaultMod: true });
+  expect(workspace.registerHoverLinkSource).toHaveBeenCalledWith("recent", { display: "Recent files", defaultMod: true });
+  plugin.unload();
+  expect(workspace.unregisterHoverLinkSource).toHaveBeenCalledWith("recent");
+});

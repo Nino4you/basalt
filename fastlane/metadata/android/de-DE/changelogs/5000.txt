@@ -1,0 +1,1 @@
+Ein Tablet-Layout mit schwebender Leiste und Karten, Bases (.base) als Tabellen und Karten, Einbettungen von Notizen und Abschnitten im Editor, der Notiz-Composer, Teilen aus anderen Apps an Basalt und Updates, die sich in der App installieren.

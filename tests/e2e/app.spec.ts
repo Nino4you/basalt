@@ -132,58 +132,86 @@ test("renders inline and block formulas in reading view", async ({ page }) => {
   await page.getByRole("button", { name: "Leseansicht", exact: true }).click();
   await expect(page.locator("#preview .katex").first()).toBeVisible();
   await expect(page.locator("#preview .katex-display")).toContainText("1");
-  await expect(page.locator("#preview code", { hasText: "$inline code$" })).toBeVisible();
+  await expect(
+    page.locator("#preview code", { hasText: "$inline code$" }),
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });
 
-test("renders Mermaid diagrams without replacing the source on failure", async ({ page }) => {
+test("renders Mermaid diagrams without replacing the source on failure", async ({
+  page,
+}) => {
   await page.goto("/");
   await createNote(page, "Netzplan");
   await editorOf(page).fill(
     "```mermaid\nflowchart LR\n  Client -->|HTTPS| Server\n```\n\n```mermaid\nnot a diagram\n```",
   );
   await page.getByRole("button", { name: "Leseansicht", exact: true }).click();
-  await expect(page.locator("#preview .mermaid-diagram svg").first()).toBeVisible({ timeout: 20_000 });
-  await expect(page.locator("#preview .mermaid-error")).toContainText("not a diagram");
+  await expect(
+    page.locator("#preview .mermaid-diagram svg").first(),
+  ).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("#preview .mermaid-error")).toContainText(
+    "not a diagram",
+  );
 });
 
-test("preserves diagram source when its lazy renderer cannot be downloaded", async ({ page }) => {
+test("preserves diagram source when its lazy renderer cannot be downloaded", async ({
+  page,
+}) => {
   const errors: string[] = [];
-  page.on("pageerror", error => errors.push(error.message));
+  page.on("pageerror", (error) => errors.push(error.message));
   let blocked = 0;
-  await page.route("**/mermaid.js*", route => { blocked++; return route.abort(); });
+  await page.route("**/mermaid.js*", (route) => {
+    blocked++;
+    return route.abort();
+  });
   await page.goto("/");
   await createNote(page, "Offline-Netzplan");
-  await editorOf(page).fill("```mermaid\nflowchart LR\n  Client --> Server\n```");
+  await editorOf(page).fill(
+    "```mermaid\nflowchart LR\n  Client --> Server\n```",
+  );
   await page.getByRole("button", { name: "Leseansicht", exact: true }).click();
-  await expect(page.locator("#preview .mermaid-error")).toContainText("Client --> Server");
+  await expect(page.locator("#preview .mermaid-error")).toContainText(
+    "Client --> Server",
+  );
   expect(blocked).toBeGreaterThan(0);
   expect(errors).toEqual([]);
 });
 
 test("inserts a vault template with title and date", async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem("basalt-demo-v1", JSON.stringify({
-      "Meine Notiz.md": "Anfang\n",
-      "_templates/Seitenvorlage.md": "# {{title}}\nDatum: {{date:YYYY-MM-DD}}\n",
-    }));
-    localStorage.setItem('basalt-workspace:"basalt-demo-v1"', JSON.stringify({
-      tabs: [{ path: "Meine Notiz.md", reading: false }],
-      active: 0,
-    }));
+    localStorage.setItem(
+      "basalt-demo-v1",
+      JSON.stringify({
+        "Meine Notiz.md": "Anfang\n",
+        "_templates/Seitenvorlage.md":
+          "# {{title}}\nDatum: {{date:YYYY-MM-DD}}\n",
+      }),
+    );
+    localStorage.setItem(
+      'basalt-workspace:"basalt-demo-v1"',
+      JSON.stringify({
+        tabs: [{ path: "Meine Notiz.md", reading: false }],
+        active: 0,
+      }),
+    );
   });
   await page.goto("/");
   await expect(page.locator("#tab-name")).toHaveText("Meine Notiz");
   await editorOf(page).click();
   await page.keyboard.press("ControlOrMeta+End");
   await page.keyboard.press("ControlOrMeta+p");
-  await page.getByRole("textbox", { name: "Befehlspalette" }).fill("Vorlage einfügen");
+  await page
+    .getByRole("textbox", { name: "Befehlspalette" })
+    .fill("Vorlage einfügen");
   await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog", { name: "Vorlage einfügen" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Seitenvorlage.md" }).click();
   await expect(editorOf(page)).toContainText("Anfang");
-  await expect(editorOf(page)).toContainText(/Meine Notiz\s*Datum: \d{4}-\d{2}-\d{2}/);
+  await expect(editorOf(page)).toContainText(
+    /Meine Notiz\s*Datum: \d{4}-\d{2}-\d{2}/,
+  );
 });
 
 test("folds solution callouts and opens them on click", async ({ page }) => {
@@ -196,7 +224,9 @@ test("folds solution callouts and opens them on click", async ({ page }) => {
   await expect(callout.locator(".callout-content")).toBeHidden();
   await callout.locator(".callout-title").click();
   await expect(callout).not.toHaveClass(/is-collapsed/);
-  await expect(callout.locator(".callout-content")).toContainText("Versteckter Rechenweg");
+  await expect(callout.locator(".callout-content")).toContainText(
+    "Versteckter Rechenweg",
+  );
 });
 
 test("toggles reading-view tasks from the keyboard", async ({ page }) => {
@@ -220,15 +250,22 @@ test("toggles reading-view tasks from the keyboard", async ({ page }) => {
 
 test("opens binary attachments outside the text editor", async ({ page }) => {
   test.skip(isMobile(), "The explorer lives in the mobile drawer.");
-  await page.addInitScript(() => localStorage.setItem("basalt-demo-v1", JSON.stringify({
-    "Willkommen.md": "# Willkommen",
-    "Handbuch.pdf": "%PDF-1.4",
-  })));
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "basalt-demo-v1",
+      JSON.stringify({
+        "Willkommen.md": "# Willkommen",
+        "Handbuch.pdf": "%PDF-1.4",
+      }),
+    ),
+  );
   await page.goto("/");
   await page.getByRole("treeitem", { name: /Handbuch\.pdf/ }).click();
   await expect(page.locator("#tab-name")).toHaveText("Handbuch.pdf");
   await expect(page.locator(".attachment-host")).toBeVisible();
-  await expect(page.locator(".attachment-host")).toContainText("nur in der nativen App");
+  await expect(page.locator(".attachment-host")).toContainText(
+    "nur in der nativen App",
+  );
   await expect(page.locator("#editor")).toBeHidden();
   await expect(page.locator("#preview")).toBeHidden();
 });
@@ -507,19 +544,33 @@ test("phones show bottom-docked panels in the right drawer", async ({
 
 test("phones fold lower-left views into the left drawer", async ({ page }) => {
   test.skip(!isMobile(), "phone layout only");
-  await page.addInitScript(() => localStorage.setItem("basalt-layout", JSON.stringify({
-    dock: {
-      left: { panels: ["files", "search"], active: "files" },
-      "left-bottom": { panels: ["bookmarks"], active: "bookmarks" },
-    },
-  })));
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "basalt-layout",
+      JSON.stringify({
+        dock: {
+          left: { panels: ["files", "search"], active: "files" },
+          "left-bottom": { panels: ["bookmarks"], active: "bookmarks" },
+        },
+      }),
+    ),
+  );
   await page.goto("/");
   await expect(page.locator("#tab-name")).toHaveText("Willkommen");
-  await page.getByRole("button", { name: "Seitenleiste öffnen", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Seitenleiste öffnen", exact: true })
+    .click();
   await expect(page.locator("#left-bottom-split")).toBeHidden();
-  await expect(page.getByRole("separator", { name: "Höhe links unten" })).toBeHidden();
-  await page.locator("#left-split").getByRole("tab", { name: "Lesezeichen" }).click();
-  await expect(page.locator("#left-split").getByRole("tabpanel", { name: "Lesezeichen" })).toBeVisible();
+  await expect(
+    page.getByRole("separator", { name: "Höhe links unten" }),
+  ).toBeHidden();
+  await page
+    .locator("#left-split")
+    .getByRole("tab", { name: "Lesezeichen" })
+    .click();
+  await expect(
+    page.locator("#left-split").getByRole("tabpanel", { name: "Lesezeichen" }),
+  ).toBeVisible();
 });
 
 test("phones show one editor group of a split workspace at a time", async ({
@@ -561,76 +612,136 @@ test.describe("desktop workspace", () => {
     test.skip(isMobile(), "desktop layout only");
   });
 
-  test("docks views above the vault name and persists their resizable height", async ({ page }) => {
+  test("docks views above the vault name and persists their resizable height", async ({
+    page,
+  }) => {
     await page.goto("/");
     await expect(page.locator("#tab-name")).toHaveText("Willkommen");
     const lower = page.locator("#left-bottom-split");
     await expect(lower).toBeVisible();
     expect((await lower.boundingBox())!.height).toBeLessThan(80);
-    await dragPanel(page, page.getByRole("tab", { name: "Lesezeichen" }), lower);
-    await expect(lower.getByRole("tabpanel", { name: "Lesezeichen" })).toBeVisible();
-    await expect(page.locator('#left-split > .workspace-split-inner > [data-dock-area="left"]').getByRole("tabpanel", { name: "Dateiexplorer" })).toBeVisible();
+    await dragPanel(
+      page,
+      page.getByRole("tab", { name: "Lesezeichen" }),
+      lower,
+    );
+    await expect(
+      lower.getByRole("tabpanel", { name: "Lesezeichen" }),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator(
+          '#left-split > .workspace-split-inner > [data-dock-area="left"]',
+        )
+        .getByRole("tabpanel", { name: "Dateiexplorer" }),
+    ).toBeVisible();
     const initial = (await lower.boundingBox())!;
     expect(initial.height).toBeCloseTo(180, 0);
     const separator = page.getByRole("separator", { name: "Höhe links unten" });
     const handle = (await separator.boundingBox())!;
-    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await page.mouse.move(
+      handle.x + handle.width / 2,
+      handle.y + handle.height / 2,
+    );
     await page.mouse.down();
-    await page.mouse.move(handle.x + handle.width / 2, handle.y - 65, { steps: 5 });
+    await page.mouse.move(handle.x + handle.width / 2, handle.y - 65, {
+      steps: 5,
+    });
     await page.mouse.up();
-    expect((await lower.boundingBox())!.height).toBeGreaterThan(initial.height + 50);
+    expect((await lower.boundingBox())!.height).toBeGreaterThan(
+      initial.height + 50,
+    );
     await separator.focus();
     await page.keyboard.press("ArrowUp");
     const resized = (await lower.boundingBox())!.height;
     await page.reload();
-    await expect(lower.getByRole("tabpanel", { name: "Lesezeichen" })).toBeVisible();
+    await expect(
+      lower.getByRole("tabpanel", { name: "Lesezeichen" }),
+    ).toBeVisible();
     expect((await lower.boundingBox())!.height).toBeCloseTo(resized, 0);
     const vault = (await page.locator("#choose-vault").boundingBox())!;
-    expect((await lower.boundingBox())!.y + resized).toBeLessThanOrEqual(vault.y);
+    expect((await lower.boundingBox())!.y + resized).toBeLessThanOrEqual(
+      vault.y,
+    );
     await page.setViewportSize({ width: 1440, height: 400 });
     await expect(page.locator("#choose-vault")).toBeInViewport();
     expect((await lower.boundingBox())!.height).toBeLessThanOrEqual(220);
     await page.screenshot({ path: "test-results/lower-left-dock.png" });
   });
 
-  test("resizes the lower-left dock from its visible height after the viewport shrinks", async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem("basalt-layout", JSON.stringify({
-      leftBottomHeight: 600,
-      dock: { "left-bottom": { panels: ["bookmarks"], active: "bookmarks" } },
-    })));
+  test("resizes the lower-left dock from its visible height after the viewport shrinks", async ({
+    page,
+  }) => {
+    await page.addInitScript(() =>
+      localStorage.setItem(
+        "basalt-layout",
+        JSON.stringify({
+          leftBottomHeight: 600,
+          dock: {
+            "left-bottom": { panels: ["bookmarks"], active: "bookmarks" },
+          },
+        }),
+      ),
+    );
     await page.goto("/");
     const lower = page.locator("#left-bottom-split");
-    await expect(lower.getByRole("tabpanel", { name: "Lesezeichen" })).toBeVisible();
+    await expect(
+      lower.getByRole("tabpanel", { name: "Lesezeichen" }),
+    ).toBeVisible();
     await page.setViewportSize({ width: 1440, height: 480 });
     const before = (await lower.boundingBox())!.height;
     const separator = page.getByRole("separator", { name: "Höhe links unten" });
     const handle = (await separator.boundingBox())!;
-    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await page.mouse.move(
+      handle.x + handle.width / 2,
+      handle.y + handle.height / 2,
+    );
     await page.mouse.down();
-    await page.mouse.move(handle.x + handle.width / 2, handle.y + 45, { steps: 5 });
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + 45, {
+      steps: 5,
+    });
     await page.mouse.up();
     expect((await lower.boundingBox())!.height).toBeLessThan(before - 30);
   });
 
-  test("reports the lower-left separator's effective range after viewport changes", async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem("basalt-layout", JSON.stringify({
-      leftBottomHeight: 600,
-      dock: { "left-bottom": { panels: ["bookmarks"], active: "bookmarks" } },
-    })));
+  test("reports the lower-left separator's effective range after viewport changes", async ({
+    page,
+  }) => {
+    await page.addInitScript(() =>
+      localStorage.setItem(
+        "basalt-layout",
+        JSON.stringify({
+          leftBottomHeight: 600,
+          dock: {
+            "left-bottom": { panels: ["bookmarks"], active: "bookmarks" },
+          },
+        }),
+      ),
+    );
     await page.goto("/");
     const lower = page.locator("#left-bottom-split");
     const separator = page.getByRole("separator", { name: "Höhe links unten" });
-    await expect(lower.getByRole("tabpanel", { name: "Lesezeichen" })).toBeVisible();
+    await expect(
+      lower.getByRole("tabpanel", { name: "Lesezeichen" }),
+    ).toBeVisible();
     await page.setViewportSize({ width: 1440, height: 400 });
     const before = Math.round((await lower.boundingBox())!.height);
-    const max = Math.max(80, Math.round((await page.locator("#left-split").boundingBox())!.height - 180));
+    const max = Math.max(
+      80,
+      Math.round(
+        (await page.locator("#left-split").boundingBox())!.height - 180,
+      ),
+    );
     await expect(separator).toHaveAttribute("aria-valuemin", "80");
     await expect(separator).toHaveAttribute("aria-valuemax", String(max));
     await expect(separator).toHaveAttribute("aria-valuenow", String(before));
     await separator.focus();
     await page.keyboard.press("ArrowDown");
     expect((await lower.boundingBox())!.height).toBeCloseTo(before - 10, 0);
-    await expect(separator).toHaveAttribute("aria-valuenow", String(before - 10));
+    await expect(separator).toHaveAttribute(
+      "aria-valuenow",
+      String(before - 10),
+    );
   });
 
   test("docks side panels anywhere by drag and drop and keeps the layout", async ({
@@ -752,7 +863,9 @@ test.describe("desktop workspace", () => {
     expect(
       await left
         .getByRole("tab")
-        .evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute("aria-label"))),
+        .evaluateAll((tabs) =>
+          tabs.map((tab) => tab.getAttribute("aria-label")),
+        ),
     ).toEqual(["Dateiexplorer", "Suche"]);
     await expect(left.getByRole("tabpanel", { name: "Suche" })).toBeVisible();
 
@@ -1141,7 +1254,9 @@ test.describe("desktop workspace", () => {
     expect(errors).toEqual([]);
   });
 
-  test("renames files while keeping unsaved edits and their extension", async ({ page }) => {
+  test("renames files while keeping unsaved edits and their extension", async ({
+    page,
+  }) => {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto("/");
@@ -1164,12 +1279,18 @@ test.describe("desktop workspace", () => {
     await page.getByLabel("Neuer Dateiname").fill("Entwurf");
     await page.getByRole("button", { name: "Umbenennen" }).click();
     await expect(page.locator("#tab-name")).toHaveText("Entwurf");
-    await expect(page.locator(".view-header-breadcrumb")).toHaveText("Projekte/");
-    await expect.poll(stored).toContainEqual([
-      "Projekte/Entwurf.md",
-      expect.stringContaining("Noch nicht gespeichert"),
-    ]);
-    expect((await stored()).map(([path]) => path)).not.toContain("Projekte/Plan.md");
+    await expect(page.locator(".view-header-breadcrumb")).toHaveText(
+      "Projekte/",
+    );
+    await expect
+      .poll(stored)
+      .toContainEqual([
+        "Projekte/Entwurf.md",
+        expect.stringContaining("Noch nicht gespeichert"),
+      ]);
+    expect((await stored()).map(([path]) => path)).not.toContain(
+      "Projekte/Plan.md",
+    );
 
     // A name can never escape its folder.
     await file("Entwurf").click({ button: "right" });
@@ -1177,7 +1298,9 @@ test.describe("desktop workspace", () => {
     await page.getByLabel("Neuer Dateiname").fill("../Ausbruch");
     await page.getByRole("button", { name: "Umbenennen" }).click();
     await expect(page.getByRole("alert")).toContainText("Ordnerpfade");
-    expect((await stored()).map(([path]) => path)).toContain("Projekte/Entwurf.md");
+    expect((await stored()).map(([path]) => path)).toContain(
+      "Projekte/Entwurf.md",
+    );
 
     await page.getByRole("button", { name: "Abbrechen" }).click();
     await page.keyboard.press("F2");
@@ -1420,7 +1543,9 @@ test.describe("desktop canvas", () => {
     );
 
     // Focusing the note leaves the canvas visible, read-only.
-    await left.locator(".mod-mirror .cm-line", { hasText: "Manche Ideen" }).click();
+    await left
+      .locator(".mod-mirror .cm-line", { hasText: "Manche Ideen" })
+      .click();
     await expect(left).toHaveClass(/is-active/);
     const mirrored = right.locator(".mod-mirror .canvas-wrapper");
     await expect(mirrored).toBeVisible();
@@ -1443,7 +1568,9 @@ test.describe("desktop canvas", () => {
     await expect(left.locator(".mod-mirror")).toContainText(
       "Platz für deine Gedanken.",
     );
-    await page.locator(".mod-root .workspace-tab-header", { hasText: "Willkommen" }).click();
+    await page
+      .locator(".mod-root .workspace-tab-header", { hasText: "Willkommen" })
+      .click();
     await expect(left).toHaveClass(/is-active/);
     await page.locator(".nav-file-title", { hasText: "Ideenboard" }).click();
     await expect(left.locator("#canvas-view")).toContainText(card);
@@ -1662,4 +1789,37 @@ test("graph view shows linked notes and opens them", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(page.locator("#tab-name")).toHaveText("Plugins");
   expect(errors).toEqual([]);
+});
+
+test("ribbon actions are reordered by dragging with the mouse", async ({
+  page,
+}) => {
+  test.skip(test.info().project.name !== "desktop", "mouse ribbon");
+  await page.goto("/");
+  const ribbon = page.locator(".workspace-ribbon");
+  const settings = ribbon.getByRole("button", {
+    name: "Einstellungen",
+    exact: true,
+  });
+  const theme = ribbon.getByRole("button", {
+    name: "Farbschema wechseln",
+    exact: true,
+  });
+  const from = await settings.boundingBox();
+  const to = await theme.boundingBox();
+  await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to!.x + to!.width / 2, to!.y + 2, { steps: 8 });
+  await page.mouse.up();
+  const order = await page.evaluate(() =>
+    [...document.querySelectorAll(".side-dock-settings > [data-command]")].map(
+      (el) => el.getAttribute("data-command"),
+    ),
+  );
+  expect(order).toEqual(["settings", "toggle-theme"]);
+  // The drag did not open the settings.
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // A plain click still does.
+  await settings.click();
+  await expect(page.getByRole("dialog")).toBeVisible();
 });

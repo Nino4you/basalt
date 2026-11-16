@@ -1,4 +1,5 @@
 import { getLocale } from "../i18n";
+import { API_VERSION } from "./api-version";
 import { StateEffect, StateField } from "@codemirror/state";
 import DOMPurify from "dompurify";
 import {
@@ -26,7 +27,13 @@ import {
   stringifyYaml,
 } from "./frontmatter";
 import { Plugin } from "./plugin";
-import { MarkdownView, Workspace, WorkspaceLeaf, WorkspaceSplit } from "./workspace";
+import {
+  MarkdownView,
+  Workspace,
+  WorkspaceLeaf,
+  WorkspaceSidedock,
+  WorkspaceSplit,
+} from "./workspace";
 
 export interface DomElementInfo {
   cls?: string | string[];
@@ -158,7 +165,6 @@ export interface RequestUrlResponsePromise extends Promise<RequestUrlResponse> {
 }
 
 const customIcons = new Map<string, string>();
-const API_VERSION = "1.15.0";
 
 /** A plugin-registered SVG, or a built-in lucide icon, as a detached element. */
 function iconElement(iconId: string): SVGSVGElement | null {
@@ -1831,6 +1837,7 @@ export function createObsidianApi(
     MarkdownView,
     Workspace,
     WorkspaceSplit,
+    WorkspaceSidedock,
     WorkspaceLeaf,
     Scope,
     Editor,

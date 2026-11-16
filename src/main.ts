@@ -2,10 +2,12 @@ import "./styles/app.css";
 import "./styles/editor.css";
 import "./styles/components.css";
 import "./styles/canvas.css";
+import "./styles/bases.css";
 import "./styles/graph.css";
 import "./styles/recovery.css";
 import "./styles/plugin-catalog.css";
 import "./styles/print.css";
+import "./styles/tablet.css";
 import { App } from "./app/app";
 import { installAndroidInsets } from "./ui/android-insets";
 

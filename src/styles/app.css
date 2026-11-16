@@ -503,8 +503,29 @@ body.hide-ribbon .sidebar-toggle-button.mod-inline {
 }
 .workspace-leaf-content:not([data-pane="files"]):not([data-pane="search"]):not(
     [data-pane="graph"]
-  ) {
+  ):not(.mod-plugin) {
   padding: 8px 8px 32px;
+}
+
+/* Sidebar views that plugins open through getLeftLeaf / getRightLeaf. */
+.workspace-leaf-content.mod-plugin {
+  padding: 0;
+  overflow: hidden;
+}
+.workspace-leaf-content.mod-plugin > .workspace-leaf {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.workspace-leaf-content.mod-plugin .view-content {
+  background: transparent;
+}
+.workspace-leaf-content.mod-plugin .view-actions:empty {
+  display: none;
+}
+.workspace-leaf-content.mod-plugin .view-content-inner {
+  padding: 4px 8px 32px;
 }
 
 .workspace-sidedock-vault-profile {
@@ -1678,26 +1699,7 @@ body.is-touch.is-editing .status-bar {
   }
 }
 
-/* Tablets keep the desktop layout, with targets sized for a finger. */
-body.is-tablet .clickable-icon {
-  min-width: 36px;
-  min-height: 36px;
-}
-body.is-tablet .workspace-ribbon .clickable-icon {
-  width: 40px;
-  height: 40px;
-}
-body.is-tablet .tree-item-self {
-  min-height: 34px;
-}
-body.is-tablet .workspace-tab-header-inner-close-button {
-  width: 26px;
-  height: 26px;
-}
-body.is-tablet .workspace-resize-handle {
-  width: 16px;
-  margin: 0 -8px;
-}
+/* Tablets: see tablet.css. */
 
 /* ── mobile ───────────────────────────────────────────────────────────────── */
 

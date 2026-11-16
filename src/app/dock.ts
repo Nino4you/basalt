@@ -53,6 +53,8 @@ function emptyDock(): DockLayout {
 export function normalizeDock(
   raw: unknown,
   specs: readonly PanelSpec[],
+  /** Panels that come and go at runtime (plugin views) keep their stored place. */
+  isDynamic: (id: string) => boolean = () => false,
 ): DockLayout {
   const known = new Map(specs.map((spec) => [spec.id, spec]));
   const layout = emptyDock();
@@ -65,7 +67,11 @@ export function normalizeDock(
     const { panels, active } = slot as { panels?: unknown; active?: unknown };
     if (Array.isArray(panels))
       for (const id of panels)
-        if (typeof id === "string" && known.has(id) && !seen.has(id)) {
+        if (
+          typeof id === "string" &&
+          (known.has(id) || isDynamic(id)) &&
+          !seen.has(id)
+        ) {
           seen.add(id);
           layout[area].panels.push(id);
         }

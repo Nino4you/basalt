@@ -63,11 +63,26 @@ will get a response once the report has been reviewed.
 - The update check is off by default. Turned on (or with "Check now" in Settings → General) it
   makes one request at most once a day: the desktop app reads `latest.json` from the latest
   GitHub release, Android and the demo ask `api.github.com/repos/Nino4you/basalt/releases/latest`.
-  Nothing is downloaded or installed until the user presses "Install and restart" (desktop only).
+  Nothing is downloaded or installed until the user presses "Install and restart" (desktop) or
+  "Install" (Android).
   The desktop app then accepts only a package whose minisign signature matches the public key in
   `src-tauri/tauri.conf.json` and was made for the announced version, so a tampered manifest
   cannot install foreign code or downgrade to an older release. The updater key exists only as a
   GitHub secret and in the maintainer's offline backup.
+- On Android the activity (patched in by `tools/patch_android.mjs`) downloads only from
+  `https://github.com/Nino4you/basalt/releases/download/` (HTTPS redirects only, 256 MiB cap)
+  and accepts the APK only if its package name is Basalt's, its version name is exactly the
+  announced version and its signing certificate is one of the installed app's certificates. It
+  then hands the APK to the system `PackageInstaller`, which asks the user to confirm and
+  enforces the same signature and no downgrade again. The install result arrives through a
+  package-bound broadcast that also carries a per-process random token, so other apps cannot
+  inject installer confirmations. Builds with `BASALT_ANDROID_STORE=1` (Google Play) leave out
+  the installer and the `REQUEST_INSTALL_PACKAGES` permission.
+- Content shared to Basalt from other Android apps ("Share" → Basalt) is read by the activity
+  only from `content://` URIs of other apps (no `file://`, nothing from Basalt's own providers),
+  at most 20 files and 32 MiB per share. Nothing is written until the user picks "Save as new
+  note" or "Append"; files go through the normal exclusive attachment import, with names reduced
+  to a plain file name.
 - The plugin catalog (Settings → Community plugins) downloads the community plugin list and
   download counts from `raw.githubusercontent.com/obsidianmd/obsidian-releases`, and plugin
   releases from `github.com/<owner>/<repo>/releases/latest/download/`, through the same

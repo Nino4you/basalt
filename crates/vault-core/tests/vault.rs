@@ -203,6 +203,7 @@ fn lists_only_visible_documents_in_sorted_order() {
         "image.png",
         "Board.canvas",
         "Notizen/Board.CANVAS",
+        "Bücher.base",
         "data.json",
         ".hidden.md",
         ".obsidian/config.md",
@@ -213,6 +214,7 @@ fn lists_only_visible_documents_in_sorted_order() {
         f.vault().document_files().unwrap(),
         vec![
             path("Board.canvas"),
+            path("Bücher.base"),
             path("Notizen/Board.CANVAS"),
             path("Notizen/ä.MD"),
             path("z.md")
@@ -228,6 +230,8 @@ fn canvases_are_documents_but_not_searched_as_markdown() {
     assert!(path("Board.CANVAS").is_canvas());
     assert!(path("Board.canvas").is_document());
     assert!(!path("Board.canvas").is_markdown());
+    assert!(path("Books.BASE").is_base());
+    assert!(path("Books.base").is_document());
     let hits = search(&f.vault(), "basalt").unwrap();
     assert_eq!(hits.len(), 1);
     assert_eq!(hits[0].path, path("note.md"));

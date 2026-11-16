@@ -56,6 +56,8 @@ Tests against real third-party plugin bundles (e.g. `tests/e2e/iconize.spec.ts`,
 `excalidraw.spec.ts`) are skipped unless `BASALT_PLUGIN_DIRS` is set — bundle directories joined by
 the **platform** path delimiter (`;` on Windows, `:` on Unix; see `tests/helpers/plugin-fixtures.ts`).
 They never run in CI, so green tests are no proof of real-plugin compatibility.
+`node tools/plugin-survey/run.mjs` loads the top community plugins in bulk and ranks the API gaps
+they hit (see `docs/plugin-compatibility.md`); it also only runs against the browser demo.
 
 Coverage traps:
 
@@ -148,10 +150,11 @@ No UI framework: DOM is built with the `h()` / `icon()` helpers in `src/ui/dom.t
   views (explorer, search, side panels, reading view, switcher/command palette, settings).
 - `src/store.ts` — `NoteStore` serializes saves and keeps localStorage drafts that remember the
   original conflict base, so recovery cannot silently overwrite external changes.
-- `src/app/vault-index.ts` — in-memory link/tag/heading index and the search query parser
-  (`tag:`, `path:`, `file:`) behind backlinks, unlinked mentions, outgoing links, tags and
-  search. Frontmatter `aliases` are indexed for completion (`[[Note|Alias]]`), the quick
-  switcher and unlinked mentions; like in Obsidian, `[[Alias]]` alone does not resolve.
+- `src/app/vault-index.ts` — in-memory link/tag/heading index and search (query syntax in
+  `search-query.ts`: `tag:`, `path:`, `file:`, `line:`, `section:`, `task*:`, `/regex/`)
+  behind backlinks, unlinked mentions, outgoing links, tags and search. Frontmatter
+  `aliases` are indexed for completion (`[[Note|Alias]]`), the quick switcher and unlinked
+  mentions; like in Obsidian, `[[Alias]]` alone does not resolve.
   `LinkResolver`
   resolves links for any file list; `src/app/link-update.ts` compares resolution before and
   after a rename/move and rewrites only links whose target would change (wiki links, embeds,
@@ -170,6 +173,10 @@ No UI framework: DOM is built with the `h()` / `icon()` helpers in `src/ui/dom.t
   - Registered plugin code-block processors (`plugin-blocks.ts`) take precedence over the
     built-in Mermaid renderer; `MarkdownEditor.refreshPluginBlocks()` re-renders after plugin
     changes.
+  - Image, media and note embeds (`embeds.ts`) render through the reading view's
+    `RenderScope` (`src/app/embed-render.ts`, via `editor-embeds.ts`); plugin embeds win.
+    Sections/blocks are cut by `src/subpath.ts`; image object URLs are shared through
+    `image-cache.ts`, cleared on vault switch.
 - `src/app/rich-content.ts` — KaTeX/Mermaid are dynamically imported only when a note uses them,
   to keep vault opening fast; keep heavy renderers (also `pdf-runtime.ts`) out of the initial
   bundle.
@@ -184,9 +191,28 @@ No UI framework: DOM is built with the `h()` / `icon()` helpers in `src/ui/dom.t
   (Syncthing/Nextcloud/Dropbox conflict copies and Git markers), `vault-styles.ts` (themes and
   CSS snippets from `Basalt/Config`), `print-export.ts` (print/PDF, standalone HTML) and
   `update-check.ts` (opt-in update check; the desktop app installs signed updates through
-  `src-tauri/src/updates.rs`, Android only links to the release) in `src/app/`; `properties.ts` +
+  `src-tauri/src/updates.rs`, Android through the patched activity's installer bridge) and
+  `android-share.ts` + `share-dialog.ts` (Android "Share" → Basalt) in `src/app/`; `properties.ts` +
   `properties-model.ts` (frontmatter fields, edited through the `yaml` document model),
   `footnotes.ts` and `attachments.ts` in `src/editor/`. Vim key bindings are a lazy chunk.
+- `src/bases/` — Bases (`.base`): `model.ts` reads the YAML (filters, formulas, display names,
+  views) and edits only the `sort` lines of a view; `expr.ts` is the filter/formula language
+  (parser + evaluator, after the public Bases docs); `query.ts` runs a view; `view.ts` renders
+  table and cards. `.base` is a text document like `.canvas` (`VaultPath::is_document`), saved
+  through `NoteStore`.
+- Layouts: `body.is-mobile` (phones, `PHONE_QUERY`), `body.is-tablet` (touch, wider) and the
+  desktop. Tablets turn the ribbon into a floating dock of icons (`App.renderRail`,
+  `tablet.css`), at the left or, with the `tabletDock` setting, at the bottom
+  (`body.is-dock-bottom`, `App.railWidth` is then 0; the left card then opens above its dock
+  icon, `App.anchorLeftCard`, and is pulled down by its header to close). Dock (and desktop
+  ribbon) icons are reordered by dragging (`dock-reorder.ts`: mouse at once, touch after a long
+  press); the actions' order is the `dockOrder` setting (`dock-order.ts`), the views follow the
+  left dock area. Their sidebars float as cards (`App.floating`, both may be open; no backdrop,
+  an outside tap closes them) unless pinned (`layout.leftPinned`/`rightPinned`), and a pinned
+  one docks only while the note keeps `NOTE_MIN_WIDTH` (`sidebarSheets` in `src/ui/device.ts`).
+  `src/app/sheet-gestures.ts` makes cards follow the finger. Phones keep the one-at-a-time
+  `drawer`. `tests/e2e/tablet.spec.ts` covers both orientations. Focus mode (`body.is-focus-mode`)
+  hides everything but the note on any layout.
 - `src/canvas/` — JSON Canvas 1.0 (`.canvas`). Parsing keeps unknown fields so files written by
   other apps round-trip losslessly.
 - `src/markdown.ts` — `marked` rendering, always sanitized through DOMPurify; remote image

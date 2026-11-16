@@ -1,11 +1,21 @@
 import type { IconNode } from "lucide";
 import {
+  ArrowDown,
+  ArrowUp,
+  LayoutGrid,
+  Filter,
+  Map as MapIcon,
+  Regex,
+  Slice,
   ArrowLeft,
   ArrowLeftRight,
   ArrowRight,
   ArrowUpNarrowWide,
   ArrowUpRight,
   BadgeCheck,
+  Pin,
+  Maximize2,
+  Minimize2,
   Focus,
   FileCode,
   Printer,
@@ -24,6 +34,8 @@ import {
   Brackets,
   Bug,
   Calendar,
+  Merge,
+  Scissors,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -127,6 +139,7 @@ import {
   Zap,
   ZoomIn,
   ZoomOut,
+  AppWindow,
 } from "lucide";
 
 /**
@@ -138,12 +151,23 @@ import {
  * literal names a Lucide icon that is missing here.
  */
 export const hostIcons: Record<string, IconNode> = {
+  ArrowDown,
+  ArrowUp,
+  LayoutGrid,
+  Filter,
+  Map: MapIcon,
+  Regex,
+  Slice,
+  AppWindow,
   ArrowLeft,
   ArrowLeftRight,
   ArrowRight,
   ArrowUpNarrowWide,
   ArrowUpRight,
   BadgeCheck,
+  Pin,
+  Maximize2,
+  Minimize2,
   // Named as the window `focus` event, which the icon test cannot tell apart.
   Focus,
   FileCode,
@@ -163,6 +187,8 @@ export const hostIcons: Record<string, IconNode> = {
   Brackets,
   Bug,
   Calendar,
+  Merge,
+  Scissors,
   Check,
   ChevronDown,
   ChevronLeft,

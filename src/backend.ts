@@ -125,6 +125,12 @@ export function validateCanvasPath(path: string): string {
   return `${note.replace(/\.md$/i, "")}.canvas`;
 }
 
+/** Like `validateNotePath`, for database views (`.base`). */
+export function validateBasePath(path: string): string {
+  const note = validateNotePath(path.trim().replace(/\.base$/i, ""));
+  return `${note.replace(/\.md$/i, "")}.base`;
+}
+
 /** Versions the browser demo keeps per note; native vaults keep every one. */
 export const DEMO_VERSIONS = 20;
 

@@ -185,6 +185,7 @@ it.each([false, true])(
         empty: element(),
         pluginView: element(),
         canvasHost: element(),
+        baseHost: element(),
         attachmentHost: element(),
         editorEl: element(),
         previewEl: element(),
@@ -215,6 +216,7 @@ it.each([false, true])(
     );
     expect(context.shell.previewEl.hidden).toBe(!reading);
     expect(context.shell.editorEl.hidden).toBe(reading);
+    expect(context.shell.baseHost.hidden).toBe(true);
     expect(context.shell.canvasHost.hidden).toBe(true);
     expect(context.shell.attachmentHost.hidden).toBe(true);
     expect(context.compatibility.setActivePath).toHaveBeenCalledWith("Note.md");

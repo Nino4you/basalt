@@ -11,7 +11,7 @@ Obsidian vaults and selected Obsidian plugins.
 
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-blue.svg)](LICENSE)
 ![Platforms: Linux | Android](https://img.shields.io/badge/Platforms-Linux%20%7C%20Android-informational)
-![Status: preview](https://img.shields.io/badge/Status-Preview%200.4-orange)
+![Status: preview](https://img.shields.io/badge/Status-Preview%200.5-orange)
 
 [Website](https://nino4you.github.io/basalt/) · [Live demo](https://nino4you.github.io/basalt/demo/) ·
 [Features](#features) · [Installation](#installation) · [Plugins](#plugins) ·
@@ -38,8 +38,8 @@ Obsidian vaults and selected Obsidian plugins.
 **Writing**
 
 - CodeMirror 6 editor with live preview: Markdown syntax fades away, links and checkboxes are
-  clickable, and KaTeX math, Mermaid diagrams and tables render right in the editor. Tables
-  are edited cell by cell while the Markdown stays the source of truth.
+  clickable, and KaTeX math, Mermaid diagrams, tables, images and embedded notes render right
+  in the editor. Tables are edited cell by cell while the Markdown stays the source of truth.
 - Completion for `[[wiki links]]` (including `#headings`, `#^blocks` and note aliases) and
   `#tags`, page previews when hovering links, templates from a folder you choose (with title
   and Moment.js date placeholders), and a source mode.
@@ -48,21 +48,31 @@ Obsidian vaults and selected Obsidian plugins.
 - Paste or drop pictures and files into a note: they are stored in the attachment folder you
   choose and linked with `![[…]]`.
 - Optional Vim key bindings (`:w` saves).
-- Reading view with callouts, properties, footnotes, note embeds and syntax highlighting.
+- Embeds of whole notes, a single section (`![[Note#Heading]]`) or block (`![[Note#^id]]`), and
+  sized images (`![[photo.png|300]]` or `|300x200`), in live preview and reading view.
+- Reading view with callouts, properties, footnotes and syntax highlighting.
 - Print a note or save it as PDF (Linux), or export it as one self-contained HTML file.
 - PDFs, images, audio and video open in their own tabs; PDFs are rendered locally.
+- On Android, "Share" in other apps sends text, links, images and PDFs to Basalt as a new note
+  or appended to the open one.
 
 **Organizing**
 
 - File tree with folders, bookmarks, drag & drop and safe renaming that carries open tabs,
   bookmarks and unsaved changes along; links to a renamed or moved note are updated.
 - Backlinks with context, unlinked mentions that become links with one click, outgoing links,
-  tags, outline and full-text search (`tag:`, `path:`, `file:`, exclusion with `-`) with
-  search and replace across the vault.
+  tags, outline and full-text search (`tag:`, `path:`, `file:`, `line:`, `section:`, `task:`,
+  `task-todo:`, `task-done:`, `/regular expressions/`, exclusion with `-`) with search and
+  replace across the vault.
 - Daily notes with their own folder, date format (Moment.js style) and template, and commands
   to step to the previous or next one.
+- Note composer: merge a note into another (properties combined, links redirected, the source
+  goes to the trash) and extract a selection into a new linked note.
 - Graph view for the whole vault and as a local graph of the active note, with group colors.
 - Canvas in the open JSON Canvas format (`.canvas`) with text, note, link and group cards.
+- Bases (`.base`): database views over note properties as tables or cards, with filters,
+  formulas, sorting and grouping in the same YAML format as Obsidian Bases (see
+  [docs/bases.md](docs/bases.md)).
 - File recovery: every earlier version of a note or canvas and every deleted file can be
   compared with the current content and restored (command palette → "Open file recovery", or
   "Version history" in the file menu). Old backups are cleaned up after a period you choose.
@@ -74,14 +84,23 @@ Obsidian vaults and selected Obsidian plugins.
 
 - Tabs with their own history, split editors and freely dockable side views like in VS Code;
   the layout is saved per vault.
+- On the desktop a note or canvas can be opened in a window of its own (tab menu → "Open in
+  new window"); saves in one window show up in the other.
 - Quick switcher (Ctrl+O), command palette (Ctrl+P), full keyboard navigation and hotkeys you
   can change in the settings.
 - Light and dark theme with an accent color, plus Obsidian-style themes and CSS snippets from
-  the vault (`Basalt/Config/themes`, `Basalt/Config/snippets`); a dedicated phone layout with
-  drawers, a bottom navigation bar and a formatting toolbar.
+  the vault (`Basalt/Config/themes`, `Basalt/Config/snippets`).
+- A dedicated phone layout with drawers, a bottom navigation bar and a formatting toolbar.
+- A tablet layout of its own: a floating dock of icons at the left edge or at the bottom
+  (Settings → Appearance), reordered by long-pressing and dragging an icon; sidebars float over the note as cards (no dimming, a tap beside
+  one closes it) that follow the finger when dragged, and can be pinned beside the note when
+  there is room; finger-sized targets and a focus mode that leaves only the note.
 
 <p align="center">
   <img src="screenshots/02-mobile-dark.png" width="300" alt="Basalt on a phone: reading view with bottom navigation bar" />
+</p>
+<p align="center">
+  <img src="screenshots/03-tablet-dark.png" width="640" alt="Basalt on a tablet in landscape: navigation rail, files beside the note and the outline" />
 </p>
 
 ## Installation
@@ -113,12 +132,11 @@ data in the browser, not in real files.
 
 ## Status
 
-Basalt is a **preview (0.4)** and not yet a complete replacement for Obsidian. The core is
+Basalt is a **preview (0.5)** and not yet a complete replacement for Obsidian. The core is
 stable and tested, but some things are still missing:
 
-- no built-in sync (use a folder sync tool, see [docs/sync.md](docs/sync.md)); the desktop app
-  installs signed updates from Settings → General, Android updates are still a manual APK
-  download,
+- no built-in sync (use a folder sync tool, see [docs/sync.md](docs/sync.md)); the desktop app and
+  the Android APK install signed updates from Settings → General,
 - plugin compatibility only for selected plugins (see below),
 - backups of attachments have to be restored by hand (old backups are kept until you set a
   retention period in Settings → Files and links → Backups),
@@ -136,7 +154,8 @@ you enable each one in the settings.
 Settings → Community plugins installs them for you:
 
 - **Browse** the Obsidian community catalog. Plugins Basalt has checked are marked; all others
-  are untested and may work, partly work or fail visibly.
+  are untested and may work, partly work or fail visibly. Each plugin installs its latest release
+  or any earlier version you pick; releases that need a newer Obsidian API are marked.
 - **From GitHub** installs the latest release of any repository, such as your own plugin or a
   beta that is not in the catalog.
 - **From files** installs a plugin you built yourself from its `manifest.json`, `main.js` and

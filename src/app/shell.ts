@@ -20,6 +20,12 @@ export const PANELS = [
 ] as const satisfies readonly PanelSpec[];
 
 export type PanelId = (typeof PANELS)[number]["id"];
+/** A sidebar view that a plugin opened (`plugin:<view type>`). */
+export type PluginPanelId = `plugin:${string}`;
+export type DockPanelId = PanelId | PluginPanelId;
+
+export const isPluginPanel = (id: string): id is PluginPanelId =>
+  id.startsWith("plugin:");
 
 export const AREA_LABELS: Record<DockArea, string> = {
   left: t("Linke Seitenleiste"),
@@ -48,8 +54,37 @@ function commandButton(
   );
 }
 
+/**
+ * Title, pin and close button of a sidebar while it floats as a card on a
+ * tablet. The right one wraps the tab strip, which stays its title there.
+ */
+function sheetHeader(side: "left" | "right", title: HTMLElement | null) {
+  const button = (action: string, iconId: string, label: string) =>
+    h(
+      "button",
+      {
+        class: `clickable-icon sheet-${action}`,
+        label,
+        attrs: { type: "button" },
+        data: { sheetSide: side, sheetAction: action, tooltipPosition: "bottom" },
+      },
+      icon(iconId),
+    );
+  return h(
+    "div",
+    `sheet-header mod-${side}`,
+    title,
+    h(
+      "div",
+      "sheet-controls",
+      button("pin", "pin", t("Anpinnen")),
+      button("close", "x", t("Schließen")),
+    ),
+  );
+}
+
 /** Tab header of a dockable panel; it is moved between dock areas. */
-function panelTab(spec: PanelSpec): HTMLButtonElement {
+export function panelTab(spec: PanelSpec): HTMLButtonElement {
   return h(
     "button",
     {
@@ -67,7 +102,7 @@ function panelTab(spec: PanelSpec): HTMLButtonElement {
   );
 }
 
-function pane(spec: PanelSpec): HTMLElement {
+export function pane(spec: PanelSpec): HTMLElement {
   return h("div", {
     class: "workspace-leaf-content",
     label: spec.label,
@@ -139,6 +174,13 @@ export function buildShell(root: HTMLElement) {
     class: "side-dock-plugins",
     id: "plugin-ribbon",
   });
+  // Tablets turn the ribbon into a navigation rail: a new-note button and
+  // one labelled button per left-sidebar view (filled in by the app).
+  const railPanels = h("div", {
+    class: "side-dock-panels",
+    label: t("Ansichten"),
+    attrs: { role: "group" },
+  });
   const ribbon = h(
     "nav",
     { class: "workspace-ribbon side-dock-ribbon mod-left", label: t("Werkzeuge") },
@@ -149,6 +191,8 @@ export function buildShell(root: HTMLElement) {
       "sidebar-toggle-button mod-left",
       "right",
     ),
+    commandButton("new-note", "plus", t("Neue Notiz"), "rail-fab", "right"),
+    railPanels,
     h(
       "div",
       "side-dock-actions",
@@ -221,6 +265,7 @@ export function buildShell(root: HTMLElement) {
     docks["left-bottom"].content,
   );
   docks["left-bottom"].empty.textContent = t("Ansicht hier ablegen");
+  const leftSheetTitle = h("div", { class: "sheet-title" });
   const leftSplit = h(
     "aside",
     {
@@ -231,6 +276,7 @@ export function buildShell(root: HTMLElement) {
     h(
       "div",
       "workspace-split-inner",
+      sheetHeader("left", leftSheetTitle),
       docks.left.tabs,
       docks.left.content,
       leftBottomHandle,
@@ -267,6 +313,24 @@ export function buildShell(root: HTMLElement) {
     "toggle-reading",
     "book-open",
     t("Leseansicht"),
+  );
+  // Shown on touch screens; elsewhere the command and its menu entry do it.
+  const focusButton = commandButton(
+    "toggle-focus-mode",
+    "maximize-2",
+    t("Fokusmodus"),
+    "focus-mode-button",
+  );
+  // Leaves focus mode, the only control it keeps besides the note.
+  const focusExit = h(
+    "button",
+    {
+      class: "clickable-icon focus-mode-exit",
+      label: t("Fokusmodus beenden"),
+      attrs: { type: "button" },
+      data: { command: "toggle-focus-mode", tooltipPosition: "left" },
+    },
+    icon("minimize-2"),
   );
   const moreButton = h(
     "button",
@@ -328,6 +392,11 @@ export function buildShell(root: HTMLElement) {
     id: "canvas-host",
     attrs: { hidden: true },
   });
+  const baseHost = h("div", {
+    class: "base-host",
+    id: "base-host",
+    attrs: { hidden: true },
+  });
   const attachmentHost = h("div", {
     class: "attachment-host",
     id: "attachment-host",
@@ -341,6 +410,7 @@ export function buildShell(root: HTMLElement) {
     previewEl,
     pluginView,
     canvasHost,
+    baseHost,
     attachmentHost,
     empty,
   );
@@ -389,7 +459,7 @@ export function buildShell(root: HTMLElement) {
         h("div", "view-header-nav-buttons", backButton, forwardButton),
       ),
       h("div", "view-header-title-container", breadcrumb, title),
-      h("div", "view-actions", modeButton, moreButton),
+      h("div", "view-actions", focusButton, modeButton, moreButton),
     ),
     saveWarning,
     viewContent,
@@ -445,7 +515,12 @@ export function buildShell(root: HTMLElement) {
       id: "right-split",
       label: t("Rechte Seitenleiste"),
     },
-    h("div", "workspace-split-inner", docks.right.tabs, docks.right.content),
+    h(
+      "div",
+      "workspace-split-inner",
+      sheetHeader("right", docks.right.tabs),
+      docks.right.content,
+    ),
   );
 
   const leftHandle = h("div", {
@@ -562,11 +637,14 @@ export function buildShell(root: HTMLElement) {
       mobileNavbar,
     ),
     scrim,
+    focusExit,
   );
 
   return {
     workspace,
     ribbon,
+    railPanels,
+    leftSheetTitle,
     pluginRibbon,
     leftSplit,
     rightSplit,
@@ -589,6 +667,7 @@ export function buildShell(root: HTMLElement) {
     title,
     modeButton,
     moreButton,
+    focusExit,
     backButton,
     forwardButton,
     saveWarning,
@@ -598,6 +677,7 @@ export function buildShell(root: HTMLElement) {
     previewEl,
     pluginView,
     canvasHost,
+    baseHost,
     attachmentHost,
     empty,
     saveStatus,

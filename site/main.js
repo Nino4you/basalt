@@ -11,7 +11,7 @@ const de = {
   "nav.plugins": "Plugins",
   "nav.core": "Unter der Haube",
   "nav.download": "Download",
-  "hero.chip": "Vorschau 0.4 · Linux &amp; Android · Open Source",
+  "hero.chip": "Vorschau 0.5 · Linux &amp; Android · Open Source",
   "hero.title":
     'Ein ruhiger Ort für <span class="wikilink"><i>[[</i>vernetzte<i>]]</i></span> Gedanken.',
   "hero.lead":
@@ -29,10 +29,10 @@ const de = {
     "Notizen sind einfaches Markdown in einem Ordner deiner Wahl. Kein Konto, keine Cloud, keine Telemetrie.",
   "p2.title": "Passt zu deinem Vault",
   "p2.text":
-    "Wiki-Links, Tags, Frontmatter, Callouts, Einbettungen und Canvas-Dateien verhalten sich so, wie du es erwartest.",
+    "Wiki-Links, Tags, Frontmatter, Callouts, Einbettungen, Canvas-Dateien und Bases verhalten sich so, wie du es erwartest.",
   "p3.title": "Gebaut für Linux und Android",
   "p3.text":
-    "Ein gemeinsamer Rust-Kern, eine native App und eine Oberfläche für Maus, Tastatur, Touch und Stift.",
+    "Ein gemeinsamer Rust-Kern, eine native App und eigene Layouts für Desktop, Tablet und Handy: Maus, Tastatur, Touch und Stift.",
   "p4.title": "Sorgsam mit deinen Daten",
   "p4.text":
     "Frühere Fassungen werden vor dem Überschreiben gesichert und lassen sich zurückholen. Änderungen von außen werden erkannt statt überschrieben.",
@@ -57,7 +57,7 @@ const de = {
   "f2.a":
     "Rückverweise mit Kontext und unverlinkte Erwähnungen, die zu Links werden",
   "f2.b":
-    "Volltextsuche mit <code>tag:</code>, <code>path:</code> und <code>file:</code>",
+    "Volltextsuche mit <code>tag:</code>, <code>path:</code>, <code>line:</code>, <code>task:</code> und regulären Ausdrücken",
   "f2.c": "Graph des ganzen Vaults oder lokaler Graph einer Notiz",
   "f2.d":
     "Benenne eine Notiz um oder verschiebe sie, und alle Links ziehen mit",
@@ -74,7 +74,8 @@ const de = {
   "f4.title": "Ein Arbeitsbereich, der sich dir anpasst",
   "f4.text":
     "Teile den Editor, docke Seitenansichten an, wo du sie brauchst, und halte eine zweite Notiz neben der ersten offen. Das Layout wird pro Vault gemerkt.",
-  "f4.a": "Tabs mit eigenem Verlauf, geteilte Editoren, andockbare Ansichten",
+  "f4.a":
+    "Tabs mit eigenem Verlauf, geteilte Editoren, andockbare Ansichten und Pop-out-Fenster",
   "f4.b":
     "Schnellauswahl <kbd>Strg</kbd> <kbd>O</kbd>, Befehlspalette <kbd>Strg</kbd> <kbd>P</kbd>",
   "f4.c": "Helles und dunkles Design mit einer Akzentfarbe deiner Wahl",
@@ -123,7 +124,7 @@ const de = {
   "c.l4.text": "Dein Ordner mit Markdown-Dateien",
   "s.title": "Noch nicht ganz erkaltet",
   "s.text":
-    "Basalt ist eine Vorschau (0.4) und noch kein vollständiger Ersatz für Obsidian. Der Kern ist stabil und getestet, aber ein paar Dinge fehlen:",
+    "Basalt ist eine Vorschau (0.5) und noch kein vollständiger Ersatz für Obsidian. Der Kern ist stabil und getestet, aber ein paar Dinge fehlen:",
   "s.a": "keine eingebaute Synchronisation, Android-Updates noch per Download",
   "s.b": "Plugin-Unterstützung nur für ausgewählte Plugins",
   "s.c": "Sicherungen werden noch nicht automatisch aufgeräumt",

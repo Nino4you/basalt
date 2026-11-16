@@ -3,12 +3,15 @@ import type { EditorState } from "@codemirror/state";
 import {
   backend,
   native,
+  validateBasePath,
   validateCanvasPath,
   validateNotePath,
   type VaultInfo,
 } from "../backend";
-import { attachmentKind, attachmentLink } from "../attachments";
+import { attachmentKind, attachmentLink, availablePath } from "../attachments";
 import { importAttachments } from "./attachment-import";
+import { createEmbedPreviewHost } from "./editor-embeds";
+import { clearImageCache } from "./image-cache";
 import { autoCleanBackups } from "./backup-cleanup";
 import {
   readAppearance,
@@ -21,6 +24,8 @@ import { insertFootnote } from "../editor/footnotes";
 import { exportHtml, printNote } from "./print-export";
 import {
   findUpdate,
+  AndroidUpdateError,
+  installAndroidUpdate,
   installSignedUpdate,
   updateCheckDue,
   type AvailableUpdate,
@@ -37,16 +42,24 @@ import {
 } from "./sync-conflicts";
 import { foldAll, toggleFold, unfoldAll } from "@codemirror/language";
 import { emptyCanvas } from "../canvas/model";
+import { parse as parseYaml } from "yaml";
+import { IMAGE_TYPES, MAX_ATTACHMENT_BYTES } from "../attachments";
+import { frontmatterRange } from "../editor/properties-model";
+import { BaseView } from "../bases/view";
+import { emptyBase } from "../bases/model";
+import type { EvalHost, FileRecord } from "../bases/expr";
 import { CanvasView } from "../canvas/view";
 import { TFile, TFolder } from "../compat/files";
 import {
   Menu as PluginMenu,
+  getIcon as getPluginIcon,
+  setIcon as setPluginIcon,
   TextFileView,
   type FileView,
 } from "../compat/obsidian-api";
 import { nativeRequestUrl } from "../compat/request";
 import { CompatibilitySession } from "../compat/session";
-import type { ViewState, WorkspaceLeaf } from "../compat/workspace";
+import type { SideName, ViewState, WorkspaceLeaf } from "../compat/workspace";
 import { MarkdownEditor, type EditorOptions } from "../editor";
 import type { EditorSuggestRegistration } from "../editor/editor-suggest";
 import { documentOutline, renderMarkdown, wordCount } from "../markdown";
@@ -58,15 +71,25 @@ import {
   errorMessage,
   extension,
   formatHotkey,
+  frameThrottle,
   h,
   icon,
 } from "../ui/dom";
 import { closeMenu, showMenu, type MenuEntry } from "../ui/menu";
-import { Modal, SuggestModal, topModal } from "../ui/modal";
+import { confirmAction, Modal, SuggestModal, topModal } from "../ui/modal";
+import { fuzzyMatch } from "../ui/fuzzy";
 import { notify } from "../ui/notice";
 import { installTooltips } from "../ui/tooltip";
 import { CommandRegistry } from "./commands";
-import { NARROW_TABLET_QUERY, PHONE_QUERY, TOUCH_QUERY } from "../ui/device";
+import {
+  PHONE_QUERY,
+  RAIL_WIDTH,
+  sidebarSheets,
+  TOUCH_QUERY,
+} from "../ui/device";
+import { installSheetGestures } from "./sheet-gestures";
+import { applyDockOrder, normalizeDockOrder } from "./dock-order";
+import { installDockReorder } from "./dock-reorder";
 import { buildMobileToolbar } from "./mobile-toolbar";
 import { EditorView } from "@codemirror/view";
 import { Explorer } from "./explorer";
@@ -76,6 +99,7 @@ import { ReadingView } from "./reading";
 import { LinkPreview } from "./link-preview";
 import { SearchView } from "./search";
 import { expandTemplate, templatePaths } from "./templates";
+import { mergeNoteText, suggestNoteName, wikiLinkTo } from "./note-tools";
 import { formatDate, parseDate } from "../dates";
 import { SettingsStore } from "./settings";
 import { openSettings } from "./settings-modal";
@@ -97,8 +121,13 @@ import { GroupMirror } from "./group-mirror";
 import {
   buildGroup,
   buildShell,
+  isPluginPanel,
+  pane as panelPane,
+  panelTab,
   PANELS,
+  type DockPanelId,
   type PanelId,
+  type PluginPanelId,
   type Shell,
 } from "./shell";
 import {
@@ -118,11 +147,18 @@ import { openCommandPalette, openQuickSwitcher } from "./switcher";
 import { openFileRecovery } from "./file-recovery";
 import { LinkUpdate } from "./link-update";
 import { VaultIndex } from "./vault-index";
+import {
+  listenForShares,
+  shareMarkdown,
+  type SharedContent,
+} from "./android-share";
+import { openShareDialog } from "./share-dialog";
+import { openPopout, popoutPath, SaveBroadcast } from "./popout";
 
 export interface Tab {
   id: number;
   path: string | null;
-  kind: "empty" | "markdown" | "canvas" | "plugin" | "attachment";
+  kind: "empty" | "markdown" | "canvas" | "base" | "plugin" | "attachment";
   viewType: string | null;
   reading: boolean;
   note: Note | null;
@@ -165,6 +201,17 @@ type AppEvent = "active" | "files" | "index" | "doc" | "tabs" | "bookmarks";
 
 /** Longest time between full plugin-vault refreshes while notes are saved. */
 const FULL_REFRESH_INTERVAL = 30_000;
+/** Short labels for the tablet rail; other views use their full name. */
+const RAIL_LABELS: Partial<Record<DockPanelId, string>> = {
+  files: t("Dateien"),
+  search: t("Suche"),
+  bookmarks: t("Lesezeichen"),
+  backlinks: t("Rückverweise"),
+  outgoing: t("Ausgehend"),
+  tags: t("Tags"),
+  outline: t("Gliederung"),
+  graph: t("Graph"),
+};
 
 interface SavedTab {
   path: string | null;
@@ -195,6 +242,9 @@ interface Layout {
   leftOpen: boolean;
   rightOpen: boolean;
   bottomOpen: boolean;
+  /** Tablets: the sidebar docks beside the note instead of floating. */
+  leftPinned: boolean;
+  rightPinned: boolean;
   /** Which panel lives in which dock area; moved by drag & drop. */
   dock: DockLayout;
   /** Panels the user closed; they keep their place in `dock` for reopening. */
@@ -232,6 +282,15 @@ export class App {
   split: SplitNode = { group: 0 };
   ws: SavedWorkspace = emptyWorkspace();
   layout: Layout;
+  /**
+   * The note this window was popped out for, or null in the main window. A
+   * pop-out shows one tab without sidebars, runs no plugins and never writes
+   * the main window's workspace or layout.
+   */
+  readonly popout = popoutPath();
+  private readonly saves = new SaveBroadcast((vaultId, path, text) => {
+    if (vaultId === this.vault?.id) this.adoptText(path, text);
+  });
   indexing = false;
 
   private readonly listeners = new Map<AppEvent, Set<() => void>>();
@@ -242,7 +301,6 @@ export class App {
   readonly pluginErrors = new Map<string, string>();
   private readonly mobile = matchMedia(PHONE_QUERY);
   private readonly touch = matchMedia(TOUCH_QUERY);
-  private readonly narrowTouch = matchMedia(NARROW_TABLET_QUERY);
   private readonly linkPreview: LinkPreview;
   private readonly groupViews = new Map<number, GroupView>();
   /** Structure of the split as last built into the DOM. */
@@ -255,10 +313,16 @@ export class App {
   private pluginViewReady: Promise<void> = Promise.resolve();
   private requestedPluginLeaf: WorkspaceLeaf | null = null;
   private canvasView: CanvasView | null = null;
+  private baseView: BaseView | null = null;
   private readonly attachmentView: AttachmentView;
   private drawer: "left" | "right" | null = null;
   /** Panel picked on a phone, where bottom panels share the right drawer. */
-  private mobilePanel: PanelId | null = null;
+  private mobilePanel: DockPanelId | null = null;
+  /** Sidebar views opened by plugins through `getLeftLeaf` / `getRightLeaf`. */
+  private readonly pluginPanels = new Map<
+    PluginPanelId,
+    { leaf: WorkspaceLeaf; tab: HTMLButtonElement; pane: HTMLElement }
+  >();
 
   private readonly saveWorkspace = debounce(() => this.writeWorkspace(), 250);
   private readonly emitIndex = debounce(() => {
@@ -280,7 +344,8 @@ export class App {
     document.documentElement.classList.add("is-starting");
     this.shell = buildShell(root);
     this.attachmentView = new AttachmentView(this.shell.attachmentHost);
-    this.layout = loadLayout();
+    this.layout = this.popout ? popoutLayout() : loadLayout();
+    document.body.classList.toggle("is-popout", this.popout !== null);
     this.linkPreview = new LinkPreview((target, source) => {
       const path = this.index.resolve(target, source);
       if (!path || extension(path) !== "md") return null;
@@ -331,6 +396,7 @@ export class App {
               this.activePath,
             ) ?? null)
           : null,
+      embedPreview: createEmbedPreviewHost(this),
       pluginContext: () =>
         this.compatibility
           ? { sourcePath: this.activePath ?? "", app: this.compatibility }
@@ -359,6 +425,8 @@ export class App {
     // Puts the live views into the document, where the wiring finds them.
     this.renderGroups();
     this.wireShell();
+    this.applyDockOrder();
+    installDockReorder(this, this.shell.ribbon);
     installTooltips();
     this.index.onChange(() => this.emitIndex());
     this.settings.onChange((key) => {
@@ -366,16 +434,28 @@ export class App {
       this.renderGroups();
       if (key === "fontSize") this.editor.measure();
       if (key === "inlineTitle") this.showActive();
+      if (key === "tabletDock") this.applyLayout();
+      if (key === "dockOrder") this.applyDockOrder();
     });
     this.mobile.addEventListener("change", () => this.applyLayout());
     this.touch.addEventListener("change", () => this.applyLayout());
-    this.narrowTouch.addEventListener("change", () => this.applyLayout());
+    // Tablets dock or slide sidebars by the width left for the note.
+    window.addEventListener(
+      "resize",
+      debounce(() => {
+        if (this.isTablet) this.applyLayout();
+      }, 100),
+    );
     this.on("tabs", () => this.renderGroups());
     this.on("active", () => {
       this.updateHeader();
       this.updateStatus();
     });
-    this.on("index", () => this.updateBacklinkCount());
+    this.on("index", () => {
+      this.updateBacklinkCount();
+      // Embedded notes in live preview follow changes to their content.
+      this.editor.refreshLinks();
+    });
     this.applyLayout();
     this.renderGroups();
     this.showActive();
@@ -460,7 +540,9 @@ export class App {
 
   /** The note or canvas file the active tab edits through the note store. */
   get activeDocument(): Note | null {
-    return this.active.kind === "markdown" || this.active.kind === "canvas"
+    return this.active.kind === "markdown" ||
+      this.active.kind === "canvas" ||
+      this.active.kind === "base"
       ? this.active.note
       : null;
   }
@@ -480,6 +562,13 @@ export class App {
         requestAnimationFrame(() => root.classList.remove("is-starting")),
       );
     }
+    if (this.popout) return;
+    // Content shared from other Android apps ("Share" → Basalt); a no-op
+    // without the activity's bridge.
+    listenForShares(
+      (share) => this.receiveShare(share),
+      (error) => this.report(error),
+    );
     // Opt-in; a failed check (offline, rate limit) is not worth a notice.
     void this.checkForUpdates().catch((error) => console.warn(error));
   }
@@ -495,9 +584,11 @@ export class App {
     this.failed.clear();
     this.vault = next;
     this.store = new NoteStore(backend, next.id);
+    this.store.onSaved = (path, text) => this.saves.post(next.id, path, text);
     this.index.reset();
     this.reading.clear();
     this.clearAttachment();
+    clearImageCache();
     for (const view of this.groupViews.values()) view.mirror.release();
     this.pluginErrors.clear();
     const previous = this.compatibility;
@@ -510,7 +601,9 @@ export class App {
     if (previous) await previous.dispose().catch((error) => this.report(error));
     if (epoch !== this.epoch) return;
 
-    this.ws = loadWorkspace(next.id);
+    this.ws = this.popout
+      ? { ...emptyWorkspace(), tabs: [{ path: this.popout, reading: false }] }
+      : loadWorkspace(next.id);
     this.shell.vaultName.textContent = next.name;
     this.shell.environment.textContent = native
       ? t("{platform} · lokal", { platform: next.platform === "android" ? "Android" : "Linux" })
@@ -521,8 +614,10 @@ export class App {
     // Plugins read and parse every note before they load. When the saved
     // tabs are plain notes and canvases, show them first and connect the
     // plugins afterwards; tabs of plugin or attachment files need the session.
-    const pluginsLater = native && this.documentsOnly();
-    if (native && !pluginsLater) await this.connectPlugins(next);
+    // A pop-out leaves plugins to the main window, so none runs twice.
+    const plugins = native && !this.popout;
+    const pluginsLater = plugins && this.documentsOnly();
+    if (plugins && !pluginsLater) await this.connectPlugins(next);
     if (epoch !== this.epoch) return;
     await this.restoreTabs(epoch);
     if (epoch !== this.epoch) return;
@@ -531,6 +626,7 @@ export class App {
       if (epoch !== this.epoch) return;
     }
     void this.indexFiles();
+    if (this.popout) return;
     // Old backups go once a day; a failure only costs disk space.
     void autoCleanBackups(backend, next.id, {
       maxAgeDays: this.settings.get("backupMaxAgeDays"),
@@ -547,7 +643,7 @@ export class App {
       group.tabs.every(
         (tab) =>
           tab.path === null ||
-          (/\.(md|canvas)$/i.test(tab.path) && this.index.has(tab.path)),
+          (/\.(md|canvas|base)$/i.test(tab.path) && this.index.has(tab.path)),
       ),
     );
   }
@@ -719,7 +815,92 @@ export class App {
       throw new Error(t("Für dieses Update gibt es keine automatische Installation."));
     await saveBeforeLeaving(this);
     this.writeWorkspace();
-    await installSignedUpdate(onProgress);
+    if (this.availableUpdate.apk && this.vault?.platform === "android") {
+      try {
+        await installAndroidUpdate(this.availableUpdate, onProgress);
+      } catch (error) {
+        throw androidUpdateMessage(error);
+      }
+    } else await installSignedUpdate(onProgress);
+  }
+
+  /** Asks where shared content goes, then stores it like a pasted note. */
+  receiveShare(share: SharedContent): void {
+    if (!this.vault) return;
+    closeMenu();
+    openShareDialog(
+      {
+        createNote: (content, name) => this.createSharedNote(content, name),
+        appendTarget: () => this.activeNote?.path ?? null,
+        appendToCurrent: (content) => this.appendShared(content),
+      },
+      share,
+    );
+  }
+
+  private async sharedEmbeds(
+    share: SharedContent,
+    sourcePath: string,
+  ): Promise<string[]> {
+    if (!share.files.length) return [];
+    const files = share.files.map(
+      (file) => new File([file.bytes], file.name, { type: file.type }),
+    );
+    const links = await importAttachments(
+      this.compatibility?.vault ?? null,
+      files,
+      {
+        sourcePath,
+        folderSetting: this.settings.get("attachmentFolder"),
+        pasted: false,
+      },
+    );
+    if (links) {
+      this.setFiles((await backend.info()).files);
+      this.syncVisibleFiles();
+    }
+    return links ? links.split("\n") : [];
+  }
+
+  private async createSharedNote(
+    share: SharedContent,
+    name: string,
+  ): Promise<string | null> {
+    const folder =
+      this.settings.get("newNoteLocation") === "current" && this.activePath
+        ? dirname(this.activePath)
+        : "";
+    const path = validateNotePath(
+      folder ? `${folder}/${name.trim()}` : name.trim(),
+    );
+    const folderOf = dirname(path);
+    const free = availablePath(
+      folderOf,
+      folderOf ? path.slice(folderOf.length + 1) : path,
+      (candidate) => this.index.has(candidate),
+    );
+    const embeds = await this.sharedEmbeds(share, free);
+    return this.createNote(free, {
+      text: `${shareMarkdown(share, embeds)}\n`,
+      throwOnError: true,
+    });
+  }
+
+  private async appendShared(share: SharedContent): Promise<void> {
+    const note = this.activeNote;
+    if (!note) throw new Error(t("Keine Notiz geöffnet."));
+    const embeds = await this.sharedEmbeds(share, note.path);
+    if (this.activeNote !== note) throw new Error(t("Die Notiz wurde gewechselt."));
+    const addition = shareMarkdown(share, embeds);
+    if (!addition) return;
+    this.setReading(false);
+    const doc = this.editor.view.state.doc;
+    const separator = !doc.length ? "" : doc.toString().endsWith("\n\n") ? "" : doc.toString().endsWith("\n") ? "\n" : "\n\n";
+    this.editor.view.dispatch({
+      changes: { from: doc.length, insert: `${separator}${addition}\n` },
+      selection: { anchor: doc.length + separator.length + addition.length + 1 },
+      scrollIntoView: true,
+    });
   }
 
   /** Sync conflict copies and notes with merge markers in this vault. */
@@ -806,6 +987,9 @@ export class App {
 
   /** Plugin navigation and explorer navigation share the same real views/leaves. */
   private bindPluginWorkspace(session: CompatibilitySession): void {
+    // Sidebar views of the previous vault's plugins are gone with its session.
+    for (const { pane } of this.pluginPanels.values()) pane.remove();
+    this.pluginPanels.clear();
     session.workspace.registerHostView(this.explorer);
     session.workspace.host = {
       open: async (leaf: WorkspaceLeaf, state: ViewState) => {
@@ -827,7 +1011,74 @@ export class App {
         if (this.pluginView?.leaf === leaf && this.active !== this.pluginView.tab)
           void this.activate(this.pluginView.tab);
       },
+      detach: leaf => {
+        if (leaf.side) this.removePluginPanel(leaf);
+      },
+      sidebar: {
+        show: leaf => this.showPluginPanel(leaf),
+        reveal: leaf => {
+          const id = this.pluginPanelId(leaf);
+          if (id) this.showPanel(id);
+        },
+        isOpen: side => (side === "left" ? this.leftVisible : this.rightVisible),
+        setOpen: (side, open) => (side === "left" ? this.toggleLeft(open) : this.toggleRight(open)),
+      },
     };
+  }
+
+  private pluginPanelId(leaf: WorkspaceLeaf): PluginPanelId | null {
+    for (const [id, entry] of this.pluginPanels) if (entry.leaf === leaf) return id;
+    return null;
+  }
+
+  /**
+   * Docks a plugin's sidebar view as a panel tab. A view type keeps its
+   * place in the stored layout, so a plugin that recreates its view on the
+   * next start puts it back where the user moved it.
+   */
+  private showPluginPanel(leaf: WorkspaceLeaf): void {
+    const side: SideName = leaf.side ?? "right";
+    const label = leaf.getDisplayText();
+    let id = this.pluginPanelId(leaf);
+    let entry = id ? this.pluginPanels.get(id) : undefined;
+    if (!id || !entry) {
+      const type = leaf.view.getViewType();
+      let candidate: PluginPanelId = `plugin:${type}`;
+      for (let n = 2; this.pluginPanels.has(candidate); n++) candidate = `plugin:${type}:${n}`;
+      id = candidate;
+      const spec = { id, label, icon: "file", area: side };
+      entry = { leaf, tab: panelTab(spec), pane: panelPane(spec) };
+      entry.pane.classList.add("mod-plugin");
+      entry.pane.append(leaf.containerEl);
+      this.pluginPanels.set(id, entry);
+      if (!areaOf(this.layout.dock, id)) this.layout.dock[side].panels.push(id);
+    }
+    entry.tab.setAttribute("aria-label", label);
+    entry.pane.setAttribute("aria-label", label);
+    // Unknown icon ids keep the generic file icon instead of an empty tab.
+    if (getPluginIcon(leaf.getIcon())) setPluginIcon(entry.tab, leaf.getIcon());
+    this.applyLayout();
+  }
+
+  private removePluginPanel(leaf: WorkspaceLeaf): void {
+    const id = this.pluginPanelId(leaf);
+    if (!id) return;
+    const entry = this.pluginPanels.get(id)!;
+    this.pluginPanels.delete(id);
+    entry.tab.remove();
+    entry.pane.remove();
+    if (this.mobilePanel === id) this.mobilePanel = null;
+    this.applyLayout();
+  }
+
+  /** Closed panels plus plugin views that are not open right now. */
+  private get hiddenPanels(): string[] {
+    const absent = DOCK_AREAS.flatMap((area) =>
+      this.layout.dock[area].panels.filter(
+        (id) => isPluginPanel(id) && !this.pluginPanels.has(id),
+      ),
+    );
+    return [...this.layout.closedPanels, ...absent];
   }
 
   /** Plugin-compat status line shown in the settings. */
@@ -868,7 +1119,7 @@ export class App {
       .map((file) => file.path)
       .filter(
         (path) =>
-          /\.(md|canvas)$/i.test(path) ||
+          /\.(md|canvas|base)$/i.test(path) ||
           !!attachmentKind(path) ||
           !!session.services.getViewTypeForExtension(extension(path)),
       );
@@ -927,7 +1178,7 @@ export class App {
     const epoch = this.epoch;
     const queue = this.index.files.filter(
       (path) =>
-        /\.(md|canvas)$/i.test(path) && this.index.content(path) === undefined,
+        /\.(md|canvas|base)$/i.test(path) && this.index.content(path) === undefined,
     );
     if (!queue.length) return;
     this.indexing = true;
@@ -964,11 +1215,20 @@ export class App {
     file: TFile,
   ): Promise<void> {
     const type = file.extension.toLowerCase();
-    if (session !== this.compatibility || (type !== "md" && type !== "canvas"))
+    if (session !== this.compatibility || (type !== "md" && type !== "canvas" && type !== "base"))
       return;
     const text = await session.vault.read(file);
-    if (session !== this.compatibility || !this.store) return;
-    const note = this.store.notes.get(file.path);
+    if (session !== this.compatibility) return;
+    this.adoptText(file.path, text);
+  }
+
+  /**
+   * Shows `text` as the saved content of `path`, which another program or
+   * window wrote. A local draft is kept and reported instead.
+   */
+  private adoptText(path: string, text: string): void {
+    if (!this.store) return;
+    const note = this.store.notes.get(path);
     if (note && note.saved !== text) {
       if (note.text !== note.saved) {
         this.failed.set(
@@ -988,10 +1248,10 @@ export class App {
       if (this.activeNote === note) {
         this.editor.setText(text);
         if (this.active.reading) this.reading.render(note.path, text);
-      } else if (this.activeDocument === note) this.canvasView?.setText(text);
+      } else if (this.activeDocument === note) this.setDocumentText(text);
       this.renderGroups();
     }
-    this.index.setContent(file.path, text);
+    this.index.setContent(path, text);
   }
 
   async chooseVault(): Promise<void> {
@@ -1310,7 +1570,8 @@ export class App {
       await leaf.openFile(file);
       return;
     }
-    if (this.isMobile) this.closeDrawers();
+    // Drawers and sheets give the note back once a file is picked.
+    this.closeDrawers();
     if (!options.newTab) {
       if (this.active.path === path && this.active.loaded &&
         (!options.pluginState || (this.active.viewType ?? "markdown") === options.pluginState.type)) {
@@ -1368,7 +1629,15 @@ export class App {
     if (tab === this.active && this.pluginView?.leaf !== this.requestedPluginLeaf) this.unmountPluginView();
     tab.path = path;
     tab.note = note;
-    tab.kind = viewType ? "plugin" : isCanvas(path) ? "canvas" : attachment ? "attachment" : "markdown";
+    tab.kind = viewType
+      ? "plugin"
+      : isCanvas(path)
+        ? "canvas"
+        : isBase(path)
+          ? "base"
+          : attachment
+            ? "attachment"
+            : "markdown";
     tab.viewType = viewType;
     tab.loaded = true;
     tab.state = null;
@@ -1436,6 +1705,12 @@ export class App {
       return;
     }
     void this.createNote(name, { newTab });
+  }
+
+  /** Browser demo: SVG images live as text in the demo vault. */
+  async demoImage(path: string): Promise<string | null> {
+    if (native || !/\.svg$/i.test(path) || !this.index.has(path)) return null;
+    return backend.read(path);
   }
 
   openExternal(url: string): void {
@@ -1530,11 +1805,14 @@ export class App {
     shell.empty.hidden = tab.kind !== "empty";
     shell.pluginView.hidden = tab.kind !== "plugin";
     shell.canvasHost.hidden = tab.kind !== "canvas";
+    shell.baseHost.hidden = tab.kind !== "base";
     shell.attachmentHost.hidden = tab.kind !== "attachment";
     if (tab.kind === "attachment") void this.showAttachment(tab);
     else this.clearAttachment();
     if (tab.kind === "canvas" && tab.note && tab.path) this.showCanvas(tab);
     else this.canvasView?.suspend();
+    if (tab.kind === "base" && tab.note && tab.path) this.showBase(tab);
+    else this.baseView?.suspend();
     shell.editorEl.hidden = !note || tab.reading;
     shell.previewEl.hidden = !note || !tab.reading;
     if (note && tab.path) {
@@ -1615,6 +1893,121 @@ export class App {
     this.canvasView.load(tab.path!, note.text);
   }
 
+  /** Pushes new text of the active canvas or base into its view. */
+  private setDocumentText(text: string): void {
+    if (this.active.kind === "canvas") this.canvasView?.setText(text);
+    else if (this.active.kind === "base") this.baseView?.setText(text);
+  }
+
+  private showBase(tab: Tab): void {
+    if (!this.baseView) {
+      this.baseView = new BaseView({
+        records: () => this.baseRecords(),
+        record: (path) => this.baseRecord(path),
+        evalHost: () => this.baseEvalHost(),
+        openFile: (path, newTab) => void this.openPath(path, { newTab }),
+        resolve: (target, source) => this.index.resolve(target, source),
+        loadImage: (path) => this.loadVaultImage(path),
+        // Base edits are saved like canvas edits: drafts, autosave, backups.
+        onChange: (path, text) => this.onCanvasChange(path, text),
+      });
+      this.shell.baseHost.append(this.baseView.el);
+      const refresh = frameThrottle(() => {
+        if (this.active.kind === "base") this.baseView?.refresh();
+      });
+      this.on("index", refresh);
+    }
+    this.baseView.load(tab.path!, tab.note!.text);
+  }
+
+  /** File records for bases, built from the index and parsed frontmatter. */
+  private baseRecords(): FileRecord[] {
+    const records: FileRecord[] = [];
+    for (const path of this.index.files) {
+      if (!/\.md$/i.test(path)) continue;
+      const record = this.baseRecord(path);
+      if (record) records.push(record);
+    }
+    return records;
+  }
+
+  private readonly frontmatterCache = new Map<string, { text: string; data: Record<string, unknown> }>();
+
+  private baseRecord(path: string): FileRecord | null {
+    if (!this.index.has(path)) return null;
+    const text = this.index.content(path) ?? "";
+    let cached = this.frontmatterCache.get(path);
+    if (!cached || cached.text !== text) {
+      cached = { text, data: /\.md$/i.test(path) ? frontmatterData(text) : {} };
+      this.frontmatterCache.set(path, cached);
+    }
+    const meta = this.index.metaOf(path);
+    const file = this.compatibility?.vault.getFileByPath(path);
+    return {
+      path,
+      properties: cached.data,
+      tags: meta?.tags ?? [],
+      links: meta?.links.filter((link) => !link.embed).map((link) => link.target) ?? [],
+      embeds: meta?.links.filter((link) => link.embed).map((link) => link.target) ?? [],
+      size: file ? file.stat.size : new TextEncoder().encode(text).length,
+      ctime: file?.stat.ctime ? new Date(file.stat.ctime) : null,
+      mtime: file?.stat.mtime ? new Date(file.stat.mtime) : null,
+    };
+  }
+
+  private baseEvalHost(): EvalHost {
+    return {
+      resolve: (target, source) => this.index.resolve(target, source),
+      file: (path) => this.baseRecord(path),
+      backlinks: (path) => [...new Set(this.index.backlinks(path).map((entry) => entry.source))],
+      now: () => new Date(),
+      locale: getLocale(),
+    };
+  }
+
+  /** An object URL for a vault image (native vaults only), or null. */
+  private async loadVaultImage(path: string): Promise<string | null> {
+    const session = this.compatibility;
+    const mime = IMAGE_TYPES[extension(path)];
+    const file = session?.vault.getFileByPath(path);
+    if (!session || !mime || !file || file.stat.size > MAX_ATTACHMENT_BYTES) return null;
+    try {
+      const data = await session.vault.readBinary(file);
+      return URL.createObjectURL(new Blob([data], { type: mime }));
+    } catch {
+      return null;
+    }
+  }
+
+  /** Creates a base with one table view; names without extension get `.base`. */
+  async createBase(folder?: string): Promise<string | null> {
+    const vault = this.vault;
+    if (!vault) return null;
+    const base =
+      folder ??
+      (this.settings.get("newNoteLocation") === "current" && this.activePath
+        ? dirname(this.activePath)
+        : "");
+    try {
+      let path = "";
+      for (let n = 0; ; n++) {
+        const name = `${base ? `${base}/` : ""}${t("Unbenannt")}${n ? ` ${n}` : ""}`;
+        path = validateBasePath(name);
+        if (!this.index.has(path)) break;
+      }
+      await backend.create(path, emptyBase(t("Tabelle")), vault.id);
+      if (vault !== this.vault) return null;
+      this.setFiles((await backend.info()).files);
+      await this.refreshCompatibility().catch((error) => this.report(error));
+      if (this.compatibility) this.syncVisibleFiles();
+      await this.openPath(path);
+      return path;
+    } catch (error) {
+      this.report(error);
+      return null;
+    }
+  }
+
   /** Renders a directly opened attachment using vault-scoped binary reads. */
   private showAttachment(tab: Tab): Promise<void> {
     return this.attachmentView.show(tab.path, this.compatibility);
@@ -1670,6 +2063,7 @@ export class App {
   focusView(): void {
     if (this.isMobile) return;
     if (this.active.kind === "canvas") this.canvasView?.focus();
+    else if (this.active.kind === "base") this.baseView?.focus();
     else if (this.activeNote && !this.active.reading) this.editor.focus();
     else if (this.activeNote)
       this.shell.previewEl.focus({ preventScroll: true });
@@ -1961,7 +2355,7 @@ export class App {
         }
       this.index.setContent(fresh.path, fresh.text);
       if (tab === this.active) {
-        if (tab.kind === "canvas") this.canvasView?.setText(fresh.text);
+        if (tab.kind === "canvas" || tab.kind === "base") this.setDocumentText(fresh.text);
         else {
           this.editor.setText(fresh.text);
           if (tab.reading) this.reading.render(fresh.path, fresh.text);
@@ -2034,7 +2428,8 @@ export class App {
     await this.save(note, { backup: true });
     for (const tab of this.allTabs) if (tab.note === note) tab.state = null;
     if (this.activeDocument === note) {
-      if (this.active.kind === "canvas") this.canvasView?.setText(text);
+      if (this.active.kind === "canvas" || this.active.kind === "base")
+        this.setDocumentText(text);
       else {
         this.editor.setText(text);
         if (this.active.reading) this.reading.render(note.path, text);
@@ -2789,6 +3184,201 @@ export class App {
       );
   }
 
+  // ── note composer ─────────────────────────────────────────────────────────
+
+  /** Asks for another note and merges `path` into it. */
+  promptMergeFile(path = this.activePath): void {
+    if (!path || !/\.md$/i.test(path) || !this.index.has(path)) return;
+    const notes = this.index.files
+      .filter((file) => /\.md$/i.test(file) && file !== path)
+      .map((file) => ({ file, lower: file.toLowerCase() }));
+    const modal = new SuggestModal(
+      t("Zielnotiz suchen …"),
+      t("Zusammenführen mit"),
+      (raw) => {
+        const query = raw.trim().toLowerCase();
+        return notes
+          .map((note) => ({ ...note, match: fuzzyMatch(query, note.file, note.lower) }))
+          .filter((note) => note.match)
+          .sort((a, b) => b.match!.score - a.match!.score)
+          .map(({ file }) => ({
+            render(parent: HTMLElement) {
+              parent.append(
+                h(
+                  "div",
+                  "suggestion-content",
+                  h("div", {
+                    class: "suggestion-title",
+                    text: basename(file).replace(/\.md$/i, ""),
+                  }),
+                  dirname(file)
+                    ? h("div", { class: "suggestion-note", text: dirname(file) })
+                    : null,
+                ),
+              );
+            },
+            run: () => {
+              confirmAction({
+                title: t("Notizen zusammenführen"),
+                text: t("„{source}“ an „{target}“ anhängen und danach in den Papierkorb verschieben? Links auf die Notiz zeigen dann auf das Ziel.", {
+                  source: basename(path).replace(/\.md$/i, ""),
+                  target: basename(file).replace(/\.md$/i, ""),
+                }),
+                confirm: t("Zusammenführen"),
+                run: () => this.mergeFile(path, file),
+                onError: (error) => this.report(error),
+              });
+            },
+          }));
+      },
+      [
+        ["↑↓", t("navigieren")],
+        ["↵", t("zusammenführen")],
+        ["esc", t("schließen")],
+      ],
+      t("Keine passende Notiz."),
+    );
+    modal.open();
+  }
+
+  /**
+   * Appends `source` to `target`, points links at the target and moves the
+   * source to the trash. Every step goes through the version-checked save
+   * (the target is backed up first); a failure leaves the source in place.
+   */
+  async mergeFile(source: string, target: string): Promise<void> {
+    const store = this.store;
+    if (!store || source === target) return;
+    if (!this.index.has(source) || !this.index.has(target))
+      throw new Error(t("Die Datei gibt es nicht mehr."));
+    const update = this.settings.get("updateLinks")
+      ? new LinkUpdate(this.index.files, new Map([[source, target]]))
+      : null;
+    const sources = update
+      ? (await this.linkSources(update)).filter((path) => path !== source)
+      : [];
+    if (store !== this.store) return;
+    const from = await store.load(source);
+    const into = await store.load(target);
+    if (store !== this.store) return;
+    const merged = mergeNoteText(into.text, from.text);
+    await this.replaceText(into, merged);
+    this.index.setContent(target, merged);
+    if (update && sources.length) await this.updateLinks(update, sources);
+    if (store !== this.store) return;
+    await this.deleteFile(source, store);
+    if (store === this.store) await this.openPath(target);
+    notify(t("Notizen zusammengeführt."));
+  }
+
+  /** Moves the editor selection into a new note and leaves a link behind. */
+  promptExtractSelection(): void {
+    const path = this.activePath;
+    if (!path || this.active.kind !== "markdown" || this.active.reading) return;
+    const view = this.editor.view;
+    const { from, to } = view.state.selection.main;
+    if (from === to) {
+      notify(t("Zuerst Text auswählen, der in eine neue Notiz soll."));
+      return;
+    }
+    const selection = view.state.sliceDoc(from, to);
+    const folder =
+      this.settings.get("newNoteLocation") === "current" ? dirname(path) : "";
+    const modal = new Modal("mod-new-note");
+    modal.setTitle(t("Auswahl in neue Notiz extrahieren"));
+    const input = h("input", {
+      attrs: {
+        type: "text",
+        placeholder: t("Name der Notiz"),
+        maxlength: "180",
+        autocomplete: "off",
+        spellcheck: "false",
+        enterkeyhint: "done",
+      },
+      label: t("Name der Notiz"),
+    });
+    const name = suggestNoteName(selection) || t("Unbenannt");
+    input.value = folder ? `${folder}/${name}` : name;
+    const error = h("p", {
+      class: "field-error",
+      attrs: { role: "alert", hidden: true },
+    });
+    const submit = h("button", {
+      class: "mod-cta",
+      text: t("Extrahieren"),
+      attrs: { type: "submit" },
+    });
+    const form = h(
+      "form",
+      { attrs: { novalidate: true } },
+      h("p", {
+        class: "modal-description",
+        text: t("Die Auswahl wird durch einen Link auf die neue Notiz ersetzt."),
+      }),
+      input,
+      error,
+      h(
+        "div",
+        "modal-button-container",
+        h("button", {
+          text: t("Abbrechen"),
+          attrs: { type: "button" },
+          on: { click: () => modal.close() },
+        }),
+        submit,
+      ),
+    );
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submit.disabled = true;
+      void this.extractSelection(path, from, to, selection, input.value)
+        .then(() => modal.close())
+        .catch((reason) => {
+          error.textContent = errorMessage(reason);
+          error.hidden = false;
+          submit.disabled = false;
+          input.focus();
+        });
+    });
+    modal.contentEl.append(form);
+    modal.open();
+    input.focus();
+    input.select();
+  }
+
+  private async extractSelection(
+    source: string,
+    from: number,
+    to: number,
+    selection: string,
+    name: string,
+  ): Promise<void> {
+    const vault = this.vault;
+    if (!vault) return;
+    const target = validateNotePath(name);
+    if (this.index.has(target))
+      throw new Error(t("„{name}“ gibt es bereits.", { name: target }));
+    const view = this.editor.view;
+    // The note or the selection changed while the dialog was open.
+    if (this.activePath !== source || view.state.sliceDoc(from, to) !== selection)
+      throw new Error(t("Die Auswahl hat sich geändert. Bitte erneut auswählen."));
+    await this.ensureFolder(dirname(target));
+    await backend.create(target, selection.replace(/\s+$/, "") + "\n", vault.id);
+    if (vault !== this.vault) return;
+    this.setFiles((await backend.info()).files);
+    await this.refreshCompatibility().catch((error) => this.report(error));
+    if (this.compatibility) this.syncVisibleFiles();
+    if (this.activePath === source && view.state.sliceDoc(from, to) === selection) {
+      const link = wikiLinkTo(this.index.files, target, source);
+      view.dispatch({
+        changes: { from, to, insert: link },
+        selection: { anchor: from + link.length },
+      });
+      this.docEdited.flush();
+      notify(t("„{name}“ angelegt und verlinkt.", { name: basename(target).replace(/\.md$/i, "") }));
+    }
+  }
+
   /** Creates the missing folders of `folder`, one level at a time. */
   private async ensureFolder(folder: string): Promise<void> {
     if (!folder) return;
@@ -2930,11 +3520,28 @@ export class App {
     const mobile = this.isMobile;
     document.body.classList.toggle("is-mobile", mobile);
     document.body.classList.toggle("is-touch", this.touch.matches);
-    document.body.classList.toggle("is-tablet", this.touch.matches && !mobile);
+    const tablet = this.isTablet;
+    document.body.classList.toggle("is-tablet", tablet);
     if (!mobile) {
-      this.drawer = null;
       this.mobilePanel = null;
+      this.drawer = null;
     }
+    // A card that no longer floats (pinned with room, desktop) closes.
+    const sheets = this.sheets;
+    if (!tablet || !sheets.left) this.floating.left = false;
+    if (!tablet || !sheets.right) this.floating.right = false;
+    workspace.classList.toggle("is-left-sheet", tablet && sheets.left);
+    workspace.classList.toggle("is-right-sheet", tablet && sheets.right);
+    for (const side of ["left", "right"] as const)
+      for (const pin of document.querySelectorAll<HTMLElement>(
+        `.sheet-pin[data-sheet-side="${side}"]`,
+      )) {
+        const pinned =
+          side === "left" ? this.layout.leftPinned : this.layout.rightPinned;
+        pin.classList.toggle("is-active", pinned);
+        pin.setAttribute("aria-pressed", String(pinned));
+        pin.setAttribute("aria-label", pinned ? t("Lösen") : t("Anpinnen"));
+      }
     const leftOpen = this.leftVisible;
     const rightOpen = this.rightVisible;
     const bottomOpen = this.bottomVisible;
@@ -2948,14 +3555,17 @@ export class App {
       `${this.layout.bottomHeight}px`,
     );
     workspace.style.setProperty("--left-bottom-height", `${this.layout.leftBottomHeight}px`);
-    scrim.classList.toggle("is-visible", mobile && this.drawer !== null);
+    // Phones dim the note behind a drawer; tablet cards leave it usable.
+    scrim.classList.toggle("is-visible", this.drawer !== null);
     this.shell.leftSplit.inert = !leftOpen;
     this.shell.rightSplit.inert = !rightOpen;
     this.shell.bottomSplit.inert = !bottomOpen;
     this.shell.leftBottomSplit.inert = !leftOpen || mobile;
     this.renderDock();
+    this.anchorLeftCard();
     try {
-      localStorage.setItem(LAYOUT_KEY, JSON.stringify(this.layout));
+      if (!this.popout)
+        localStorage.setItem(LAYOUT_KEY, JSON.stringify(this.layout));
     } catch {
       // Layout is a convenience; ignore storage failures.
     }
@@ -2965,7 +3575,7 @@ export class App {
   /** The dock layout as currently shown (phones fold the bottom area away). */
   private get shownDock(): DockLayout {
     const shown = effectiveDock(
-      withoutPanels(this.layout.dock, this.layout.closedPanels),
+      withoutPanels(this.layout.dock, this.hiddenPanels),
       this.isMobile,
     );
     if (this.mobilePanel) {
@@ -2975,44 +3585,222 @@ export class App {
     return shown;
   }
 
+  /** Tablet rail buttons, one per view of the left sidebar. */
+  private readonly railButtons = new Map<DockPanelId, HTMLButtonElement>();
+
+  /**
+   * The rail lists the views of the left sidebar with icon and label; the
+   * active one is marked while the sidebar shows it, and tapping it again
+   * closes the sidebar.
+   */
+  private renderRail(shown: DockLayout): void {
+    const ids = [...shown.left.panels, ...shown["left-bottom"].panels] as DockPanelId[];
+    const active = shown.left.active as DockPanelId | null;
+    const activeTab = active
+      ? isPluginPanel(active)
+        ? this.pluginPanels.get(active)?.tab
+        : this.shell.panelTabs[active]
+      : null;
+    this.shell.leftSheetTitle.textContent = active
+      ? (RAIL_LABELS[active] ?? activeTab?.getAttribute("aria-label") ?? "")
+      : "";
+    const buttons = ids.map((id) => {
+      let button = this.railButtons.get(id);
+      if (!button) {
+        button = h("button", {
+          class: "rail-item",
+          attrs: { type: "button", "aria-pressed": "false" },
+          data: { panel: id },
+          on: {
+            click: () => {
+              if (this.isPanelVisible(id)) this.toggleLeft(false);
+              else this.showPanel(id);
+            },
+          },
+        });
+        this.railButtons.set(id, button);
+      }
+      const tab = isPluginPanel(id)
+        ? this.pluginPanels.get(id)?.tab
+        : this.shell.panelTabs[id];
+      const label = RAIL_LABELS[id] ?? tab?.getAttribute("aria-label") ?? id;
+      const svg = tab?.querySelector("svg");
+      const visible = this.isPanelVisible(id);
+      button.replaceChildren(
+        svg ? (svg.cloneNode(true) as SVGElement) : icon("file"),
+      );
+      button.setAttribute("aria-label", label);
+      button.setAttribute("aria-pressed", String(visible));
+      button.classList.toggle("is-active", visible);
+      return button;
+    });
+    for (const id of this.railButtons.keys())
+      if (!ids.includes(id)) this.railButtons.delete(id);
+    syncChildren(this.shell.railPanels, buttons);
+  }
+
   /** Moves the panel elements into the tab strips and boxes of their areas. */
   private renderDock(): void {
     const shown = this.shownDock;
-    const { docks, panelTabs, panes } = this.shell;
+    this.renderRail(shown);
+    const { docks } = this.shell;
+    const tabOf = (id: DockPanelId) =>
+      isPluginPanel(id) ? this.pluginPanels.get(id)!.tab : this.shell.panelTabs[id];
+    const paneOf = (id: DockPanelId) =>
+      isPluginPanel(id) ? this.pluginPanels.get(id)!.pane : this.shell.panes[id];
     const draggable = String(!this.isMobile);
     this.shell.leftBottomSplit.classList.toggle("is-empty", shown["left-bottom"].panels.length === 0);
     this.shell.leftBottomHandle.hidden = shown["left-bottom"].panels.length === 0;
     for (const area of DOCK_AREAS) {
       const slot = shown[area];
-      const ids = slot.panels as PanelId[];
+      const ids = slot.panels as DockPanelId[];
       const { tabs, content, empty, add } = docks[area];
       add.hidden = this.layout.closedPanels.length === 0;
-      syncChildren(tabs, [...ids.map((id) => panelTabs[id]), add]);
-      syncChildren(content, [...ids.map((id) => panes[id]), empty]);
+      syncChildren(tabs, [...ids.map(tabOf), add]);
+      syncChildren(content, [...ids.map(paneOf), empty]);
       empty.hidden = ids.length > 0;
       for (const id of ids) {
         const selected = slot.active === id;
-        const tab = panelTabs[id];
+        const tab = tabOf(id);
         tab.classList.toggle("is-active", selected);
         tab.setAttribute("aria-selected", String(selected));
         tab.setAttribute("draggable", draggable);
-        panes[id].hidden = !selected;
+        paneOf(id).hidden = !selected;
       }
     }
   }
 
   get leftVisible(): boolean {
-    return this.isMobile ? this.drawer === "left" : this.layout.leftOpen;
+    if (this.isMobile) return this.drawer === "left";
+    return this.sheets.left ? this.floating.left : this.layout.leftOpen;
   }
 
   get rightVisible(): boolean {
     if (this.isMobile) return this.drawer === "right";
-    // A portrait tablet cannot fit both sidebars beside readable text.
-    return this.layout.rightOpen && !(this.narrowTablet && this.layout.leftOpen);
+    return this.sheets.right ? this.floating.right : this.layout.rightOpen;
   }
 
-  private get narrowTablet(): boolean {
-    return !this.isMobile && this.narrowTouch.matches;
+  /** Tablet sidebars open as floating cards; both may be open at once. */
+  private readonly floating = { left: false, right: false };
+
+  /** Pins a tablet sidebar beside the note, or lets it float again. */
+  setPinned(side: "left" | "right", pinned: boolean): void {
+    const visible = side === "left" ? this.leftVisible : this.rightVisible;
+    if (side === "left") {
+      this.layout.leftPinned = pinned;
+      this.layout.leftOpen = visible;
+    } else {
+      this.layout.rightPinned = pinned;
+      this.layout.rightOpen = visible;
+    }
+    // Unpinned, it stays on screen as a card until dismissed.
+    this.floating[side] = visible;
+    this.applyLayout();
+  }
+
+  /** Only the note: rail, sidebars, tabs and status bar step aside. */
+  focusMode = false;
+
+  setFocusMode(on: boolean): void {
+    this.focusMode = on;
+    document.body.classList.toggle("is-focus-mode", on);
+    if (on) this.closeDrawers();
+    const button = document.querySelector(".focus-mode-button");
+    button?.setAttribute("aria-pressed", String(on));
+    this.focusView();
+  }
+
+  /** Touch screens too wide for the phone layout. */
+  get isTablet(): boolean {
+    return this.touch.matches && !this.isMobile;
+  }
+
+  /** Puts the dock's (ribbon's) actions in the order the user dragged them to. */
+  applyDockOrder(): void {
+    applyDockOrder(
+      this.shell.ribbon,
+      normalizeDockOrder(this.settings.get("dockOrder")),
+    );
+  }
+
+  /**
+   * The left views in the order dragged in the dock; the left sidebar's tabs
+   * follow. Views not on screen (closed ones) keep their place.
+   */
+  setLeftViewOrder(ids: DockPanelId[]): void {
+    const panels = [...this.layout.dock.left.panels];
+    const slots = panels
+      .map((id, index) => (ids.includes(id as DockPanelId) ? index : -1))
+      .filter((index) => index >= 0);
+    slots.forEach((slot, n) => (panels[slot] = ids[n]));
+    this.layout.dock = {
+      ...this.layout.dock,
+      left: { ...this.layout.dock.left, panels },
+    };
+    this.applyLayout();
+  }
+
+  /** The tablet dock floats at the bottom (Settings → Appearance). */
+  get dockAtBottom(): boolean {
+    return this.isTablet && this.settings.get("tabletDock") === "bottom";
+  }
+
+  /** Width the tablet dock takes from the note: none when it floats at the bottom. */
+  get railWidth(): number {
+    return this.dockAtBottom ? 0 : RAIL_WIDTH;
+  }
+
+  /**
+   * With the dock at the bottom, the left card opens above the icon of its
+   * view, with a pointer to it, so it reads as coming out of the dock.
+   */
+  private anchorLeftCard(): void {
+    const split = this.shell.leftSplit;
+    if (!this.dockAtBottom) {
+      split.style.removeProperty("--card-left");
+      split.style.removeProperty("--card-arrow");
+      return;
+    }
+    const active = this.shownDock.left.active as DockPanelId | null;
+    const button =
+      (active && this.railButtons.get(active)) ?? this.shell.ribbon;
+    const rect = button.getBoundingClientRect();
+    const anchor = rect.left + rect.width / 2;
+    const gap = 10;
+    const width = Math.min(440, window.innerWidth - 2 * gap);
+    const left = Math.max(
+      gap,
+      Math.min(window.innerWidth - width - gap, anchor - width / 2),
+    );
+    // The card is placed inside the workspace, which may start after an inset.
+    const origin = this.shell.workspace.getBoundingClientRect().left;
+    split.style.setProperty("--card-left", `${left - origin}px`);
+    split.style.setProperty("--card-arrow", `${anchor - left}px`);
+  }
+
+  /** Tablet sidebars that float as cards right now (not pinned beside the note). */
+  get floatingSides(): { left: boolean; right: boolean } {
+    if (!this.isTablet) return { left: false, right: false };
+    return this.sheets;
+  }
+
+  /**
+   * Sidebars shown over the note instead of beside it: drawers on phones
+   * (one at a time, `drawer`), floating cards on tablets unless pinned with
+   * room to spare (`floating`), never with a mouse.
+   */
+  private get sheets(): { left: boolean; right: boolean } {
+    if (this.isMobile) return { left: true, right: true };
+    if (!this.isTablet) return { left: false, right: false };
+    return sidebarSheets(
+      window.innerWidth - this.railWidth,
+      {
+        open: this.layout.leftOpen,
+        width: this.layout.leftWidth,
+        pinned: this.layout.leftPinned,
+      },
+      { width: this.layout.rightWidth, pinned: this.layout.rightPinned },
+    );
   }
 
   get bottomVisible(): boolean {
@@ -3020,7 +3808,7 @@ export class App {
   }
 
   /** Whether a panel is currently on screen (its area is open and it is the active tab there). */
-  isPanelVisible(id: PanelId): boolean {
+  isPanelVisible(id: DockPanelId): boolean {
     const shown = this.shownDock;
     const area = areaOf(shown, id);
     if (!area || shown[area].active !== id) return false;
@@ -3034,20 +3822,16 @@ export class App {
   toggleLeft(force?: boolean): void {
     const next = force ?? !this.leftVisible;
     if (this.isMobile) this.drawer = next ? "left" : null;
-    else {
-      this.layout.leftOpen = next;
-      if (next && this.narrowTablet) this.layout.rightOpen = false;
-    }
+    else if (this.sheets.left) this.floating.left = next;
+    else this.layout.leftOpen = next;
     this.applyLayout();
   }
 
   toggleRight(force?: boolean): void {
     const next = force ?? !this.rightVisible;
     if (this.isMobile) this.drawer = next ? "right" : null;
-    else {
-      this.layout.rightOpen = next;
-      if (next && this.narrowTablet) this.layout.leftOpen = false;
-    }
+    else if (this.sheets.right) this.floating.right = next;
+    else this.layout.rightOpen = next;
     this.applyLayout();
   }
 
@@ -3056,7 +3840,7 @@ export class App {
     if (this.isMobile) {
       const first = this.layout.dock.bottom.active;
       if (first && (force ?? !this.rightVisible))
-        this.mobilePanel = first as PanelId;
+        this.mobilePanel = first as DockPanelId;
       this.toggleRight(force);
       return;
     }
@@ -3070,14 +3854,17 @@ export class App {
     else this.toggleBottom(true);
   }
 
+  /** Closes phone drawers and floating tablet cards; pinned sidebars stay. */
   closeDrawers(): void {
-    if (this.drawer === null) return;
+    if (this.drawer === null && !this.floating.left && !this.floating.right)
+      return;
     this.drawer = null;
+    this.floating.left = this.floating.right = false;
     this.applyLayout();
   }
 
   /** Activates a panel wherever it is docked and opens that area. */
-  showPanel(id: PanelId): void {
+  showPanel(id: DockPanelId): void {
     this.reopen(id);
     this.layout.dock = activatePanel(this.layout.dock, id);
     if (this.isMobile) this.mobilePanel = id;
@@ -3090,12 +3877,12 @@ export class App {
    * Docks a panel into `area`, at `index` in its tab strip when given. Without
    * an index a panel that already lives there just becomes active.
    */
-  movePanelTo(id: PanelId, area: DockArea, index?: number): void {
+  movePanelTo(id: DockPanelId, area: DockArea, index?: number): void {
     this.reopen(id);
     if (index !== undefined) {
       // `index` counts the tabs on screen; closed panels still hold a place in
       // the stored list, so insert before the panel that is shown there.
-      const shown = withoutPanels(this.layout.dock, this.layout.closedPanels);
+      const shown = withoutPanels(this.layout.dock, this.hiddenPanels);
       const anchor = shown[area].panels[index];
       index = anchor
         ? this.layout.dock[area].panels.indexOf(anchor)
@@ -3113,12 +3900,12 @@ export class App {
     this.applyLayout();
   }
 
-  isPanelClosed(id: PanelId): boolean {
-    return this.layout.closedPanels.includes(id);
+  isPanelClosed(id: DockPanelId): boolean {
+    return !isPluginPanel(id) && this.layout.closedPanels.includes(id);
   }
 
-  private reopen(id: PanelId): void {
-    if (this.isPanelClosed(id))
+  private reopen(id: DockPanelId): void {
+    if (!isPluginPanel(id) && this.isPanelClosed(id))
       this.layout.closedPanels = this.layout.closedPanels.filter(
         (closed) => closed !== id,
       );
@@ -3128,7 +3915,12 @@ export class App {
    * Removes a panel from its dock area. It remembers its place there and comes
    * back through its command, the "+" button of any area or a layout reset.
    */
-  closePanel(id: PanelId): void {
+  closePanel(id: DockPanelId): void {
+    // Closing a plugin's sidebar view detaches its leaf, as in Obsidian.
+    if (isPluginPanel(id)) {
+      this.pluginPanels.get(id)?.leaf.detach();
+      return;
+    }
     if (this.isPanelClosed(id)) return;
     const before = this.shownDock;
     const area = areaOf(before, id);
@@ -3160,7 +3952,7 @@ export class App {
     );
   }
 
-  private panelMenu(id: PanelId): MenuEntry[] {
+  private panelMenu(id: DockPanelId): MenuEntry[] {
     const current = areaOf(this.layout.dock, id);
     const targets: Array<[DockArea, string, string]> = [
       ["left", t("In linke Seitenleiste verschieben"), "panel-left"],
@@ -3168,7 +3960,7 @@ export class App {
       ["right", t("In rechte Seitenleiste verschieben"), "panel-right"],
       ["bottom", t("In unteren Bereich verschieben"), "panel-bottom"],
     ];
-    const shown = withoutPanels(this.layout.dock, this.layout.closedPanels);
+    const shown = withoutPanels(this.layout.dock, this.hiddenPanels);
     const slot = current ? shown[current] : null;
     const index = slot ? slot.panels.indexOf(id) : -1;
     return [
@@ -3244,7 +4036,7 @@ export class App {
           : area === "right"
             ? this.layout.rightWidth
             : area === "left-bottom" ? this.layout.leftBottomHeight : this.layout.bottomHeight,
-      drop: (id, area, index) => this.movePanelTo(id as PanelId, area, index),
+      drop: (id, area, index) => this.movePanelTo(id as DockPanelId, area, index),
     });
     document.addEventListener("contextmenu", (event) => {
       const tab = (event.target as Element).closest?.<HTMLElement>(
@@ -3252,7 +4044,7 @@ export class App {
       );
       if (!tab) return;
       event.preventDefault();
-      showMenu(this.panelMenu(tab.dataset.panel as PanelId), {
+      showMenu(this.panelMenu(tab.dataset.panel as DockPanelId), {
         x: event.clientX,
         y: event.clientY,
       });
@@ -3265,7 +4057,7 @@ export class App {
       );
       if (!tab) return;
       event.preventDefault();
-      this.closePanel(tab.dataset.panel as PanelId);
+      this.closePanel(tab.dataset.panel as DockPanelId);
     });
     for (const area of DOCK_AREAS) {
       const { add } = docks[area];
@@ -3684,6 +4476,15 @@ export class App {
       ...(this.isMobile
         ? []
         : ([
+            ...(this.canPopOut(tab)
+              ? [
+                  {
+                    title: t("In neuem Fenster öffnen"),
+                    icon: "app-window",
+                    onClick: () => void this.popOut(tab),
+                  },
+                ]
+              : []),
             {
               title: t("Nach rechts teilen"),
               icon: "columns-2",
@@ -3698,6 +4499,35 @@ export class App {
           ] satisfies MenuEntry[])),
       ...(tab.path ? this.fileMenuItems(tab.path) : []),
     ];
+  }
+
+  /** Pop-outs are for notes and canvases on desktop, from the main window. */
+  canPopOut(tab: Tab): boolean {
+    return (
+      !this.popout &&
+      !this.isMobile &&
+      this.vault?.platform !== "android" &&
+      !!tab.path &&
+      /\.(md|canvas)$/i.test(tab.path)
+    );
+  }
+
+  /**
+   * Opens the tab's note in a window of its own. The tab stays here; saves in
+   * either window reach the other one.
+   */
+  async popOut(tab: Tab): Promise<void> {
+    const path = tab.path;
+    if (!path || !this.canPopOut(tab)) return;
+    try {
+      if (tab.note && tab.note.text !== tab.note.saved)
+        await this.save(tab.note);
+      await openPopout(path, basename(path).replace(/\.(md|canvas)$/i, ""));
+    } catch (error) {
+      if (error instanceof Error && error.message === "blocked")
+        notify(t("Das Fenster wurde blockiert."), true);
+      else this.report(error);
+    }
   }
 
   /** Shows `tab` and opens it a second time in a new group on `side`. */
@@ -3766,11 +4596,18 @@ export class App {
             .then(() => notify(t("Pfad kopiert.")))
             .catch(() => notify(t("Kopieren nicht möglich."), true)),
       },
-      /\.(md|canvas)$/i.test(path)
+      /\.(md|canvas|base)$/i.test(path)
         ? {
             title: t("Versionsverlauf"),
             icon: "history",
             onClick: () => openFileRecovery(this, path),
+          }
+        : null,
+      /\.md$/i.test(path)
+        ? {
+            title: t("Zusammenführen mit …"),
+            icon: "merge",
+            onClick: () => this.promptMergeFile(path),
           }
         : null,
       /\.md$/i.test(path)
@@ -3839,7 +4676,7 @@ export class App {
       const panel = target.closest<HTMLElement>(
         ".workspace-tab-header[data-panel]",
       );
-      if (panel) this.showPanel(panel.dataset.panel as PanelId);
+      if (panel) this.showPanel(panel.dataset.panel as DockPanelId);
     });
 
     shell.stripActions
@@ -3949,6 +4786,12 @@ export class App {
                 onClick: () => this.commands.run("save"),
               }
             : null,
+          {
+            title: t("Fokusmodus"),
+            icon: "maximize-2",
+            checked: this.focusMode,
+            onClick: () => this.commands.run("toggle-focus-mode"),
+          },
           note && this.vault?.platform !== "android"
             ? {
                 title: t("Drucken oder als PDF speichern"),
@@ -3992,6 +4835,24 @@ export class App {
     document
       .getElementById("sync-conflicts")!
       .addEventListener("click", () => openSyncConflicts(this));
+    // Pin and close buttons in the header of a tablet sidebar card.
+    for (const split of [shell.leftSplit, shell.rightSplit])
+      split.addEventListener("click", (event) => {
+        const button = (event.target as Element).closest<HTMLElement>(
+          "[data-sheet-action]",
+        );
+        if (!button) return;
+        const side = button.dataset.sheetSide as "left" | "right";
+        if (button.dataset.sheetAction === "close") {
+          if (side === "left") this.toggleLeft(false);
+          else this.toggleRight(false);
+        } else
+          this.setPinned(
+            side,
+            !(side === "left" ? this.layout.leftPinned : this.layout.rightPinned),
+          );
+      });
+    installSheetGestures(this, shell);
     document
       .getElementById("export-draft")!
       .addEventListener("click", () => this.exportNote());
@@ -4019,9 +4880,16 @@ export class App {
     );
     window.addEventListener("beforeunload", (event) => {
       this.writeWorkspace();
+      const pluginData = this.compatibility?.hasPendingPluginData() ?? false;
+      void this.compatibility
+        ?.flushPluginData()
+        .catch((error) => this.report(error));
       if (
-        this.store &&
-        [...this.store.notes.values()].some((note) => note.text !== note.saved)
+        pluginData ||
+        (this.store &&
+          [...this.store.notes.values()].some(
+            (note) => note.text !== note.saved,
+          ))
       )
         event.preventDefault();
     });
@@ -4043,6 +4911,9 @@ export class App {
       }
       this.writeWorkspace();
       void this.store?.saveAll().catch((error) => this.report(error));
+      void this.compatibility
+        ?.flushPluginData()
+        .catch((error) => this.report(error));
     });
 
     // Edge swipes open the drawers on touch devices.
@@ -4061,6 +4932,7 @@ export class App {
     document.addEventListener(
       "touchend",
       (event) => {
+        // Tablet cards follow the finger instead (sheet-gestures.ts).
         if (!touch || !this.isMobile || topModal()) return;
         const point = event.changedTouches[0];
         const dx = point.clientX - touch.x;
@@ -4070,8 +4942,14 @@ export class App {
         if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
         if (this.drawer === "left" && dx < 0) this.closeDrawers();
         else if (this.drawer === "right" && dx > 0) this.closeDrawers();
-        else if (!this.drawer && dx > 0 && start < 32) this.toggleLeft(true);
-        else if (!this.drawer && dx < 0 && start > innerWidth - 32)
+        else if (!this.drawer && dx > 0 && start < 32 && !this.leftVisible)
+          this.toggleLeft(true);
+        else if (
+          !this.drawer &&
+          dx < 0 &&
+          start > innerWidth - 32 &&
+          !this.rightVisible
+        )
           this.toggleRight(true);
       },
       { passive: true },
@@ -4138,11 +5016,24 @@ export class App {
       run: () => void this.createCanvas(),
     });
     add({
+      id: "new-base",
+      name: t("Neue Base erstellen"),
+      icon: "table",
+      run: () => void this.createBase(),
+    });
+    add({
       id: "new-tab",
       name: t("Neuer Tab"),
       hotkey: "Mod+T",
       icon: "plus",
       run: () => void this.newTab(),
+    });
+    add({
+      id: "open-in-new-window",
+      name: t("In neuem Fenster öffnen"),
+      icon: "app-window",
+      when: () => this.canPopOut(this.active),
+      run: () => void this.popOut(this.active),
     });
     add({
       id: "close-tab",
@@ -4227,6 +5118,13 @@ export class App {
       icon: "book-open",
       when: hasNote,
       run: () => this.setReading(!this.active.reading),
+    });
+    add({
+      id: "toggle-focus-mode",
+      name: t("Fokusmodus umschalten"),
+      icon: "maximize-2",
+      global: true,
+      run: () => this.setFocusMode(!this.focusMode),
     });
     add({
       id: "toggle-source-mode",
@@ -4391,6 +5289,20 @@ export class App {
       run: () => void this.adjacentDailyNote(1),
     });
     add({
+      id: "merge-file",
+      name: t("Aktuelle Notiz mit einer anderen zusammenführen"),
+      icon: "merge",
+      when: () => this.active.kind === "markdown" && !!this.activePath,
+      run: () => this.promptMergeFile(),
+    });
+    add({
+      id: "extract-selection",
+      name: t("Auswahl in neue Notiz extrahieren"),
+      icon: "scissors",
+      when: () => hasNote() && this.active.kind === "markdown" && !this.active.reading,
+      run: () => this.promptExtractSelection(),
+    });
+    add({
       id: "add-property",
       name: t("Eigenschaft hinzufügen"),
       hotkey: "Mod+;",
@@ -4540,7 +5452,7 @@ export class App {
   // ── persistence ───────────────────────────────────────────────────────────
 
   private writeWorkspace(): void {
-    if (!this.vault) return;
+    if (!this.vault || this.popout) return;
     const groups = this.groups.map((group) => ({
       tabs: group.tabs.map((tab) => ({ path: tab.path, reading: tab.reading })),
       active: group.tabs.indexOf(group.active),
@@ -4568,6 +5480,18 @@ export class App {
       // Restoring tabs is optional.
     }
   }
+}
+
+/** User-facing text for a failed Android update. */
+function androidUpdateMessage(error: unknown): Error {
+  if (error instanceof AndroidUpdateError && error.state === "cancelled")
+    return new Error(t("Das Update wurde abgebrochen."));
+  const message = error instanceof Error ? error.message : String(error);
+  if (message === "SIGNATURE_MISMATCH")
+    return new Error(
+      t("Das Update ist nicht mit dem Schlüssel dieser App signiert. Installiere es über die Quelle, aus der du Basalt hast."),
+    );
+  return new Error(t("Das Update konnte nicht installiert werden: {error}", { error: message }));
 }
 
 function emptyWorkspace(): SavedWorkspace {
@@ -4633,6 +5557,16 @@ function loadWorkspace(vaultId: string): SavedWorkspace {
   return result;
 }
 
+/** A pop-out window starts with every sidebar closed. */
+function popoutLayout(): Layout {
+  return {
+    ...loadLayout(),
+    leftOpen: false,
+    rightOpen: false,
+    bottomOpen: false,
+  };
+}
+
 function loadLayout(): Layout {
   const layout: Layout = {
     leftWidth: 280,
@@ -4642,6 +5576,8 @@ function loadLayout(): Layout {
     leftOpen: true,
     rightOpen: false,
     bottomOpen: false,
+    leftPinned: false,
+    rightPinned: false,
     dock: defaultDock(PANELS),
     closedPanels: [],
   };
@@ -4665,7 +5601,12 @@ function loadLayout(): Layout {
         layout.rightOpen = value.rightOpen;
       if (typeof value.bottomOpen === "boolean")
         layout.bottomOpen = value.bottomOpen;
-      if (value.dock) layout.dock = normalizeDock(value.dock, PANELS);
+      if (typeof value.leftPinned === "boolean")
+        layout.leftPinned = value.leftPinned;
+      if (typeof value.rightPinned === "boolean")
+        layout.rightPinned = value.rightPinned;
+      if (value.dock)
+        layout.dock = normalizeDock(value.dock, PANELS, isPluginPanel);
       if (Array.isArray(value.closedPanels))
         layout.closedPanels = PANELS.map((spec) => spec.id).filter((id) =>
           (value.closedPanels as unknown[]).includes(id),
@@ -4696,6 +5637,24 @@ function syncChildren(parent: HTMLElement, children: HTMLElement[]): void {
 
 export function isCanvas(path: string): boolean {
   return /\.canvas$/i.test(path);
+}
+
+export function isBase(path: string): boolean {
+  return /\.base$/i.test(path);
+}
+
+/** Frontmatter of a note as plain data; empty when missing or invalid. */
+function frontmatterData(text: string): Record<string, unknown> {
+  const range = frontmatterRange(text);
+  if (!range) return {};
+  try {
+    const data: unknown = parseYaml(text.slice(range.yamlFrom, range.yamlTo));
+    return data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
 }
 
 /** Keep note and plugin buffers intact when a save conflict blocks navigation. */

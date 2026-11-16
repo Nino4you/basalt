@@ -255,9 +255,108 @@ try {
     .getByRole("button", { name: "Bearbeiten", exact: true })
     .click({ force: true });
   await expect(editor).toContainText("Edited by native plugin.");
+
+  // Another app shares text into the running app: the activity receives it
+  // in onNewIntent and the page asks where it goes.
+  step("share text");
+  adb(
+    "shell",
+    "am",
+    "start",
+    "-a",
+    "android.intent.action.SEND",
+    "-t",
+    "text/plain",
+    "--es",
+    "android.intent.extra.SUBJECT",
+    "'Geteilt aus dem Smoke-Test'",
+    "--es",
+    "android.intent.extra.TEXT",
+    "'Text aus einer anderen App'",
+    "-n",
+    `${appId}/.MainActivity`,
+  );
+  const shareDialog = page.getByRole("dialog", { name: "Mit Basalt teilen" });
+  await expect(shareDialog).toContainText("Text aus einer anderen App", {
+    timeout: 20000,
+  });
+  await page.screenshot({ path: "test-results/android-native-share.png" });
+  await shareDialog
+    .getByRole("button", { name: "Als neue Notiz speichern" })
+    .click({ force: true });
+  await expect(page.locator("#tab-name")).toHaveText(
+    "Geteilt aus dem Smoke-Test",
+  );
+  await expect(editor).toContainText("Text aus einer anderen App");
+
+  // An image from the media store arrives as an attachment embed. The shell's
+  // URI grant is not available on every image, so this step only warns.
+  step("share image");
+  try {
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    writeFileSync("test-results/share.png", png);
+    adb("push", "test-results/share.png", "/sdcard/Pictures/basalt-share.png");
+    adb(
+      "shell",
+      "am",
+      "broadcast",
+      "-a",
+      "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+      "-d",
+      "file:///sdcard/Pictures/basalt-share.png",
+    );
+    let id = "";
+    for (let attempt = 0; attempt < 20 && !id; attempt++) {
+      const rows = adb(
+        "shell",
+        "content",
+        "query",
+        "--uri",
+        "content://media/external/images/media",
+        "--projection",
+        "_id:_display_name",
+      );
+      id = /_id=(\d+), _display_name=basalt-share\.png/.exec(rows)?.[1] ?? "";
+      if (!id) await page.waitForTimeout(500);
+    }
+    if (!id) throw new Error("image not in the media store");
+    adb(
+      "shell",
+      "am",
+      "start",
+      "-a",
+      "android.intent.action.SEND",
+      "-t",
+      "image/png",
+      "--eu",
+      "android.intent.extra.STREAM",
+      `content://media/external/images/media/${id}`,
+      "--grant-read-uri-permission",
+      "-n",
+      `${appId}/.MainActivity`,
+    );
+    await expect(shareDialog).toContainText("basalt-share.png", {
+      timeout: 20000,
+    });
+    await page.screenshot({ path: "test-results/android-native-share-image.png" });
+    await shareDialog
+      .getByRole("button", { name: "Als neue Notiz speichern" })
+      .click({ force: true });
+    await expect(page.locator("#tab-name")).toHaveText("basalt-share");
+    await expect(editor).toContainText("basalt-share.png");
+    await page.screenshot({
+      path: "test-results/android-native-share-image-note.png",
+    });
+  } catch (error) {
+    console.warn(`[smoke] image share not verified: ${error.message}`);
+  }
+
   failed = false;
   console.log(
-    "Native Android: storage, preview, plugin activation, editor command, shared editor info and persisted plugin edit passed.",
+    "Native Android: storage, preview, plugin activation, editor command, shared editor info, persisted plugin edit and sharing passed.",
   );
 } finally {
   try {

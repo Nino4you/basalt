@@ -40,9 +40,14 @@ impl VaultPath {
         self.has_extension("canvas")
     }
 
-    /// Text documents the app opens and edits: Markdown notes and canvases.
+    /// Database views (`.base`), YAML stored as UTF-8 text like notes.
+    pub fn is_base(&self) -> bool {
+        self.has_extension("base")
+    }
+
+    /// Text documents the app opens and edits: Markdown notes, canvases and bases.
     pub fn is_document(&self) -> bool {
-        self.is_markdown() || self.is_canvas()
+        self.is_markdown() || self.is_canvas() || self.is_base()
     }
 
     fn has_extension(&self, wanted: &str) -> bool {
@@ -62,7 +67,7 @@ pub struct SearchHit {
 
 /// Backend contract for local directories and, later, Android's Storage Access Framework.
 pub trait VaultStorage {
-    /// Markdown notes and JSON canvases (see [`VaultPath::is_document`]), sorted.
+    /// Markdown notes, JSON canvases and bases (see [`VaultPath::is_document`]), sorted.
     fn document_files(&self) -> io::Result<Vec<VaultPath>>;
     fn read_text(&self, path: &VaultPath) -> io::Result<String>;
     /// Must fail rather than overwrite an existing file. Parent folders must exist.

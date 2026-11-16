@@ -14,6 +14,29 @@ export const PHONE_QUERY =
  */
 export const TOUCH_QUERY = "(any-pointer: coarse), (hover: none)";
 
-/** Tablets too narrow (portrait) for both sidebars beside the note. */
-export const NARROW_TABLET_QUERY =
-  "(any-pointer: coarse) and (max-width: 1099px), (hover: none) and (max-width: 1099px)";
+/** Room the floating dock on the left takes (56 px dock and its gaps). */
+export const RAIL_WIDTH = 76;
+/** Tablets dock a sidebar beside the note only while the note keeps this width. */
+export const NOTE_MIN_WIDTH = 520;
+
+/**
+ * Which tablet sidebars float over the note as cards instead of sitting
+ * beside it. They float unless pinned; a pinned one docks only while the
+ * note keeps its width, so a pinned sidebar still floats in portrait on a
+ * small tablet. The left sidebar decides first; the right one docks only if
+ * the note keeps its width beside both.
+ */
+export function sidebarSheets(
+  /** Width beside the dock: the viewport minus RAIL_WIDTH, or all of it. */
+  width: number,
+  left: { open: boolean; width: number; pinned: boolean },
+  right: { width: number; pinned: boolean },
+): { left: boolean; right: boolean } {
+  const room = width;
+  const leftSheet = !left.pinned || room - left.width < NOTE_MIN_WIDTH;
+  const leftDocked = !leftSheet && left.open;
+  const rightSheet =
+    !right.pinned ||
+    room - (leftDocked ? left.width : 0) - right.width < NOTE_MIN_WIDTH;
+  return { left: leftSheet, right: rightSheet };
+}

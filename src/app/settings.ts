@@ -1,5 +1,6 @@
 import { setSystemBarTheme } from "../ui/android-insets";
 import { getLocale, resolveLocale, type Locale } from "../i18n";
+import { DEFAULT_DOCK_ORDER } from "./dock-order";
 
 export type ThemeChoice = "dark" | "light" | "system";
 export type EditingMode = "live" | "source";
@@ -44,6 +45,10 @@ export interface Settings {
   updateCheck: boolean;
   /** Vim keybindings in the editor. */
   vimMode: boolean;
+  /** Where the floating dock sits on tablets. */
+  tabletDock: "left" | "bottom";
+  /** Order of the dock's (ribbon's) actions, see dock-order.ts. */
+  dockOrder: string[];
 }
 
 export const DEFAULT_ACCENT = "#8a5cf5";
@@ -75,6 +80,8 @@ export const defaults: Settings = {
   folding: true,
   updateCheck: false,
   vimMode: false,
+  tabletDock: "left",
+  dockOrder: DEFAULT_DOCK_ORDER,
 };
 
 const KEY = "basalt-settings";
@@ -182,6 +189,7 @@ export class SettingsStore {
     );
     body.classList.toggle("show-inline-title", this.value.inlineTitle);
     body.classList.toggle("hide-ribbon", !this.value.showRibbon);
+    body.classList.toggle("is-dock-bottom", this.value.tabletDock === "bottom");
     const hsl = hexToHsl(this.value.accent) ?? hexToHsl(DEFAULT_ACCENT)!;
     root.style.setProperty("--accent-h", hsl[0].toFixed(1));
     root.style.setProperty("--accent-s", `${hsl[1].toFixed(1)}%`);
