@@ -140,6 +140,41 @@ test("pinning docks the sidebar beside the note and survives a restart", async (
   await expect(workspace(page)).toHaveClass(/is-left-sheet/);
 });
 
+test("the lower-left area keeps a full-width handle and resizes on a tablet", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem("seeded")) return;
+    sessionStorage.setItem("seeded", "1");
+    localStorage.setItem(
+      "basalt-layout",
+      JSON.stringify({
+        dock: { "left-bottom": { panels: ["bookmarks"], active: "bookmarks" } },
+      }),
+    );
+  });
+  await open(page, 1280, 800);
+  await rail(page, "Dateien").tap();
+  await expect(workspace(page)).toHaveClass(/is-left-open/);
+  const lower = page.locator("#left-bottom-split");
+  await expect(
+    lower.getByRole("tabpanel", { name: "Lesezeichen" }),
+  ).toBeVisible();
+  const area = (await lower.boundingBox())!;
+  const separator = page.getByRole("separator", { name: "Höhe links unten" });
+  const handle = (await separator.boundingBox())!;
+  // The grip spans the card, not a finger-wide stub beside it.
+  expect(handle.width).toBeGreaterThan(area.width - 4);
+  expect(handle.height).toBeGreaterThanOrEqual(16);
+  const x = handle.x + handle.width / 2;
+  const y = handle.y + handle.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x, y - 100, { steps: 8 });
+  await page.mouse.up();
+  expect((await lower.boundingBox())!.height).toBeGreaterThan(area.height + 80);
+});
+
 test("cards follow the finger and open or close on release", async ({
   page,
 }) => {
