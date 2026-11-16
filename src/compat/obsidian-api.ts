@@ -185,7 +185,12 @@ function iconElement(iconId: string): SVGSVGElement | null {
     const template = document.createElement("template");
     template.innerHTML = custom;
     const svg = template.content.firstElementChild;
-    return svg instanceof SVGSVGElement ? svg : null;
+    if (svg instanceof SVGSVGElement) return svg;
+    // Like Obsidian, `addIcon` takes the content without the <svg> tag,
+    // drawn in a 100 × 100 box.
+    template.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="18" height="18" class="svg-icon">${custom}</svg>`;
+    const wrapped = template.content.firstElementChild;
+    return wrapped instanceof SVGSVGElement ? wrapped : null;
   }
   // The full set is loaded before plugins run (`CompatibilitySession.create`).
   const node = findIcon(iconId.replace(/^lucide-/, ""));

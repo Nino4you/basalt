@@ -453,6 +453,9 @@ export function renderMarkdown(source: string): string {
     ],
     FORBID_ATTR: ["style", "srcset", "background", "poster", "xlink:href"],
     ALLOW_DATA_ATTR: true,
+    // DOMPurify's default list plus `obsidian:`, whose links go to plugins.
+    ALLOWED_URI_REGEXP:
+      /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|matrix|obsidian):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
   });
   const template = document.createElement("template");
   template.innerHTML = safe;
