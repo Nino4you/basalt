@@ -268,8 +268,7 @@ body.is-tablet
   .sheet-close[data-sheet-side="right"] {
   display: none;
 }
-body.is-tablet .workspace-left-bottom.is-empty,
-body.is-tablet .workspace-left-bottom.is-empty + .workspace-resize-handle {
+body.is-tablet .workspace-left-bottom.is-empty {
   display: none;
 }
 body.is-tablet .workspace {
@@ -449,9 +448,22 @@ body.is-tablet .workspace-tab-header-inner-close-button {
   width: 28px;
   height: 28px;
 }
-body.is-tablet .workspace-resize-handle {
+/* Wider grips for fingers: across for the side handles, along for the
+   handles above the lower-left area and the bottom panel. */
+body.is-tablet .workspace-resize-handle.mod-left,
+body.is-tablet .workspace-resize-handle.mod-right {
   width: 16px;
   margin: 0 -8px;
+}
+body.is-tablet .workspace-resize-handle.mod-left-bottom,
+body.is-tablet .workspace-resize-handle.mod-bottom {
+  height: 16px;
+  margin: -8px 0;
+  touch-action: none;
+}
+body.is-tablet .workspace-resize-handle.mod-left-bottom::after,
+body.is-tablet .workspace-resize-handle.mod-bottom::after {
+  top: 7px;
 }
 body.is-tablet .search-input {
   height: 38px;
