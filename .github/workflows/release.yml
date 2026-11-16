@@ -9,6 +9,9 @@ name: Signed release
 #   signed, but only uploaded as Actions artifacts, no release is created.
 # - A manual run with `test_keys` signs with throwaway keys generated inside
 #   the run. It needs no secrets and checks the whole pipeline before the real keys exist; its output must never be shipped.
+# - A manual run on `main` with `release` does what pushing the tag does: it
+#   creates the tag `v<version>` on the run's commit and the draft release.
+#   This releases without a local git, for example from a phone.
 
 on:
   push:
@@ -17,6 +20,10 @@ on:
     inputs:
       test_keys:
         description: "Sign with throwaway test keys (no secrets needed, output is not distributable)"
+        type: boolean
+        default: false
+      release:
+        description: "Release: tag main's version (v<version>) and create the draft release"
         type: boolean
         default: false
 
@@ -45,6 +52,7 @@ jobs:
         id: version
         env:
           TEST_KEYS: ${{ github.event_name == 'workflow_dispatch' && inputs.test_keys }}
+          RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
         run: |
           set -euo pipefail
           conf=$(jq -r .version src-tauri/tauri.conf.json)
@@ -61,6 +69,19 @@ jobs:
             # core must match the app version that Tauri/Android embed.
             if [ "${version%%-*}" != "$conf" ]; then
               echo "::error::Tag $tag does not match app version $conf"
+              exit 1
+            fi
+            publish=true
+          elif [ "$RELEASE" = "true" ]; then
+            # A manual release is what a pushed tag would be, from main only.
+            if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+              echo "::error::A manual release runs on main, not $GITHUB_REF"
+              exit 1
+            fi
+            tag="v$conf"
+            version="$conf"
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+              echo "::error::Tag $tag exists already; push a new version first"
               exit 1
             fi
             publish=true
@@ -554,6 +575,11 @@ jobs:
             echo
             echo "Verification: see docs/release-signing.md in the repository."
           } >> "$RUNNER_TEMP/notes.md"
+          # A manual release creates its tag here, on the commit that was built.
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            gh api "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA" > /dev/null
+          fi
           args=(--draft --verify-tag --title "Basalt $VERSION" --notes-file "$RUNNER_TEMP/notes.md")
           if [ "$PRERELEASE" = "true" ]; then args+=(--prerelease); fi
           gh release create "$TAG" "${args[@]}" dist-release/*
