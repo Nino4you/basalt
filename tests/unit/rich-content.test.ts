@@ -93,3 +93,30 @@ it("preserves source when the Mermaid renderer rejects a malformed diagram", asy
   enhanceMermaid(root, () => true);
   await vi.waitFor(() => expect(root.querySelector(".mermaid-error")?.textContent).toBe("not a valid diagram"));
 });
+
+it("shares the lazy Mermaid instance between plugins and host diagrams", async () => {
+  const mermaid = {
+    initialize: vi.fn(),
+    render: vi.fn().mockResolvedValue({ svg: "<svg></svg>" }),
+  };
+  vi.doMock("mermaid", () => ({ default: mermaid }));
+  const { createObsidianApi } = await import("../../src/compat/obsidian-api");
+  const { enhanceMermaid } = await import("../../src/app/rich-content");
+  const load = createObsidianApi({ app: {} }).loadMermaid as () => Promise<unknown>;
+  expect(typeof load).toBe("function");
+  const first = load();
+  expect(load()).toBe(first);
+  expect(await first).toBe(mermaid);
+  enhanceMermaid(diagram("flowchart LR\n A --> B"), () => true);
+  await vi.waitFor(() => expect(mermaid.render).toHaveBeenCalledOnce());
+  expect(mermaid.initialize).toHaveBeenCalledWith(expect.objectContaining({ securityLevel: "strict" }));
+});
+
+it("propagates Mermaid chunk failures to plugin callers", async () => {
+  const failure = new Error("Chunk unavailable");
+  vi.doMock("mermaid", () => { throw failure; });
+  const { createObsidianApi } = await import("../../src/compat/obsidian-api");
+  const load = createObsidianApi({ app: {} }).loadMermaid as () => Promise<unknown>;
+  expect(typeof load).toBe("function");
+  await expect(load()).rejects.toMatchObject({ cause: failure });
+});

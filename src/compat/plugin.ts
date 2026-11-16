@@ -1,7 +1,12 @@
 import { Component } from "./component";
+import { constructLegacy } from "./legacy-constructor";
 import type { Extension } from "@codemirror/state";
 import type { EditorExtensionRegistry } from "./editor-extensions";
-import type { PluginCommand, PluginServices } from "./plugin-services";
+import type {
+  ObsidianProtocolHandler,
+  PluginCommand,
+  PluginServices,
+} from "./plugin-services";
 
 export interface PluginManifest {
   id: string;
@@ -33,6 +38,13 @@ function validId(id: string): void {
 
 /** Host API shared by compiled plugins and explicitly enabled external bundles. */
 export class Plugin extends Component {
+  static call(receiver: Plugin, app: object, manifest: PluginManifest): Plugin {
+    return constructLegacy(this, receiver, [app, manifest]);
+  }
+  static apply(receiver: Plugin, args: ArrayLike<unknown>): Plugin {
+    return constructLegacy(this, receiver, args);
+  }
+
   private epoch = 0;
   constructor(
     readonly app: object,
@@ -144,6 +156,22 @@ export class Plugin extends Component {
     if (!workspace) throw new Error("Hover link sources are not available in this host");
     workspace.registerHoverLinkSource(id, info);
     this.register(() => workspace.unregisterHoverLinkSource(id));
+  }
+
+  /**
+   * Handles `obsidian://<action>?…` links that are opened inside Basalt (in
+   * notes, canvases and plugin views). Basalt does not register the scheme
+   * with the system, so links from other apps do not arrive.
+   */
+  registerObsidianProtocolHandler(
+    action: string,
+    handler: ObsidianProtocolHandler,
+  ): void {
+    this.services().registerObsidianProtocolHandler(
+      this.manifest.id,
+      action,
+      handler,
+    );
   }
 
   registerEditorSuggest(suggest: unknown): void {

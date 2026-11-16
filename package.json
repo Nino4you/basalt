@@ -1,6 +1,6 @@
 {
   "name": "basalt-notes",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "license": "MPL-2.0",
   "type": "module",
@@ -24,6 +24,7 @@
     "@codemirror/lang-sql": "^6.10.0",
     "@codemirror/language": "^6.11.0",
     "@codemirror/legacy-modes": "^6.5.5",
+    "@codemirror/lint": "6.9.7",
     "@codemirror/search": "^6.5.10",
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.36.5",
@@ -38,6 +39,7 @@
     "lucide": "^0.468.0",
     "marked": "^15.0.0",
     "mermaid": "^12.3.0",
+    "moment": "2.31.0",
     "pdfjs-dist": "^6.5.438",
     "yaml": "^2.9.1"
   },

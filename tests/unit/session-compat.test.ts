@@ -1,9 +1,10 @@
-import { Compartment, EditorState, Facet } from "@codemirror/state";
+import { Compartment, EditorState, Facet, StateEffect, type StateField } from "@codemirror/state";
 import { expect, it, beforeEach, vi } from "vitest";
 import { CompatibilitySession } from "../../src/compat/session";
 import { Editor } from "../../src/compat/editor-adapter";
 import { EditorExtensionRegistry } from "../../src/compat/editor-extensions";
-import { editorInfoField } from "../../src/compat/obsidian-api";
+import { createObsidianApi, editorInfoField } from "../../src/compat/obsidian-api";
+import { renderedFacet } from "../../src/editor/live-preview";
 import { Plugin } from "../../src/compat/plugin";
 import type { VaultStoragePort } from "../../src/compat/storage-port";
 
@@ -199,6 +200,30 @@ it("publishes the active file through editorInfoField for sync plugins", async (
   await session.dispose();
 });
 
+it("publishes live preview changes from the actual host mode compartment", async () => {
+  const f = fixture();
+  const mode = new Compartment();
+  f.editor.cm.dispatch({ effects: StateEffect.appendConfig.of(mode.of(renderedFacet.of(false))) });
+  const session = await CompatibilitySession.create({
+    vaultId: "fixture", name: "Fixture", mobile: false,
+    editor: f.editor, extensions: f.extensions,
+    container: document.createElement("div"), port: f.port,
+    navigate: async () => {},
+  });
+  const field = createObsidianApi({ app: session }).editorLivePreviewField as StateField<boolean>;
+  try {
+    expect(field).toBeDefined();
+    expect(f.state().field(field)).toBe(false);
+    f.editor.cm.dispatch({ effects: mode.reconfigure(renderedFacet.of(true)) });
+    expect(f.state().field(field)).toBe(true);
+    f.editor.cm.dispatch({ effects: mode.reconfigure(renderedFacet.of(false)) });
+    expect(f.state().field(field)).toBe(false);
+  } finally {
+    await session.dispose();
+  }
+  expect(f.state().field(field, false)).toBeUndefined();
+});
+
 it("persists app-level local storage as JSON like the documented API", async () => {
   const f = fixture();
   let session: CompatibilitySession;
@@ -257,6 +282,32 @@ it("refuses to bind a foreign storage port or navigate foreign file objects", as
     first.workspace.getLeaf().openFile(second.vault.getFileByPath("Note.md")!),
   ).rejects.toThrow("another or stale");
   expect(options.navigate).not.toHaveBeenCalled();
+});
+
+it("reports live host theme changes through modern and legacy plugin APIs", async () => {
+  const f = fixture();
+  const session = await CompatibilitySession.create({
+    vaultId: "fixture", name: "Fixture", mobile: false,
+    editor: f.editor, extensions: f.extensions,
+    container: document.createElement("div"), port: f.port,
+    navigate: async () => {},
+  });
+  const previousClass = document.body.className;
+  try {
+    document.body.classList.remove("theme-dark");
+    document.body.classList.add("theme-light");
+    expect(session.isDarkMode()).toBe(false);
+    expect(session.getTheme()).toBe("moonstone");
+    document.body.classList.replace("theme-light", "theme-dark");
+    expect(session.isDarkMode()).toBe(true);
+    expect(session.getTheme()).toBe("obsidian");
+    document.body.classList.replace("theme-dark", "theme-light");
+    expect(session.isDarkMode()).toBe(false);
+    expect(session.getTheme()).toBe("moonstone");
+  } finally {
+    document.body.className = previousClass;
+    await session.dispose();
+  }
 });
 
 it("exposes the host status bar container to plugins", async () => {

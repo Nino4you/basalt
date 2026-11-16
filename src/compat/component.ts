@@ -8,8 +8,8 @@ export class Component {
   private parent: Component | null = null;
   private unloadTasks: Promise<unknown>[] = [];
 
-  /** Obsidian plugins inspect this lifecycle flag when patching view routing. */
-  get _loaded(): boolean { return this.phase === "loaded"; }
+  /** Legacy plugins assign this flag; only phase controls host resource ownership. */
+  _loaded = false;
 
   onload(): void {}
   onunload(): void {}
@@ -20,6 +20,7 @@ export class Component {
     if (this.phase === "unloading")
       throw new Error("Cannot load a component while it is unloading");
     this.phase = "loaded";
+    this._loaded = true;
     this.unloadTasks = [];
     return true;
   }
@@ -49,6 +50,7 @@ export class Component {
     if (this.phase === "unloading" || this.phase === "unloaded") return;
     const wasLoaded = this.phase === "loaded";
     this.phase = "unloading";
+    this._loaded = false;
     const errors: unknown[] = [];
     const attempt = (fn: () => unknown) => {
       try {

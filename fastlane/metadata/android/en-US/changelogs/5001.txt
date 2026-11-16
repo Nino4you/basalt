@@ -1,0 +1,1 @@
+Fixes for plugins: icons from cmdr no longer stop Iconize, Copilot and Omnisearch start again, and many plugin settings, editors and older plugins work better.

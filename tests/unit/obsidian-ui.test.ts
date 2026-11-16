@@ -1,6 +1,8 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { loadIconLibrary } from "../../src/ui/icon-library";
 import {
+  BaseComponent,
+  ButtonComponent,
   createFragment,
   createObsidianApi,
   FuzzySuggestModal,
@@ -21,6 +23,75 @@ installDomCompat();
 // Plugin hosts load the full Lucide set before activation; do the same here.
 beforeAll(() => loadIconLibrary());
 describe("Obsidian DOM and UI compatibility", () => {
+  it("disables and reenables every tracked control in a setting row", () => {
+    const setting = new Setting(document.createElement("div"))
+      .addText(text => text.setValue("kept"))
+      .addTextArea(text => text.setValue("description"))
+      .addToggle(toggle => toggle.setValue(true))
+      .addButton(button => button.setButtonText("Apply"))
+      .addExtraButton(button => button.setTooltip("More"))
+      .addDropdown(dropdown => dropdown.addOption("one", "One").setValue("one"))
+      .addSlider(slider => slider.setValue(5))
+      .addColorPicker(color => color.setValue("#ffffff"));
+    expect(setting.components).toHaveLength(8);
+    const controls = [...setting.controlEl.querySelectorAll<HTMLInputElement | HTMLButtonElement>("input, textarea, select, button")];
+    expect(controls).toHaveLength(8);
+    for (const disabled of [true, false]) {
+      expect(setting.setDisabled(disabled)).toBe(setting);
+      for (const component of setting.components) {
+        expect(component).toBeInstanceOf(BaseComponent);
+        expect(component.disabled).toBe(disabled);
+      }
+      expect(controls.every(control => control.disabled === disabled)).toBe(true);
+    }
+    expect((controls[0] as HTMLInputElement).value).toBe("kept");
+    expect((controls[2] as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("disables controls added to a disabled setting without affecting another row", () => {
+    const root = document.createElement("div");
+    const setting = new Setting(root).setDisabled(true);
+    const other = new Setting(root).addText(text => text.setValue("other"));
+    setting.addText(text => text.setValue("late")).addButton(button => button.setDisabled(false));
+    expect(setting.components.every(component => component.disabled)).toBe(true);
+    expect(setting.controlEl.querySelector<HTMLInputElement>("input")?.disabled).toBe(true);
+    expect(setting.controlEl.querySelector<HTMLButtonElement>("button")?.disabled).toBe(true);
+    expect(other.controlEl.querySelector<HTMLInputElement>("input")?.disabled).toBe(false);
+  });
+
+  it("preserves a callback's disabled control in an enabled setting", () => {
+    const setting = new Setting(document.createElement("div"))
+      .addText(text => text.setDisabled(true))
+      .addButton(button => button.setDisabled(true));
+    expect(setting.components.every(component => component.disabled)).toBe(true);
+    expect(setting.controlEl.querySelector<HTMLInputElement>("input")?.disabled).toBe(true);
+    expect(setting.controlEl.querySelector<HTMLButtonElement>("button")?.disabled).toBe(true);
+  });
+
+  it("sets a button tooltip through the shared accessible tooltip helper", () => {
+    const button = new ButtonComponent(document.createElement("div"));
+    expect(button.setTooltip("Sync settings", { placement: "left" })).toBe(button);
+    expect(button.buttonEl.title).toBe("Sync settings");
+    expect(button.buttonEl.getAttribute("aria-label")).toBe("Sync settings");
+    button.setTooltip("Updated");
+    expect(button.buttonEl.title).toBe("Updated");
+  });
+
+  it("removes and reapplies button CTA styling without losing other state", () => {
+    const button = new ButtonComponent(document.createElement("div"))
+      .setButtonText("Apply")
+      .setDisabled(true)
+      .setCta();
+    button.buttonEl.classList.add("plugin-action");
+    expect(button.removeCta()).toBe(button);
+    expect(button.buttonEl.classList.contains("mod-cta")).toBe(false);
+    expect(button.buttonEl.classList.contains("plugin-action")).toBe(true);
+    expect(button.buttonEl.textContent).toBe("Apply");
+    expect(button.buttonEl.disabled).toBe(true);
+    expect(button.setCta()).toBe(button);
+    expect(button.buttonEl.classList.contains("mod-cta")).toBe(true);
+  });
+
   it("creates detached global DOM elements and honors parent options", () => {
     const parent = document.createElement("div");
     const child = createDiv({ cls: "cell", text: "A1", parent }, (el) => {

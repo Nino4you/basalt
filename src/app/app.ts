@@ -1714,6 +1714,12 @@ export class App {
   }
 
   openExternal(url: string): void {
+    // `obsidian://` links go to the plugin that registered their action.
+    if (/^obsidian:/i.test(url.trim())) {
+      if (!this.compatibility?.services.handleObsidianUrl(url))
+        notify(t("Kein aktiviertes Plugin verarbeitet diesen obsidian://-Link."));
+      return;
+    }
     // SECURITY.md: external links are never opened automatically.
     const copied = navigator.clipboard?.writeText(url);
     if (copied)

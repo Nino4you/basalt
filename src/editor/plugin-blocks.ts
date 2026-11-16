@@ -144,6 +144,7 @@ export const pluginBlocks = StateField.define<DecorationSet>({
   update(decorations, tr) {
     if (
       tr.docChanged ||
+      syntaxTree(tr.startState) !== syntaxTree(tr.state) ||
       tr.startState.facet(renderedFacet) !== tr.state.facet(renderedFacet) ||
       tr.startState.facet(codeBlockHost) !== tr.state.facet(codeBlockHost) ||
       tr.effects.some((effect) => effect.is(refreshCodeBlocks))
