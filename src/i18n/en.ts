@@ -89,6 +89,8 @@ export const en = {
     "External links are not opened automatically. Address copied.",
   "Externe Links werden aus Sicherheitsgründen nicht automatisch geöffnet.":
     "External links are not opened automatically for security reasons.",
+  "Kein aktiviertes Plugin verarbeitet diesen obsidian://-Link.":
+    "No enabled plugin handles this obsidian:// link.",
   "Ungespeicherte Änderungen": "Unsaved changes",
   "Vault wird geöffnet …": "Opening vault …",
   "Keine Datei geöffnet": "No file open",

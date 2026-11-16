@@ -39,6 +39,22 @@ describe("module helpers", () => {
     expect(api.getIcon("basalt-test")?.getAttribute("width")).toBe("100");
   });
 
+  it("wraps icon content given without an <svg> tag, like Obsidian", () => {
+    // cmdr registers bare shapes for a 100 × 100 box; Iconize then reads every id.
+    api.addIcon(
+      "basalt-bare",
+      '<g style="fill: currentColor;"><path d="M10 10h80v80H10z"/></g>',
+    );
+    const icon = api.getIcon("basalt-bare");
+    expect(icon).toBeInstanceOf(SVGSVGElement);
+    expect(icon?.getAttribute("viewBox")).toBe("0 0 100 100");
+    expect(icon?.querySelector("g > path")).toBeInstanceOf(SVGElement);
+    const element = document.createElement("div");
+    api.setIcon(element, "basalt-bare");
+    expect(element.querySelector("svg path")).not.toBeNull();
+    for (const id of api.getIconIds()) expect(api.getIcon(id)).not.toBeNull();
+  });
+
   it("removes a custom icon again", () => {
     api.addIcon("basalt-temp", SVG);
     api.removeIcon("basalt-temp");

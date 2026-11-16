@@ -40,7 +40,9 @@ will get a response once the report has been reviewed.
   its original version base, so restoring it cannot silently overwrite external changes. A full
   or locked storage medium remains an error case.
 - Markdown is sanitized with DOMPurify before display. The native CSP blocks remote resources,
-  scripts, frames and object embeds; external links are never opened automatically. The preview
+  scripts, frames and object embeds; external links are never opened automatically. An
+  `obsidian://` link is only handed to the handler an enabled plugin registered for its action,
+  never to the system. The preview
   additionally strips remote image sources, also in the browser demo.
 - Plugin loader: bundles from `Basalt/Plugins/<id>` only run after explicit activation. There
   is **no sandbox**: plugin code has the same frontend permissions as the app, including the

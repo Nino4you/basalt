@@ -203,7 +203,13 @@ newline), `from`, `to` and `contentStart`; without a block all values are empty.
 `DocumentFragment`. `requireApiVersion` compares against the reported `apiVersion` 1.15.0;
 `getLinkpath`, `stripHeading` and `stripHeadingForLink` follow the documented examples, and
 `getAllTags` normalizes the tags of a `CachedMetadata`. `addIcon`, `getIcon` and `removeIcon`
-extend the built-in Lucide icons, and `setIcon` uses both sources. The full Lucide set lives in a
+extend the built-in Lucide icons, and `setIcon` uses both sources. As in Obsidian, `addIcon`
+content without an `<svg>` tag is drawn in a `0 0 100 100` box (cmdr registers its icons that
+way, and Iconize reads every listed id). `Plugin.registerObsidianProtocolHandler` receives
+`obsidian://<action>?…` links that are opened inside Basalt (notes, canvases, plugin views) as
+`{ action, …parameters }` and is released when the plugin unloads; the scheme is not registered
+with the system, so links from other apps do not arrive. A link no enabled plugin handles shows a
+notice. The full Lucide set lives in a
 lazily loaded chunk that is loaded before any plugin is activated, so `setIcon` stays synchronous
 and knows every icon for plugins. The buffer helpers (`arrayBufferToBase64`,
 `base64ToArrayBuffer`, `arrayBufferToHex`, `hexToArrayBuffer`, `getBlobArrayBuffer`) work

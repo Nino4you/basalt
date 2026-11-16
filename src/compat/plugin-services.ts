@@ -36,6 +36,27 @@ interface PluginResources {
   codeBlockProcessors: Set<string>;
   postProcessors: Set<unknown>;
   editorSuggests: Set<unknown>;
+  protocolHandlers: Set<string>;
+}
+
+/** The parameters of an `obsidian://action?…` link, as Obsidian passes them. */
+export type ObsidianProtocolData = { action: string } & Record<string, string>;
+export type ObsidianProtocolHandler = (params: ObsidianProtocolData) => unknown;
+
+/** `obsidian://action?a=1&b=2` → `{ action, a, b }`, or null for other URLs. */
+export function parseObsidianUrl(url: string): ObsidianProtocolData | null {
+  const match = /^obsidian:\/\/([^?#/]+)\/?(?:\?([^#]*))?/i.exec(url.trim());
+  if (!match) return null;
+  let action: string;
+  try {
+    action = decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+  const data: ObsidianProtocolData = { action };
+  for (const [key, value] of new URLSearchParams(match[2] ?? ""))
+    if (key !== "action") data[key] = value;
+  return data;
 }
 
 function emptyResources(): PluginResources {
@@ -49,6 +70,7 @@ function emptyResources(): PluginResources {
     codeBlockProcessors: new Set(),
     postProcessors: new Set(),
     editorSuggests: new Set(),
+    protocolHandlers: new Set(),
   };
 }
 
@@ -69,6 +91,7 @@ export class PluginServices {
     (source: string, el: HTMLElement, ctx: unknown) => unknown
   >();
   private readonly postProcessors: unknown[] = [];
+  private readonly protocolHandlers = new Map<string, ObsidianProtocolHandler>();
   private readonly resources = new Map<string, PluginResources>();
   private readonly defaultHotkeys = new Map<string, PluginHotkey[]>();
   private readonly doc: Document;
@@ -340,6 +363,33 @@ export class PluginServices {
     ]);
   }
 
+  registerObsidianProtocolHandler(
+    pluginId: string,
+    action: string,
+    handler: ObsidianProtocolHandler,
+  ): void {
+    if (typeof handler !== "function")
+      throw new TypeError("Protocol handlers must be functions");
+    if (this.protocolHandlers.has(action))
+      throw new Error(`Protocol action is already registered: ${action}`);
+    this.protocolHandlers.set(action, handler);
+    this.resource(pluginId).protocolHandlers.add(action);
+  }
+
+  /**
+   * Runs the plugin handler for an `obsidian://` link opened inside Basalt.
+   * False when the URL is not one or no plugin handles its action.
+   */
+  handleObsidianUrl(url: string): boolean {
+    const data = parseObsidianUrl(url);
+    const handler = data && this.protocolHandlers.get(data.action);
+    if (!data || !handler) return false;
+    void Promise.resolve()
+      .then(() => handler(data))
+      .catch((error) => console.error(`obsidian://${data.action}:`, error));
+    return true;
+  }
+
   /** Remove every contribution of one plugin. Called from its unload path. */
   removePlugin(pluginId: string): void {
     const resources = this.resources.get(pluginId);
@@ -356,6 +406,8 @@ export class PluginServices {
       const index = this.postProcessors.indexOf(handler);
       if (index >= 0) this.postProcessors.splice(index, 1);
     }
+    for (const action of resources.protocolHandlers)
+      this.protocolHandlers.delete(action);
     this.resources.delete(pluginId);
   }
 }
