@@ -50,6 +50,42 @@ describe("compatibility events", () => {
 });
 
 describe("compatibility resource lifecycle", () => {
+  it("allows legacy loaded-flag assignments without bypassing lifecycle ownership", () => {
+    class LegacyComponent extends Component {
+      constructor() {
+        super();
+        this._loaded = false;
+      }
+    }
+    const component = new LegacyComponent();
+    const load = vi.spyOn(component, "onload");
+    const unload = vi.spyOn(component, "onunload");
+    const cleanup = vi.fn();
+    component.register(cleanup);
+    expect(component._loaded).toBe(false);
+    component.load();
+    expect(component._loaded).toBe(true);
+    component._loaded = false;
+    component.load();
+    expect(load).toHaveBeenCalledOnce();
+    component.unload();
+    expect(component._loaded).toBe(false);
+    expect(unload).toHaveBeenCalledOnce();
+    expect(cleanup).toHaveBeenCalledOnce();
+    component._loaded = true;
+    component.unload();
+    expect(unload).toHaveBeenCalledOnce();
+    expect(() => component.addChild(new Component())).toThrow("after cleanup");
+    const late = vi.fn();
+    component.register(late);
+    expect(late).toHaveBeenCalledOnce();
+    component.load();
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(component._loaded).toBe(true);
+    component.unload();
+    expect(component._loaded).toBe(false);
+  });
+
   it("loads children once, including late additions, and cleans all resources", () => {
     vi.useFakeTimers();
     const parent = new Component();

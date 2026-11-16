@@ -77,6 +77,11 @@ type Mermaid = typeof import("mermaid").default;
 let mermaidRenderer: Promise<Mermaid> | null = null;
 let diagramId = 0;
 
+export function loadMermaid(): Promise<Mermaid> {
+  mermaidRenderer ??= import("mermaid").then(({ default: mermaid }) => mermaid);
+  return mermaidRenderer;
+}
+
 /**
  * Resolves an app color token to `rgb(...)`. Mermaid derives shades from its
  * theme colors and cannot parse `var()` or `color-mix()` itself.
@@ -164,8 +169,7 @@ export function enhanceMermaid(
     fallback.textContent = source;
     holder.replaceChildren(fallback);
   };
-  mermaidRenderer ??= import("mermaid").then(({ default: mermaid }) => mermaid);
-  void mermaidRenderer
+  void loadMermaid()
     .then(async (mermaid) => {
       // Re-read the theme per batch so a light/dark switch reaches new diagrams.
       mermaid.initialize(mermaidConfig());

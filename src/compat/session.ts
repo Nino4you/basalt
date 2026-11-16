@@ -11,6 +11,7 @@ import {
   createObsidianApi,
   editorInfoEffect,
   editorInfoField,
+  editorLivePreviewField,
   Scope,
 } from "./obsidian-api";
 import type { RequestUrl } from "./request";
@@ -210,7 +211,7 @@ export class CompatibilitySession {
         modules: editorModules,
       },
     });
-    this.editorInfoCleanup = options.extensions.register(editorInfoField);
+    this.editorInfoCleanup = options.extensions.register([editorInfoField, editorLivePreviewField]);
     const ui = options.pluginUi;
     this.plugins.setToggleHost({
       enable: async (id) => {
@@ -333,6 +334,14 @@ export class CompatibilitySession {
     if (value === null || value === undefined)
       localStorage.removeItem(this.localStorageKey(key));
     else localStorage.setItem(this.localStorageKey(key), JSON.stringify(value));
+  }
+
+  isDarkMode(): boolean {
+    return document.body.classList.contains("theme-dark");
+  }
+
+  getTheme(): "obsidian" | "moonstone" {
+    return this.isDarkMode() ? "obsidian" : "moonstone";
   }
 
   getAccentColor(): string {

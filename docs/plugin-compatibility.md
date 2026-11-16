@@ -237,8 +237,9 @@ missing wiki links for this. **Cmdr 0.5.11** activates after adding the exported
 `cmdr:open-commander-settings` and deactivates cleanly. The macro and ribbon UI has not been
 clicked through completely. **Calendar 1.5.10** used to fail on `Workspace.getRightLeaf`; sidebar
 leaves now exist (see "Sidebar views" below), and Calendar opens its view in the right sidebar,
-but its month grid still fails on `moment.localeData`, because the exported `moment` is not the
-full Moment.js API. **Double Shift
+and the exported/global date API now uses Moment.js 2.31.0 with bundled German/English locales.
+The unchanged Calendar Beta 2.0.0 bundle reaches daily-note settings, which are still missing;
+this is not a claim that the calendar works completely. **Double Shift
 Search 1.0.0** activates with `double-shift-search:open-vault-search`, and **Ninja Cursor
 0.0.14** activates without commands or views; both deactivate cleanly. **File Explorer Plus
 1.3.1** fails because there is no `file-explorer` view: the host has its own file tree but no
@@ -281,7 +282,8 @@ active leaf for editor commands. Notes cannot be opened in a sidebar. `leftSplit
 report and change the sidebar's collapsed state; `split` (a new tab group) opens a new tab.
 Verified with the bulk survey: File Tree Alternative 2.x, Spaced Repetition, Quiet Outline,
 Reminder and Notebook Navigator open their sidebar views; Quiet Outline then fails on the
-internal `getActiveFileView`, Reminder on the Moment.js gap.
+internal `getActiveFileView`. Reminder's former Moment.js failure is fixed: the unchanged
+Reminder bundle now completes the survey stages without errors.
 
 ### Bulk survey of community plugins
 
@@ -295,6 +297,10 @@ views, render the first settings tab, disable. It writes `report.md` / `report.j
 of the live API objects against `obsidian.d.ts`. Downloads are cached there and never committed.
 It runs the browser demo only, so it proves neither native IPC nor Android, and "loads cleanly"
 does not mean every feature works.
+"Loads cleanly" requires successful activation and zero recorded errors, including network
+errors. A green Playwright run means the diagnostics were collected, not that every plugin
+passed; check the report counts, missing results and download failures. Report classification
+regressions run with `node --test tools/plugin-survey/report.test.mjs`.
 
 ## Open compatibility stages
 
@@ -304,8 +310,11 @@ does not mean every feature works.
 2. Check sync, pen and spreadsheet plugins on real devices (two clients, offline/resume, pen
    pressure, OCR/worker resources, file fidelity).
 
-Other shared gaps: the full Moment.js API (Calendar, Reminder, Day Planner) and the CodeMirror 5
-mode for older syntax plugins. `Editor.exec` maps the documented commands onto the shared CodeMirror 6
+Plugin dates use the actual Moment.js API rather than a timestamp-formatting placeholder;
+parsing, mutable arithmetic, cloning, comparisons, durations and locale data share one instance.
+The app's own filename/template formatter remains independent. Calendar configuration and
+fileless main-area plugin views remain separate gaps, as does the CodeMirror 5 mode for older
+syntax plugins. `Editor.exec` maps the documented commands onto the shared CodeMirror 6
 editor; `EditorSuggest` is connected to editor completion; `registerHoverLinkSource` (on the
 workspace and, unregistered on unload, on `Plugin`) stores plugin sources but is not yet queried
 for the host's own page preview. Node/Electron plugins do

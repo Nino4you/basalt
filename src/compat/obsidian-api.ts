@@ -1,6 +1,12 @@
 import { getLocale } from "../i18n";
+import obsidianMoment from "moment";
+import { loadMermaid } from "../app/rich-content";
+import { constructLegacy } from "./legacy-constructor";
+import { installSvgCompat } from "./svg";
+import "moment/locale/de.js";
 import { API_VERSION } from "./api-version";
 import { StateEffect, StateField } from "@codemirror/state";
+import { renderedFacet } from "../editor/live-preview";
 import DOMPurify from "dompurify";
 import {
   fetchRequestUrl,
@@ -12,6 +18,7 @@ import { createElement } from "lucide";
 import { findIcon, iconIds } from "../ui/icon-library";
 import { showMenu, type MenuEntry } from "../ui/menu";
 import { Component } from "./component";
+import { SettingPage } from "./setting-page";
 import { debounce } from "./debounce";
 import { installDomEvents } from "./dom-events";
 import { Editor, type EditorPosition } from "./editor-adapter";
@@ -154,6 +161,11 @@ export const editorInfoField = StateField.define<EditorInfo | null>({
       if (effect.is(editorInfoEffect)) value = effect.value;
     return value;
   },
+});
+
+export const editorLivePreviewField = StateField.define<boolean>({
+  create: (state) => state.facet(renderedFacet),
+  update: (_value, transaction) => transaction.state.facet(renderedFacet),
 });
 
 export type { RequestUrlParam, RequestUrlResponse } from "./request";
@@ -346,6 +358,7 @@ export function getBlobArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
 }
 
 export function installDomCompat(): void {
+  installSvgCompat();
   const marker = Symbol.for("basalt.domCompat");
   const prototype = HTMLElement.prototype as unknown as Record<
     symbol | string,
@@ -544,21 +557,6 @@ export function createFragment(
   return fragment;
 }
 
-// shortcut: only the filename tokens Obsidian plugins use, swap for moment if locale-aware dates are needed.
-function momentFormat(date: Date, pattern: string): string {
-  const pad = (value: number, width = 2) => String(value).padStart(width, "0");
-  const tokens: Record<string, string> = {
-    YYYY: String(date.getFullYear()),
-    MM: pad(date.getMonth() + 1),
-    DD: pad(date.getDate()),
-    HH: pad(date.getHours()),
-    mm: pad(date.getMinutes()),
-    ss: pad(date.getSeconds()),
-    SSS: pad(date.getMilliseconds(), 3),
-  };
-  return pattern.replace(/YYYY|MM|DD|HH|mm|ss|SSS/g, (token) => tokens[token]);
-}
-
 /** Documented DOM extensions Obsidian adds to native prototypes. */
 function installDomHelpers(): void {
   const node = Node.prototype as unknown as Record<string, unknown>;
@@ -663,19 +661,8 @@ function installDomHelpers(): void {
   }
 }
 
-/** Obsidian exposes these globals; plugins call them without importing. */
-const obsidianMoment = Object.assign(
-  () => ({
-    format: (pattern: string) => momentFormat(new Date(), pattern),
-    // Plugins use the active interface language for dictionary selection.
-    locale: getLocale,
-  }),
-  {
-    // Moment also exposes these as statics on the callable itself.
-    format: (pattern: string) => momentFormat(new Date(), pattern),
-    locale: getLocale,
-  },
-);
+// Bundle the host's supported locales; date APIs never need ambient filesystem access.
+obsidianMoment.locale(getLocale());
 
 /** Obsidian extends built-ins exactly as documented in its global type patches. */
 function installLanguageHelpers(): void {
@@ -910,6 +897,13 @@ export class Modal {
 }
 
 export class PluginSettingTab {
+  static call(receiver: PluginSettingTab, app: object, plugin: Plugin): PluginSettingTab {
+    return constructLegacy(this, receiver, [app, plugin]);
+  }
+  static apply(receiver: PluginSettingTab, args: ArrayLike<unknown>): PluginSettingTab {
+    return constructLegacy(this, receiver, args);
+  }
+
   readonly containerEl: HTMLElement;
   constructor(
     readonly app: object,
@@ -997,6 +991,36 @@ export class TextComponent extends InputComponent<string> {
   }
 }
 
+export class SearchComponent extends TextComponent {
+  readonly clearButtonEl: HTMLButtonElement;
+  constructor(containerEl: HTMLElement) {
+    const wrapper = element("div", "search-input-container");
+    super(wrapper);
+    (this.inputEl as HTMLInputElement).type = "search";
+    this.clearButtonEl = document.createElement("button");
+    this.clearButtonEl.type = "button";
+    this.clearButtonEl.textContent = "×";
+    this.clearButtonEl.setAttribute("aria-label", getLocale() === "de" ? "Suche leeren" : "Clear search");
+    this.clearButtonEl.addEventListener("click", () => {
+      this.setValue("");
+      this.onChanged();
+      this.inputEl.focus();
+    });
+    wrapper.append(this.inputEl, this.clearButtonEl);
+    containerEl.append(wrapper);
+  }
+  override getValue(): string {
+    return this.inputEl.value;
+  }
+  onChanged(): void {
+    this.inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  override setDisabled(disabled: boolean): this {
+    this.clearButtonEl.disabled = disabled;
+    return super.setDisabled(disabled);
+  }
+}
+
 export class TextAreaComponent extends InputComponent<string> {
   constructor(settingEl: HTMLElement) {
     super(settingEl, "textarea");
@@ -1031,9 +1055,10 @@ export class ToggleComponent extends InputComponent<boolean> {
   }
 }
 
-export class ButtonComponent {
+export class ButtonComponent extends BaseComponent {
   readonly buttonEl: HTMLButtonElement;
   constructor(settingEl: HTMLElement) {
+    super();
     this.buttonEl = document.createElement("button");
     this.buttonEl.type = "button";
     this.buttonEl.className = "mod-cta";
@@ -1047,6 +1072,14 @@ export class ButtonComponent {
     this.buttonEl.classList.add("mod-cta");
     return this;
   }
+  removeCta(): this {
+    this.buttonEl.classList.remove("mod-cta");
+    return this;
+  }
+  setTooltip(value: string, options: Record<string, unknown> = {}): this {
+    setTooltip(this.buttonEl, value, options);
+    return this;
+  }
   setWarning(): this {
     this.buttonEl.classList.add("mod-warning");
     return this;
@@ -1055,9 +1088,9 @@ export class ButtonComponent {
     setIcon(this.buttonEl, icon);
     return this;
   }
-  setDisabled(value: boolean): this {
+  override setDisabled(value: boolean): this {
     this.buttonEl.disabled = value;
-    return this;
+    return super.setDisabled(value);
   }
   onClick(callback: (event: MouseEvent) => unknown): this {
     this.buttonEl.addEventListener("click", callback);
@@ -1065,9 +1098,10 @@ export class ButtonComponent {
   }
 }
 
-export class ExtraButtonComponent {
+export class ExtraButtonComponent extends BaseComponent {
   readonly extraSettingsEl: HTMLElement;
   constructor(settingEl: HTMLElement) {
+    super();
     this.extraSettingsEl = element("button", "clickable-icon");
     (this.extraSettingsEl as HTMLButtonElement).type = "button";
     settingEl.append(this.extraSettingsEl);
@@ -1080,9 +1114,9 @@ export class ExtraButtonComponent {
     setTooltip(this.extraSettingsEl, value);
     return this;
   }
-  setDisabled(value: boolean): this {
+  override setDisabled(value: boolean): this {
     (this.extraSettingsEl as HTMLButtonElement).disabled = value;
-    return this;
+    return super.setDisabled(value);
   }
   onClick(callback: (event: MouseEvent) => unknown): this {
     this.extraSettingsEl.addEventListener("click", callback);
@@ -1154,6 +1188,8 @@ export class ColorComponent extends InputComponent<string> {
 }
 
 export class Setting {
+  readonly components: BaseComponent[] = [];
+  private disabled = false;
   readonly settingEl: HTMLElement;
   readonly infoEl: HTMLElement;
   readonly nameEl: HTMLElement;
@@ -1181,6 +1217,18 @@ export class Setting {
     this.settingEl.classList.add("setting-item-heading");
     return this;
   }
+  setDisabled(disabled: boolean): this {
+    this.disabled = disabled;
+    this.settingEl.classList.toggle("is-disabled", disabled);
+    for (const component of this.components) component.setDisabled(disabled);
+    return this;
+  }
+  private addComponent<T extends BaseComponent>(component: T, callback: (component: T) => unknown): this {
+    this.components.push(component);
+    callback(component);
+    if (this.disabled) component.setDisabled(true);
+    return this;
+  }
   /** Private host helper used by Excalidraw's export dialog. */
   setVisibility(visible: boolean): this {
     this.settingEl.hidden = !visible;
@@ -1197,45 +1245,70 @@ export class Setting {
   addText(callback: (component: TextComponent) => unknown): this {
     const component = new TextComponent(this.controlEl);
     this.controlEl.append(component.inputEl);
-    callback(component);
-    return this;
+    return this.addComponent(component, callback);
   }
   addTextArea(callback: (component: TextAreaComponent) => unknown): this {
     const component = new TextAreaComponent(this.controlEl);
     this.controlEl.append(component.inputEl);
-    callback(component);
-    return this;
+    return this.addComponent(component, callback);
   }
   addToggle(callback: (component: ToggleComponent) => unknown): this {
     const component = new ToggleComponent(this.controlEl);
     this.controlEl.append(component.inputEl);
-    callback(component);
-    return this;
+    return this.addComponent(component, callback);
   }
   addButton(callback: (component: ButtonComponent) => unknown): this {
-    callback(new ButtonComponent(this.controlEl));
-    return this;
+    return this.addComponent(new ButtonComponent(this.controlEl), callback);
   }
   addExtraButton(callback: (component: ExtraButtonComponent) => unknown): this {
-    callback(new ExtraButtonComponent(this.controlEl));
-    return this;
+    return this.addComponent(new ExtraButtonComponent(this.controlEl), callback);
   }
   addDropdown(callback: (component: DropdownComponent) => unknown): this {
     const component = new DropdownComponent(this.controlEl);
     this.controlEl.append(component.inputEl);
-    callback(component);
-    return this;
+    return this.addComponent(component, callback);
   }
   addSlider(callback: (component: SliderComponent) => unknown): this {
     const component = new SliderComponent(this.controlEl);
     this.controlEl.append(component.inputEl);
-    callback(component);
-    return this;
+    return this.addComponent(component, callback);
   }
   addColorPicker(callback: (component: ColorComponent) => unknown): this {
     const component = new ColorComponent(this.controlEl);
     this.controlEl.append(component.inputEl);
-    callback(component);
+    return this.addComponent(component, callback);
+  }
+}
+
+export class SettingGroup {
+  readonly listEl = element("div", "setting-group");
+  private readonly headingEl = element("h3", "setting-group-heading");
+  private readonly actionsEl = element("div", "setting-group-actions");
+  constructor(containerEl: HTMLElement) {
+    this.headingEl.hidden = true;
+    containerEl.append(this.headingEl, this.actionsEl, this.listEl);
+  }
+  setHeading(text: string | DocumentFragment): this {
+    this.headingEl.replaceChildren(text);
+    this.headingEl.hidden = false;
+    return this;
+  }
+  addClass(...classes: string[]): this {
+    this.listEl.classList.add(...classes);
+    return this;
+  }
+  addSetting(callback: (setting: Setting) => void): this {
+    callback(new Setting(this.listEl));
+    return this;
+  }
+  addSearch(callback: (component: SearchComponent) => unknown): this {
+    const container = element("div", "setting-group-search");
+    this.listEl.prepend(container);
+    callback(new SearchComponent(container));
+    return this;
+  }
+  addExtraButton(callback: (component: ExtraButtonComponent) => unknown): this {
+    callback(new ExtraButtonComponent(this.actionsEl));
     return this;
   }
 }
@@ -1844,10 +1917,13 @@ export function createObsidianApi(
     Notice,
     Modal,
     PluginSettingTab,
+    SettingPage,
     Setting,
+    SettingGroup,
     BaseComponent,
     ValueComponent,
     TextComponent,
+    SearchComponent,
     TextAreaComponent,
     ToggleComponent,
     ButtonComponent,
@@ -1894,7 +1970,9 @@ export function createObsidianApi(
     arrayBufferToHex,
     hexToArrayBuffer,
     getBlobArrayBuffer,
+    loadMermaid,
     requestUrl,
+    request: (input: RequestUrlParam | string): Promise<string> => requestUrl(input).text,
     parseYaml,
     stringifyYaml,
     getFrontMatterInfo,
@@ -1906,6 +1984,7 @@ export function createObsidianApi(
       throw new Error("PDF.js is not bundled in Basalt yet");
     },
     editorInfoField,
+    editorLivePreviewField,
     MarkdownRenderer: {
       render: async (
         _app: object,

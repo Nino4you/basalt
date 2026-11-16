@@ -16,6 +16,34 @@ function api(transport?: RequestUrl) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("requestUrl compatibility", () => {
+  it("exposes the legacy text-only request API through the same transport and error rules", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response("plain text"))
+      .mockResolvedValueOnce(new Response("missing", { status: 404 }))
+      .mockResolvedValueOnce(new Response("missing", { status: 404 }))
+      .mockRejectedValueOnce(new Error("offline"));
+    vi.stubGlobal("fetch", fetch);
+    const request = createObsidianApi({ app: {} }).request as (
+      input: RequestUrlParam | string,
+    ) => Promise<string>;
+    expect(request).toBeTypeOf("function");
+    await expect(request("https://example.test/data")).resolves.toBe("plain text");
+    await expect(request({ url: "https://example.test/missing" })).rejects.toThrow("404");
+    await expect(request({ url: "https://example.test/missing", throw: false })).resolves.toBe("missing");
+    await expect(request("https://example.test/data")).rejects.toThrow("offline");
+    expect(fetch).toHaveBeenCalledTimes(4);
+  });
+
+  it("routes legacy text requests through the injected native transport", async () => {
+    const run = vi.fn(async () => ({ status: 200, headers: {}, body: btoa("native text") }));
+    const request = createObsidianApi({ app: {}, requestUrl: nativeRequestUrl(run) }).request as (
+      input: RequestUrlParam | string,
+    ) => Promise<string>;
+    expect(request).toBeTypeOf("function");
+    await expect(request("https://example.test/data")).resolves.toBe("native text");
+    expect(run).toHaveBeenCalledOnce();
+  });
+
   it("accepts a URL string and shares one response across lazy body shortcuts", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>(
       async () =>
