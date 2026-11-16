@@ -1,0 +1,563 @@
+/*
+ * Tablet layout (body.is-tablet: touch screen wider than a phone).
+ *
+ * One floating language: the dock, the sidebar cards and the status bar
+ * are rounded panels with the same gap, radius and shadow over a calm page.
+ *
+ * - The ribbon becomes a floating dock of icons: new note, the views of the
+ *   left sidebar, the actions. It sits at the left edge, or as a pill at the
+ *   bottom with body.is-dock-bottom (Settings → Appearance).
+ * - Sidebars float over the note as cards (.is-left-sheet / .is-right-sheet)
+ *   without a backdrop, and follow the finger (src/app/sheet-gestures.ts).
+ *   Pinned, one docks beside the note while it keeps NOTE_MIN_WIDTH
+ *   (src/ui/device.ts).
+ * - Targets are sized for a finger.
+ */
+
+/* Desktop and phones never show the dock parts. */
+.side-dock-panels,
+.workspace-ribbon .rail-fab {
+  display: none;
+}
+
+body.is-tablet {
+  /* Room the left dock takes: 56 px plus a gap on either side (RAIL_WIDTH). */
+  --ribbon-width: 76px;
+  --header-height: 44px;
+  --font-ui-small: 14px;
+  --font-ui-smaller: 12.5px;
+  --card-gap: 10px;
+  --card-radius: 18px;
+  --card-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), 0 14px 40px rgba(0, 0, 0, 0.26);
+  --card-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+body.is-tablet.is-dock-bottom {
+  --ribbon-width: 0px;
+  --dock-height: 60px;
+  /* The dock rides above the formatting bar and the keyboard. */
+  --dock-bottom: calc(var(--safe-bottom) + 14px);
+}
+body.is-tablet.is-dock-bottom.is-editing {
+  --dock-bottom: calc(var(--keyboard-inset, 0px) + var(--safe-bottom) + 58px);
+}
+
+/* A calm page under the floating panels: one background, no chrome strips. */
+body.is-tablet .app-container,
+body.is-tablet .horizontal-main-container,
+body.is-tablet .workspace-tab-header-container.mod-root {
+  background: var(--background-primary);
+}
+body.is-tablet .workspace-tab-header-container.mod-root {
+  padding-left: 6px;
+}
+
+/* ── the dock ────────────────────────────────────────────────────────────── */
+
+/* The dock is the tablet's navigation; it cannot be hidden like the ribbon. */
+body.is-tablet.hide-ribbon .workspace-ribbon {
+  display: flex;
+}
+body.is-tablet.hide-ribbon .sidebar-toggle-button.mod-inline {
+  display: none;
+}
+body.is-tablet .workspace-ribbon {
+  position: relative;
+  z-index: 60;
+  width: 56px;
+  margin: var(--card-gap);
+  gap: 4px;
+  padding: 8px 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 20px;
+  background: var(--background-secondary);
+  box-shadow: var(--card-shadow);
+}
+/* The dock's view buttons open and close the left sidebar instead. */
+body.is-tablet .workspace-ribbon .sidebar-toggle-button.mod-left {
+  display: none;
+}
+body.is-tablet .workspace-ribbon .rail-fab {
+  display: inline-flex;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  margin-bottom: 4px;
+  border-radius: 13px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent, #fff);
+}
+body.is-tablet .workspace-ribbon .rail-fab:hover,
+body.is-tablet .workspace-ribbon .rail-fab:active {
+  background: var(--interactive-accent-hover, var(--interactive-accent));
+  color: var(--text-on-accent, #fff);
+}
+body.is-tablet .side-dock-panels {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--divider-color);
+}
+/* Views and actions look alike: an icon in a soft rounded square. */
+.rail-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+body.is-tablet .rail-item,
+body.is-tablet .workspace-ribbon .side-dock-actions > .clickable-icon,
+body.is-tablet .workspace-ribbon .side-dock-settings > .clickable-icon,
+body.is-tablet .basalt-plugin-ribbon {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border-radius: 13px;
+  color: var(--text-muted);
+  transition:
+    background-color 150ms var(--ease),
+    color 150ms var(--ease);
+}
+body.is-tablet .rail-item .svg-icon,
+body.is-tablet .workspace-ribbon .clickable-icon .svg-icon {
+  width: 21px;
+  height: 21px;
+}
+body.is-tablet .rail-item:hover,
+body.is-tablet .workspace-ribbon .side-dock-actions > .clickable-icon:hover,
+body.is-tablet .workspace-ribbon .side-dock-settings > .clickable-icon:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.rail-item.is-active,
+.rail-item.is-active:hover {
+  background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.2);
+  color: var(--text-accent);
+}
+body.is-tablet .side-dock-actions,
+body.is-tablet .side-dock-settings,
+body.is-tablet .side-dock-plugins {
+  gap: 4px;
+}
+body.is-tablet .side-dock-actions {
+  padding-top: 2px;
+}
+
+/* ── the dock at the bottom ──────────────────────────────────────────────── */
+
+body.is-tablet.is-dock-bottom .workspace-ribbon {
+  position: fixed;
+  left: 50%;
+  bottom: var(--dock-bottom);
+  flex-direction: row;
+  align-items: center;
+  width: auto;
+  max-width: calc(100vw - 2 * var(--card-gap));
+  height: var(--dock-height);
+  margin: 0;
+  padding: 0 9px;
+  border-radius: 999px;
+  transform: translateX(-50%);
+  transition: bottom 200ms var(--ease);
+}
+body.is-tablet.is-dock-bottom .side-dock-panels,
+body.is-tablet.is-dock-bottom .side-dock-actions,
+body.is-tablet.is-dock-bottom .side-dock-settings,
+body.is-tablet.is-dock-bottom .side-dock-plugins {
+  flex: none;
+  flex-direction: row;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+}
+body.is-tablet.is-dock-bottom .side-dock-panels {
+  padding: 0 6px 0 2px;
+  border-bottom: 0;
+  border-right: 1px solid var(--divider-color);
+}
+body.is-tablet.is-dock-bottom .side-dock-actions {
+  padding: 0 2px;
+}
+body.is-tablet.is-dock-bottom .side-dock-settings {
+  padding-left: 6px;
+  border-left: 1px solid var(--divider-color);
+}
+body.is-tablet.is-dock-bottom .workspace-ribbon .rail-fab {
+  margin: 0 4px 0 0;
+  border-radius: 999px;
+}
+body.is-tablet.is-dock-bottom .rail-item,
+body.is-tablet.is-dock-bottom .workspace-ribbon .clickable-icon {
+  border-radius: 999px;
+}
+/* Room under the note so its last lines can scroll above the dock. */
+body.is-tablet.is-dock-bottom .markdown-preview-view {
+  padding-bottom: calc(var(--dock-height) + 40px);
+}
+/* The dock takes the status bar's place. */
+body.is-tablet.is-dock-bottom .status-bar {
+  display: none;
+}
+
+/* ── sidebars: floating cards, or pinned beside the note ─────────────────── */
+
+/* Desktop and phones never show the card header. */
+.sheet-header.mod-left {
+  display: none;
+}
+.sheet-header.mod-right {
+  display: contents;
+}
+.sheet-controls {
+  display: none;
+}
+/* The rail selects the left views; their tab strip would only repeat it. */
+body.is-tablet .mod-left-split .workspace-split-inner > .mod-dock-header {
+  display: none;
+}
+body.is-tablet .sheet-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--header-height);
+  padding: 0 6px 0 16px;
+}
+body.is-tablet .sheet-header.mod-right {
+  padding-left: 0;
+}
+body.is-tablet .sheet-header.mod-right > .mod-dock-header {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-bottom: 0;
+}
+.sheet-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.is-tablet .sheet-controls {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+.sheet-pin.is-active {
+  color: var(--text-accent);
+}
+/* Docked sidebars need no close button: the rail or toggle closes them. */
+body.is-tablet
+  .workspace:not(.is-left-sheet)
+  .sheet-close[data-sheet-side="left"],
+body.is-tablet
+  .workspace:not(.is-right-sheet)
+  .sheet-close[data-sheet-side="right"] {
+  display: none;
+}
+body.is-tablet .workspace-left-bottom.is-empty,
+body.is-tablet .workspace-left-bottom.is-empty + .workspace-resize-handle {
+  display: none;
+}
+body.is-tablet .workspace {
+  position: relative;
+}
+body.is-tablet .workspace.is-left-sheet .mod-left-split,
+body.is-tablet .workspace.is-right-sheet .mod-right-split {
+  position: absolute;
+  top: var(--card-gap);
+  bottom: var(--card-gap);
+  z-index: 50;
+  width: min(360px, calc(100vw - var(--ribbon-width) - 64px)) !important;
+  border: 1px solid var(--background-modifier-border) !important;
+  border-radius: var(--card-radius);
+  background: color-mix(in srgb, var(--background-secondary) 96%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  box-shadow: none;
+  visibility: hidden;
+  transition:
+    transform 320ms var(--card-ease),
+    box-shadow 320ms var(--card-ease),
+    visibility 0s linear 320ms;
+  will-change: transform;
+}
+body.is-tablet .workspace.is-left-sheet .mod-left-split {
+  /* Beside the dock, which already keeps a gap; at the edge without it. */
+  left: max(var(--card-gap), var(--ribbon-width));
+  transform: translateX(
+    calc(-100% - var(--ribbon-width) - 2 * var(--card-gap))
+  );
+}
+body.is-tablet .workspace.is-right-sheet .mod-right-split {
+  right: var(--card-gap);
+  transform: translateX(calc(100% + 2 * var(--card-gap)));
+}
+body.is-tablet .workspace.is-left-sheet.is-left-open .mod-left-split,
+body.is-tablet .workspace.is-right-sheet.is-right-open .mod-right-split {
+  transform: none;
+  visibility: visible;
+  box-shadow: var(--card-shadow);
+  transition:
+    transform 320ms var(--card-ease),
+    box-shadow 320ms var(--card-ease);
+}
+/* The right card ends above the bottom dock. */
+body.is-tablet.is-dock-bottom .workspace.is-right-sheet .mod-right-split {
+  bottom: calc(var(--dock-height) + 14px + var(--card-gap));
+}
+/*
+ * With the dock at the bottom, the left card grows out of it: above the
+ * icon of its view (--card-left/--card-arrow, set by App.anchorLeftCard),
+ * with a pointer to that icon, rising from below. It is dragged down to
+ * close (sheet-gestures.ts).
+ */
+body.is-tablet.is-dock-bottom .workspace.is-left-sheet .mod-left-split {
+  top: auto;
+  left: var(--card-left, var(--card-gap));
+  bottom: calc(var(--dock-height) + 14px + 14px);
+  width: min(440px, calc(100vw - 2 * var(--card-gap))) !important;
+  height: min(70vh, 680px);
+  overflow: visible;
+  opacity: 0;
+  transform: translateY(28px) scale(0.94);
+  transform-origin: var(--card-arrow, 50%) 100%;
+  transition:
+    transform 300ms var(--card-ease),
+    opacity 180ms var(--ease),
+    box-shadow 300ms var(--card-ease),
+    visibility 0s linear 300ms;
+}
+body.is-tablet.is-dock-bottom
+  .workspace.is-left-sheet.is-left-open
+  .mod-left-split {
+  opacity: 1;
+  transform: none;
+  transition:
+    transform 300ms var(--card-ease),
+    opacity 120ms var(--ease),
+    box-shadow 300ms var(--card-ease);
+}
+/* The card clips its contents; the pointer below it stays outside. */
+body.is-tablet.is-dock-bottom
+  .workspace.is-left-sheet
+  .mod-left-split
+  .workspace-split-inner {
+  overflow: hidden;
+  border-radius: var(--card-radius);
+}
+body.is-tablet.is-dock-bottom .workspace.is-left-sheet .mod-left-split::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  left: calc(var(--card-arrow, 50%) - 8px);
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--background-modifier-border);
+  border-width: 0 1px 1px 0;
+  background: var(--background-secondary);
+  transform: rotate(45deg);
+}
+/* A grip on the header: drag the card down to put it back into the dock. */
+body.is-tablet.is-dock-bottom .mod-left-split .sheet-header.mod-left::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--background-modifier-border-hover, var(--text-faint));
+  opacity: 0.6;
+  transform: translateX(-50%);
+}
+body.is-tablet.is-dock-bottom .mod-left-split .sheet-header.mod-left {
+  position: relative;
+  padding-top: 8px;
+}
+/* Pinned sidebars are cards too, in the flow beside the note. */
+body.is-tablet .workspace.is-left-open:not(.is-left-sheet) .mod-left-split,
+body.is-tablet .workspace.is-right-open:not(.is-right-sheet) .mod-right-split {
+  margin: var(--card-gap) 0;
+  border: 1px solid var(--background-modifier-border) !important;
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+}
+body.is-tablet .workspace.is-right-open:not(.is-right-sheet) .mod-right-split {
+  margin-right: var(--card-gap);
+}
+body.is-tablet.is-dock-bottom
+  .workspace.is-left-open:not(.is-left-sheet)
+  .mod-left-split {
+  margin-left: var(--card-gap);
+}
+
+/* While a finger drags a card it follows without delay. */
+body.is-tablet .workspace .workspace-split.is-dragging {
+  visibility: visible !important;
+  transition: none !important;
+}
+body.is-tablet .workspace.is-left-sheet .workspace-split-inner,
+body.is-tablet .workspace.is-right-sheet .workspace-split-inner {
+  width: 100% !important;
+}
+/* Cards have a fixed width; only pinned sidebars can be resized. */
+body.is-tablet .workspace.is-left-sheet .workspace-resize-handle.mod-left,
+body.is-tablet .workspace.is-right-sheet .workspace-resize-handle.mod-right {
+  display: none;
+}
+/* A card's own contents sit on its translucent background. */
+body.is-tablet
+  .workspace.is-left-sheet
+  .mod-left-split
+  .workspace-sidedock-vault-profile,
+body.is-tablet
+  .workspace.is-right-sheet
+  .mod-right-split
+  .workspace-tab-header-container {
+  background: transparent;
+}
+
+/* ── touch sizes ─────────────────────────────────────────────────────────── */
+
+body.is-tablet .clickable-icon {
+  min-width: 40px;
+  min-height: 40px;
+}
+body.is-tablet .tree-item-self {
+  min-height: 40px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+body.is-tablet .workspace-tab-header.mod-dock {
+  width: 44px;
+}
+body.is-tablet .workspace-tab-header-inner-close-button {
+  width: 28px;
+  height: 28px;
+}
+body.is-tablet .workspace-resize-handle {
+  width: 16px;
+  margin: 0 -8px;
+}
+body.is-tablet .search-input {
+  height: 38px;
+}
+body.is-tablet .menu-item {
+  min-height: 40px;
+}
+
+/* ── focus mode (any layout) ─────────────────────────────────────────────── */
+
+.focus-mode-exit,
+.focus-mode-button {
+  display: none;
+}
+/* The header button is for touch screens; keyboards have the command. */
+body.is-touch:not(.is-mobile) .focus-mode-button {
+  display: inline-flex;
+}
+body.is-focus-mode .workspace-ribbon,
+body.is-focus-mode .workspace-split.mod-left-split,
+body.is-focus-mode .workspace-split.mod-right-split,
+body.is-focus-mode .workspace-split.mod-bottom-split,
+body.is-focus-mode .workspace-resize-handle,
+body.is-focus-mode .workspace-tab-header-container.mod-root,
+body.is-focus-mode .view-header,
+body.is-focus-mode .status-bar,
+body.is-focus-mode .mobile-navbar,
+body.is-focus-mode .workspace-group:not(.is-active),
+body.is-focus-mode .workspace-group-sash {
+  display: none !important;
+}
+body.is-focus-mode .focus-mode-exit {
+  position: fixed;
+  top: calc(var(--safe-top, 0px) + 10px);
+  right: 14px;
+  z-index: 70;
+  display: inline-flex;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 999px;
+  background: var(--background-secondary);
+  box-shadow: var(--shadow-s);
+  opacity: 0.55;
+  transition: opacity 150ms var(--ease);
+}
+body.is-focus-mode .focus-mode-exit:hover,
+body.is-focus-mode .focus-mode-exit:focus-visible {
+  opacity: 1;
+}
+
+/* ── dialogs ─────────────────────────────────────────────────────────────── */
+
+body.is-tablet .vertical-tab-nav-item {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+body.is-tablet .suggestion-item {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+body.is-tablet .modal .setting-item {
+  min-height: 56px;
+}
+
+/* ── system bars ─────────────────────────────────────────────────────────── */
+
+/*
+ * Android draws its navigation bar over the bottom of the WebView. Phones
+ * keep clear of it with their navigation bar; tablets would put the rail's
+ * settings, the vault switcher and the status bar under it, where taps go
+ * to the system. The formatting toolbar pads itself while editing.
+ */
+body.is-tablet:not(.is-editing) .app-container {
+  padding-bottom: max(var(--keyboard-inset, 0px), var(--safe-bottom));
+}
+/* The status bar floats like the rest: a small pill in the corner. */
+body.is-tablet .status-bar {
+  right: var(--card-gap);
+  bottom: calc(var(--safe-bottom) + var(--card-gap));
+  border-width: 1px;
+  border-radius: 999px;
+  padding: 2px 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+}
+
+/* ── reordering the dock (src/app/dock-reorder.ts) ───────────────────────── */
+
+/* The finger belongs to the dock: no scrolling, text selection or callout. */
+.workspace-ribbon {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.workspace-ribbon .is-reordering {
+  position: relative;
+  z-index: 2;
+  background: var(--background-modifier-hover) !important;
+  color: var(--text-normal) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+  scale: 1.12;
+  transition: scale 120ms var(--ease);
+  cursor: grabbing;
+}
+body.is-dock-reordering .workspace-ribbon {
+  cursor: grabbing;
+}

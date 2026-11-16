@@ -1699,26 +1699,7 @@ body.is-touch.is-editing .status-bar {
   }
 }
 
-/* Tablets keep the desktop layout, with targets sized for a finger. */
-body.is-tablet .clickable-icon {
-  min-width: 36px;
-  min-height: 36px;
-}
-body.is-tablet .workspace-ribbon .clickable-icon {
-  width: 40px;
-  height: 40px;
-}
-body.is-tablet .tree-item-self {
-  min-height: 34px;
-}
-body.is-tablet .workspace-tab-header-inner-close-button {
-  width: 26px;
-  height: 26px;
-}
-body.is-tablet .workspace-resize-handle {
-  width: 16px;
-  margin: 0 -8px;
-}
+/* Tablets: see tablet.css. */
 
 /* ── mobile ───────────────────────────────────────────────────────────────── */
 

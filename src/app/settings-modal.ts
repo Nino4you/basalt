@@ -1006,6 +1006,20 @@ export function openSettings(app: App, initial: TabId = lastTab): void {
       size.control.append(value, slider);
       vaultStyleSettings(app, content);
       heading(content, t("Oberfläche"));
+      dropdown(
+        row(
+          content,
+          t("Leiste auf dem Tablet"),
+          t("Wo die schwebende Leiste mit Ansichten und Aktionen auf Tablets sitzt."),
+        ),
+        t("Leiste auf dem Tablet"),
+        [
+          ["left", t("Links")],
+          ["bottom", t("Unten")],
+        ],
+        settings.get("tabletDock"),
+        set("tabletDock"),
+      );
       toggle(
         row(
           content,

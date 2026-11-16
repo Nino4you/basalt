@@ -11,7 +11,7 @@ Obsidian vaults and selected Obsidian plugins.
 
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-blue.svg)](LICENSE)
 ![Platforms: Linux | Android](https://img.shields.io/badge/Platforms-Linux%20%7C%20Android-informational)
-![Status: preview](https://img.shields.io/badge/Status-Preview%200.4-orange)
+![Status: preview](https://img.shields.io/badge/Status-Preview%200.5-orange)
 
 [Website](https://nino4you.github.io/basalt/) · [Live demo](https://nino4you.github.io/basalt/demo/) ·
 [Features](#features) · [Installation](#installation) · [Plugins](#plugins) ·
@@ -89,11 +89,18 @@ Obsidian vaults and selected Obsidian plugins.
 - Quick switcher (Ctrl+O), command palette (Ctrl+P), full keyboard navigation and hotkeys you
   can change in the settings.
 - Light and dark theme with an accent color, plus Obsidian-style themes and CSS snippets from
-  the vault (`Basalt/Config/themes`, `Basalt/Config/snippets`); a dedicated phone layout with
-  drawers, a bottom navigation bar and a formatting toolbar.
+  the vault (`Basalt/Config/themes`, `Basalt/Config/snippets`).
+- A dedicated phone layout with drawers, a bottom navigation bar and a formatting toolbar.
+- A tablet layout of its own: a floating dock of icons at the left edge or at the bottom
+  (Settings → Appearance), reordered by long-pressing and dragging an icon; sidebars float over the note as cards (no dimming, a tap beside
+  one closes it) that follow the finger when dragged, and can be pinned beside the note when
+  there is room; finger-sized targets and a focus mode that leaves only the note.
 
 <p align="center">
   <img src="screenshots/02-mobile-dark.png" width="300" alt="Basalt on a phone: reading view with bottom navigation bar" />
+</p>
+<p align="center">
+  <img src="screenshots/03-tablet-dark.png" width="640" alt="Basalt on a tablet in landscape: navigation rail, files beside the note and the outline" />
 </p>
 
 ## Installation
@@ -125,7 +132,7 @@ data in the browser, not in real files.
 
 ## Status
 
-Basalt is a **preview (0.4)** and not yet a complete replacement for Obsidian. The core is
+Basalt is a **preview (0.5)** and not yet a complete replacement for Obsidian. The core is
 stable and tested, but some things are still missing:
 
 - no built-in sync (use a folder sync tool, see [docs/sync.md](docs/sync.md)); the desktop app and
