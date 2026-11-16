@@ -1,0 +1,1 @@
+A tablet layout with a floating dock and cards, Bases (.base) as tables and cards, embeds of notes and sections in the editor, the note composer, sharing from other apps to Basalt and updates that install in the app.

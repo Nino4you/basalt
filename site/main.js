@@ -11,7 +11,7 @@ const de = {
   "nav.plugins": "Plugins",
   "nav.core": "Unter der Haube",
   "nav.download": "Download",
-  "hero.chip": "Vorschau 0.4 · Linux &amp; Android · Open Source",
+  "hero.chip": "Vorschau 0.5 · Linux &amp; Android · Open Source",
   "hero.title":
     'Ein ruhiger Ort für <span class="wikilink"><i>[[</i>vernetzte<i>]]</i></span> Gedanken.',
   "hero.lead":
@@ -124,7 +124,7 @@ const de = {
   "c.l4.text": "Dein Ordner mit Markdown-Dateien",
   "s.title": "Noch nicht ganz erkaltet",
   "s.text":
-    "Basalt ist eine Vorschau (0.4) und noch kein vollständiger Ersatz für Obsidian. Der Kern ist stabil und getestet, aber ein paar Dinge fehlen:",
+    "Basalt ist eine Vorschau (0.5) und noch kein vollständiger Ersatz für Obsidian. Der Kern ist stabil und getestet, aber ein paar Dinge fehlen:",
   "s.a": "keine eingebaute Synchronisation, Android-Updates noch per Download",
   "s.b": "Plugin-Unterstützung nur für ausgewählte Plugins",
   "s.c": "Sicherungen werden noch nicht automatisch aufgeräumt",
