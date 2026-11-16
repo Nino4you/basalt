@@ -1,4 +1,5 @@
 import { Component } from "./component";
+import { constructLegacy } from "./legacy-constructor";
 import type { Extension } from "@codemirror/state";
 import type { EditorExtensionRegistry } from "./editor-extensions";
 import type { PluginCommand, PluginServices } from "./plugin-services";
@@ -33,6 +34,13 @@ function validId(id: string): void {
 
 /** Host API shared by compiled plugins and explicitly enabled external bundles. */
 export class Plugin extends Component {
+  static call(receiver: Plugin, app: object, manifest: PluginManifest): Plugin {
+    return constructLegacy(this, receiver, [app, manifest]);
+  }
+  static apply(receiver: Plugin, args: ArrayLike<unknown>): Plugin {
+    return constructLegacy(this, receiver, args);
+  }
+
   private epoch = 0;
   constructor(
     readonly app: object,

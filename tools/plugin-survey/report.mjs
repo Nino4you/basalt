@@ -111,7 +111,7 @@ export function analyze(dir) {
       ? "not run"
       : !result.enabled
         ? "fails to load"
-        : causes.some((event) => event.cause.kind !== "network")
+        : causes.length > 0
           ? "loads with errors"
           : "loads cleanly";
     plugins.push({

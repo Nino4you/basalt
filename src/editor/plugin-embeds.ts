@@ -89,6 +89,7 @@ export const pluginEmbeds = StateField.define<DecorationSet>({
   create: build,
   update(decorations, tr) {
     return tr.docChanged ||
+      syntaxTree(tr.startState) !== syntaxTree(tr.state) ||
       tr.startState.facet(renderedFacet) !== tr.state.facet(renderedFacet) ||
       tr.effects.some((effect) => effect.is(refreshCodeBlocks))
       ? build(tr.state)
